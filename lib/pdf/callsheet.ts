@@ -1,5 +1,6 @@
 import { jsPDF } from 'jspdf';
 import { PDFContext, save } from './base';
+import { DEPARTMENTS } from '../departments';
 
 /* ── helpers ─────────────────────────────────────── */
 function bold(doc: jsPDF) { doc.setFont('helvetica', 'bold'); }
@@ -184,7 +185,6 @@ export async function generateCallSheet({ production, crew, locations, inventory
 
   /* ── CREW BY DEPARTMENT ── */
   y = maybeNewPage(doc, y);
-  const { DEPARTMENTS } = await import('../departments');
   const crewCols = (pageW - 20) / 2;
   const crewByDept = DEPARTMENTS.map((d: any) => ({
     ...d,
