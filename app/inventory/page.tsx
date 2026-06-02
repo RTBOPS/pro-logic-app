@@ -1,15 +1,15 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useData } from '@/hooks/useData';
 import { addDoc, updateDoc, deleteDoc, collection, doc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import Modal from '@/components/Modal';
 import {
   Plus, Pencil, Trash2, Search, Database, ExternalLink,
-  ChevronDown, ChevronUp, DollarSign, Zap, Weight,
+  ChevronDown, ChevronUp, Zap,
 } from 'lucide-react';
-import { EQUIPMENT_CATALOG, CATALOG_CATEGORIES, CATALOG_STATUSES, CATALOG_CONDITIONS, type CatalogItem } from '@/lib/equipment-catalog';
+import { loadEquipmentCatalog, CATALOG_CATEGORIES, CATALOG_STATUSES, CATALOG_CONDITIONS, type CatalogItem } from '@/lib/equipment-catalog';
 
 const STATUS_COLOR: Record<string, string> = {
   Available:    'bg-green-100 text-green-700',
@@ -46,6 +46,8 @@ type FormState = typeof emptyForm;
 
 export default function InventoryPage() {
   const { data: inventory, loading } = useData('inventory');
+  const [catalog, setCatalog] = useState<CatalogItem[]>([]);
+  const [catalogLoading, setCatalogLoading] = useState(false);
   const [modal, setModal] = useState<'create' | 'edit' | 'database' | 'detail' | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [editId, setEditId] = useState<string | null>(null);
@@ -62,6 +64,16 @@ export default function InventoryPage() {
   const [filterQuery, setFilterQuery] = useState('');
   const [filterCat, setFilterCat] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
+
+  const openDatabase = async () => {
+    if (catalog.length === 0) {
+      setCatalogLoading(true);
+      const data = await loadEquipmentCatalog();
+      setCatalog(data);
+      setCatalogLoading(false);
+    }
+    setModal('database');
+  };
 
   const openCreate = () => { setForm(emptyForm); setFormTab('basic'); setModal('create'); };
   const openEdit = (i: any) => {
@@ -113,7 +125,7 @@ export default function InventoryPage() {
   };
 
   const dbResults = useMemo(() => {
-    return EQUIPMENT_CATALOG.filter(item => {
+    return catalog.filter(item => {
       const q = dbQuery.toLowerCase();
       const matchQ = !q || item.name.toLowerCase().includes(q) ||
         item.brand.toLowerCase().includes(q) || item.model.toLowerCase().includes(q) ||
@@ -121,7 +133,7 @@ export default function InventoryPage() {
       const matchC = !dbCategory || item.category === dbCategory;
       return matchQ && matchC;
     });
-  }, [dbQuery, dbCategory]);
+  }, [catalog, dbQuery, dbCategory]);
 
   const toggleSelect = (id: string) => {
     const s = new Set(selectedItems);
@@ -138,7 +150,7 @@ export default function InventoryPage() {
   };
 
   const importSelected = async () => {
-    const toImport = EQUIPMENT_CATALOG.filter(i => selectedItems.has(i.item_id));
+    const toImport = catalog.filter(i => selectedItems.has(i.item_id));
     for (const item of toImport) {
       const { data_confidence, ...rest } = item as any;
       await addDoc(collection(db, 'inventory'), { ...rest, status: 'Available' });
@@ -192,14 +204,14 @@ export default function InventoryPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Inventory</h1>
-          <p className="text-gray-500 text-sm mt-1">{inventory.length} items · {EQUIPMENT_CATALOG.length}-item standard catalog available</p>
+          <p className="text-gray-500 text-sm mt-1">{inventory.length} items · 90-item standard catalog available</p>
         </div>
         <div className="flex gap-2">
           <button
-            onClick={() => setModal('database')}
+            onClick={openDatabase}
             className="flex items-center gap-2 border border-gray-200 text-gray-700 px-4 py-2 rounded-xl text-sm hover:bg-gray-50"
           >
-            <Database size={15} /> Browse Catalog
+            <Database size={15} /> {catalogLoading ? 'Loading…' : 'Browse Catalog'}
           </button>
           <button
             onClick={openCreate}
@@ -303,7 +315,7 @@ export default function InventoryPage() {
             <div className="flex items-center justify-between px-6 py-4 border-b shrink-0">
               <div>
                 <h2 className="font-semibold text-lg">Production Equipment Catalog</h2>
-                <p className="text-xs text-gray-400 mt-0.5">{EQUIPMENT_CATALOG.length} industry-standard items · select to add to your inventory</p>
+                <p className="text-xs text-gray-400 mt-0.5">{catalog.length} industry-standard items · select to add to your inventory</p>
               </div>
               <div className="flex items-center gap-2">
                 {selectedItems.size > 0 && (
