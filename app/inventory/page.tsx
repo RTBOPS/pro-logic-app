@@ -1,13 +1,14 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { useData } from '@/hooks/useData';
 import { addDoc, updateDoc, deleteDoc, collection, doc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db, storage } from '@/lib/firebase';
 import Modal from '@/components/Modal';
 import {
   Plus, Pencil, Trash2, Search, Database, ExternalLink,
-  ChevronDown, ChevronUp, Zap,
+  ChevronDown, ChevronUp, Zap, Upload, ClipboardCheck, X,
 } from 'lucide-react';
 import { loadEquipmentCatalog, CATALOG_CATEGORIES, CATALOG_STATUSES, CATALOG_CONDITIONS, type CatalogItem } from '@/lib/equipment-catalog';
 
@@ -19,6 +20,17 @@ const STATUS_COLOR: Record<string, string> = {
   Lost:         'bg-red-100 text-red-600',
   Retired:      'bg-gray-100 text-gray-500',
 };
+
+const STATUS_ROW_BG: Record<string, string> = {
+  Available:    '',
+  Reserved:     'bg-blue-50/50',
+  'Checked Out':'bg-purple-50/60',
+  'In Repair':  'bg-yellow-50/60',
+  Lost:         'bg-red-50/60',
+  Retired:      'bg-gray-100/80 opacity-70',
+};
+
+const UNAVAILABLE = new Set(['Reserved', 'Checked Out', 'In Repair', 'Lost', 'Retired']);
 
 const CONDITION_COLOR: Record<string, string> = {
   Excellent:      'text-green-600',
@@ -40,9 +52,21 @@ const emptyForm = {
   insurance_required: false, maintenance_cycle_days: '',
   last_service_date: '', next_service_due: '', purchase_date: '',
   source_url: '', notes: '',
+  images: [] as string[],
 };
 
 type FormState = typeof emptyForm;
+
+const emptyInspection = {
+  item_id: '', item_name: '',
+  rental_company: '', rental_contact: '', rental_contact_phone: '',
+  rental_start: '', rental_end: '',
+  pre_condition: 'Good', pre_notes: '', pre_images: [] as string[],
+  post_condition: 'Good', post_notes: '', post_images: [] as string[],
+  damage_claim: false, claim_notes: '', claim_amount: '',
+  inspector_name: '', inspector_signature: '',
+};
+type InspectionState = typeof emptyInspection;
 
 export default function InventoryPage() {
   const { data: inventory, loading } = useData('inventory');
@@ -65,6 +89,18 @@ export default function InventoryPage() {
   const [filterCat, setFilterCat] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
 
+  // Image upload
+  const imgRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState('');
+
+  // Rental inspection
+  const [inspection, setInspection] = useState<InspectionState>(emptyInspection);
+  const [inspectionPhase, setInspectionPhase] = useState<'pre' | 'post'>('pre');
+  const preImgRef = useRef<HTMLInputElement>(null);
+  const postImgRef = useRef<HTMLInputElement>(null);
+  const [inspUploading, setInspUploading] = useState(false);
+
   const openDatabase = async () => {
     if (catalog.length === 0) {
       setCatalogLoading(true);
@@ -73,6 +109,46 @@ export default function InventoryPage() {
       setCatalogLoading(false);
     }
     setModal('database');
+  };
+
+  const handleImageUpload = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+    target: 'form' | 'pre' | 'post'
+  ) => {
+    const files = e.target.files;
+    if (!files?.length) return;
+    target === 'form' ? setUploading(true) : setInspUploading(true);
+    setUploadError('');
+    try {
+      const urls: string[] = [];
+      for (const file of Array.from(files)) {
+        const path = `inventory/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+        const snap = await uploadBytes(storageRef(storage, path), file);
+        urls.push(await getDownloadURL(snap.ref));
+      }
+      if (target === 'form') setForm(f => ({ ...f, images: [...f.images, ...urls] }));
+      else if (target === 'pre') setInspection(i => ({ ...i, pre_images: [...i.pre_images, ...urls] }));
+      else setInspection(i => ({ ...i, post_images: [...i.post_images, ...urls] }));
+    } catch (err: any) {
+      setUploadError(err.message || 'Upload failed');
+    } finally {
+      target === 'form' ? setUploading(false) : setInspUploading(false);
+    }
+  };
+
+  const openInspection = (item: any) => {
+    setInspection({ ...emptyInspection, item_id: item.item_id || item.id, item_name: item.name });
+    setInspectionPhase('pre');
+    setModal('inspection' as any);
+  };
+
+  const saveInspection = async () => {
+    await addDoc(collection(db, 'equipment_inspections'), { ...inspection, created_at: new Date().toISOString() });
+    if (inspection.damage_claim) {
+      const itemDoc = inventory.find((i: any) => i.id === editId || i.item_id === inspection.item_id);
+      if (itemDoc) await updateDoc(doc(db, 'inventory', itemDoc.id), { status: 'In Repair', notes: `Damage claim: ${inspection.claim_notes}` });
+    }
+    close();
   };
 
   const openCreate = () => { setForm(emptyForm); setFormTab('basic'); setModal('create'); };
@@ -93,6 +169,7 @@ export default function InventoryPage() {
       maintenance_cycle_days: i.maintenance_cycle_days ?? '',
       last_service_date: i.last_service_date || '', next_service_due: i.next_service_due || '',
       purchase_date: i.purchase_date || '', source_url: i.source_url || '', notes: i.notes || '',
+      images: i.images || [],
     });
     setEditId(i.id);
     setFormTab('basic');
@@ -269,7 +346,9 @@ export default function InventoryPage() {
             </thead>
             <tbody className="divide-y divide-gray-50">
               {filteredInventory.map((i: any) => (
-                <tr key={i.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => { setDetailItem(i); setModal('detail'); }}>
+                <tr key={i.id}
+                  className={`hover:brightness-95 cursor-pointer transition-colors ${STATUS_ROW_BG[i.status] || ''}`}
+                  onClick={() => { setDetailItem(i); setModal('detail'); }}>
                   <td className="px-5 py-3">
                     <div className="font-medium text-gray-900">{i.name}</div>
                     {i.serial_number && <div className="text-xs text-gray-400">S/N: {i.serial_number}</div>}
@@ -297,6 +376,7 @@ export default function InventoryPage() {
                   </td>
                   <td className="px-5 py-3" onClick={e => e.stopPropagation()}>
                     <div className="flex items-center gap-1.5 justify-end">
+                      <button onClick={() => openInspection(i)} title="Rental inspection" className="text-gray-400 hover:text-blue-600"><ClipboardCheck size={14} /></button>
                       <button onClick={() => openEdit(i)} className="text-gray-400 hover:text-gray-700"><Pencil size={14} /></button>
                       <button onClick={() => remove(i.id)} className="text-gray-400 hover:text-red-600"><Trash2 size={14} /></button>
                     </div>
@@ -483,6 +563,158 @@ export default function InventoryPage() {
         </Modal>
       )}
 
+      {/* ── Rental Inspection Modal ── */}
+      {(modal as any) === 'inspection' && (
+        <Modal title={`Rental Inspection — ${inspection.item_name}`} onClose={close}>
+          <div className="flex gap-0 border-b mb-4 -mx-1">
+            {(['pre', 'post'] as const).map(p => (
+              <button key={p} onClick={() => setInspectionPhase(p)}
+                className={`px-4 py-2 text-sm border-b-2 transition-colors ${inspectionPhase === p ? 'border-black text-black font-medium' : 'border-transparent text-gray-400'}`}>
+                {p === 'pre' ? 'Pre-Rental Inspection' : 'Post-Rental Inspection'}
+              </button>
+            ))}
+          </div>
+          <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
+            {inspectionPhase === 'pre' && (
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Rental Company</label>
+                    <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none"
+                      value={inspection.rental_company} onChange={e => setInspection(i => ({ ...i, rental_company: e.target.value }))} />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Contact Name</label>
+                    <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none"
+                      value={inspection.rental_contact} onChange={e => setInspection(i => ({ ...i, rental_contact: e.target.value }))} />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Rental Start</label>
+                    <input type="date" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none"
+                      value={inspection.rental_start} onChange={e => setInspection(i => ({ ...i, rental_start: e.target.value }))} />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Rental End</label>
+                    <input type="date" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none"
+                      value={inspection.rental_end} onChange={e => setInspection(i => ({ ...i, rental_end: e.target.value }))} />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Pre-rental Condition</label>
+                  <select className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none"
+                    value={inspection.pre_condition} onChange={e => setInspection(i => ({ ...i, pre_condition: e.target.value }))}>
+                    {CATALOG_CONDITIONS.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Pre-rental Notes</label>
+                  <textarea className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none resize-none" rows={2}
+                    placeholder="Existing scratches, missing parts, accessories included…"
+                    value={inspection.pre_notes} onChange={e => setInspection(i => ({ ...i, pre_notes: e.target.value }))} />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-2">Pre-rental Photos</label>
+                  <input ref={preImgRef} type="file" accept="image/*" multiple className="hidden"
+                    onChange={e => handleImageUpload(e, 'pre')} />
+                  <button type="button" onClick={() => preImgRef.current?.click()} disabled={inspUploading}
+                    className="flex items-center gap-2 border border-dashed border-gray-300 rounded-lg px-4 py-2 text-sm text-gray-500 hover:bg-gray-50 w-full justify-center">
+                    <Upload size={13} /> {inspUploading ? 'Uploading…' : 'Upload photos'}
+                  </button>
+                  {inspection.pre_images.length > 0 && (
+                    <div className="flex gap-2 mt-2 flex-wrap">
+                      {inspection.pre_images.map(url => (
+                        <div key={url} className="relative">
+                          <img src={url} className="w-16 h-16 rounded-lg object-cover" alt="" />
+                          <button onClick={() => setInspection(i => ({ ...i, pre_images: i.pre_images.filter(u => u !== url) }))}
+                            className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center"><X size={9} /></button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Inspector Name</label>
+                  <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none"
+                    value={inspection.inspector_name} onChange={e => setInspection(i => ({ ...i, inspector_name: e.target.value }))} />
+                </div>
+                <button onClick={() => setInspectionPhase('post')}
+                  className="w-full bg-blue-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-blue-700">
+                  Continue to Post-Rental →
+                </button>
+              </>
+            )}
+
+            {inspectionPhase === 'post' && (
+              <>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Post-rental Condition</label>
+                  <select className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none"
+                    value={inspection.post_condition} onChange={e => setInspection(i => ({ ...i, post_condition: e.target.value }))}>
+                    {CATALOG_CONDITIONS.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Post-rental Notes</label>
+                  <textarea className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none resize-none" rows={2}
+                    placeholder="Describe any new damage, missing items, issues found…"
+                    value={inspection.post_notes} onChange={e => setInspection(i => ({ ...i, post_notes: e.target.value }))} />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-2">Post-rental Photos</label>
+                  <input ref={postImgRef} type="file" accept="image/*" multiple className="hidden"
+                    onChange={e => handleImageUpload(e, 'post')} />
+                  <button type="button" onClick={() => postImgRef.current?.click()} disabled={inspUploading}
+                    className="flex items-center gap-2 border border-dashed border-gray-300 rounded-lg px-4 py-2 text-sm text-gray-500 hover:bg-gray-50 w-full justify-center">
+                    <Upload size={13} /> {inspUploading ? 'Uploading…' : 'Upload photos'}
+                  </button>
+                  {inspection.post_images.length > 0 && (
+                    <div className="flex gap-2 mt-2 flex-wrap">
+                      {inspection.post_images.map(url => (
+                        <div key={url} className="relative">
+                          <img src={url} className="w-16 h-16 rounded-lg object-cover" alt="" />
+                          <button onClick={() => setInspection(i => ({ ...i, post_images: i.post_images.filter(u => u !== url) }))}
+                            className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center"><X size={9} /></button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div className="border border-red-100 bg-red-50 rounded-xl p-3 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <input type="checkbox" id="claim" checked={inspection.damage_claim}
+                      onChange={e => setInspection(i => ({ ...i, damage_claim: e.target.checked }))} className="rounded" />
+                    <label htmlFor="claim" className="text-sm font-medium text-red-700">File damage claim</label>
+                  </div>
+                  {inspection.damage_claim && (
+                    <>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Claim notes</label>
+                        <textarea className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none resize-none" rows={2}
+                          value={inspection.claim_notes} onChange={e => setInspection(i => ({ ...i, claim_notes: e.target.value }))} />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Estimated claim amount (USD)</label>
+                        <input type="number" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none"
+                          value={inspection.claim_amount} onChange={e => setInspection(i => ({ ...i, claim_amount: e.target.value }))} />
+                      </div>
+                    </>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+          <div className="flex gap-3 pt-4 border-t mt-4">
+            <button onClick={saveInspection}
+              className="flex-1 bg-black text-white py-2 rounded-lg text-sm font-medium hover:bg-zinc-800">
+              Save Inspection Report
+            </button>
+            <button onClick={close} className="px-4 py-2 text-sm text-gray-500">Cancel</button>
+          </div>
+        </Modal>
+      )}
+
       {/* ── Create / Edit Modal ── */}
       {(modal === 'create' || modal === 'edit') && (
         <Modal title={modal === 'create' ? 'Add Equipment' : 'Edit Equipment'} onClose={close}>
@@ -527,6 +759,30 @@ export default function InventoryPage() {
                     value={form.production_use}
                     onChange={e => setForm({ ...form, production_use: e.target.value })}
                     placeholder="When / how this item is used" />
+                </div>
+                {/* Images */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-2">Photos</label>
+                  <input ref={imgRef} type="file" accept="image/*" multiple className="hidden"
+                    onChange={e => handleImageUpload(e, 'form')} />
+                  <button type="button" onClick={() => imgRef.current?.click()} disabled={uploading}
+                    className="flex items-center gap-2 border border-dashed border-gray-300 rounded-lg px-4 py-2 text-sm text-gray-500 hover:bg-gray-50 w-full justify-center disabled:opacity-50">
+                    <Upload size={13} /> {uploading ? 'Uploading…' : 'Upload photos'}
+                  </button>
+                  {uploadError && <p className="text-xs text-red-500 mt-1">{uploadError}</p>}
+                  {form.images.length > 0 && (
+                    <div className="flex gap-2 mt-2 flex-wrap">
+                      {form.images.map(url => (
+                        <div key={url} className="relative">
+                          <img src={url} className="w-16 h-16 rounded-lg object-cover" alt="" />
+                          <button onClick={() => setForm(f => ({ ...f, images: f.images.filter(u => u !== url) }))}
+                            className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center">
+                            <X size={9} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </>
             )}

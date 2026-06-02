@@ -6,12 +6,15 @@ import { addDoc, updateDoc, deleteDoc, collection, doc } from 'firebase/firestor
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '@/lib/firebase';
 import Modal from '@/components/Modal';
-import { Plus, Pencil, Trash2, Search, Mail, Phone, Upload, Users, Filter, Merge } from 'lucide-react';
+import { Plus, Pencil, Trash2, Search, Mail, Phone, Upload, Users, Merge, BookUser } from 'lucide-react';
 import { DEPARTMENTS, deptColor, deptLabel } from '@/lib/departments';
 
 const DEFAULT_PICTURE = 'https://img.freepik.com/free-photo/portrait-white-man-isolated_53876-40306.jpg';
 
 const UNION_STATUSES = ['Non-Union', 'Union', 'SAG-AFTRA', 'IATSE', 'Teamsters', 'Other'];
+const GENDERS = ['Male', 'Female', 'Non-binary', 'Prefer not to say', 'Other'];
+const SHIRT_SIZES = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL'];
+const SHOE_SIZES_US = ['5', '5.5', '6', '6.5', '7', '7.5', '8', '8.5', '9', '9.5', '10', '10.5', '11', '11.5', '12', '12.5', '13', '14', '15'];
 
 const ROLES_BY_DEPT: Record<string, string[]> = {
   production: ['Executive Producer', 'Producer', 'Line Producer', 'Production Manager', 'Production Coordinator', 'Production Assistant', 'Unit Production Manager', 'Post Production Supervisor'],
@@ -406,6 +409,28 @@ export default function CrewPage() {
                   {slct('Union Status', 'union_status', UNION_STATUSES)}
                   {slct('Status', 'status', AVAILABILITY_STATUSES)}
                 </div>
+                <div className="flex justify-end">
+                  <button type="button"
+                    onClick={async () => {
+                      if (!('contacts' in navigator)) { alert('Contact Picker not supported. Use Chrome on Android or Safari iOS 15.4+.'); return; }
+                      try {
+                        const contacts = await (navigator as any).contacts.select(['name','email','tel'], { multiple: false });
+                        if (contacts[0]) {
+                          const c = contacts[0];
+                          setForm(f => ({
+                            ...f,
+                            name: c.name?.[0]?.split(' ')[0] || f.name,
+                            last_name: c.name?.[0]?.split(' ').slice(1).join(' ') || f.last_name,
+                            phone: c.tel?.[0] || f.phone,
+                            email: c.email?.[0] || f.email,
+                          }));
+                        }
+                      } catch {}
+                    }}
+                    className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 border border-blue-200 rounded-lg px-2 py-1 mb-1">
+                    <BookUser size={11} /> Import from Contacts
+                  </button>
+                </div>
                 <div className="grid grid-cols-2 gap-3">
                   {fld('Phone', 'phone', '+1 555…', 'tel')}
                   {fld('Email', 'email', 'crew@email.com', 'email')}
@@ -430,11 +455,11 @@ export default function CrewPage() {
               <>
                 <div className="grid grid-cols-2 gap-3">
                   {fld('Date of birth', 'dob', '', 'date')}
-                  {fld('Gender', 'gender', 'Male / Female / Non-binary…')}
+                  {slct('Gender', 'gender', GENDERS)}
                 </div>
                 <div className="grid grid-cols-2 gap-3">
-                  {fld('Shirt size', 'shirt_size', 'S / M / L / XL')}
-                  {fld('Shoe size', 'shoe_size', '10 / 42')}
+                  {slct('Shirt size', 'shirt_size', SHIRT_SIZES)}
+                  {slct('Shoe size (US)', 'shoe_size', SHOE_SIZES_US)}
                 </div>
                 {fld('Dietary restrictions', 'dietary_restrictions', 'Vegetarian, Gluten-free…')}
                 {fld('Allergies', 'allergies', 'Peanuts, Shellfish…')}
