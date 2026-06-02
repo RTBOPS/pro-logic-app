@@ -1,7 +1,7 @@
 import { jsPDF } from 'jspdf';
 import { PDFContext, header, sectionTitle, save } from './base';
 
-export async function generateCharacterBreakdown({ production, crew }: PDFContext) {
+export async function generateCharacterBreakdown({ production, crew, preview }: PDFContext) {
   const doc = new jsPDF({ unit: 'mm', format: 'letter' });
   const pageW = doc.internal.pageSize.getWidth();
 
@@ -83,5 +83,5 @@ export async function generateCharacterBreakdown({ production, crew }: PDFContex
     y += 6;
   });
 
-  save(doc, `character-breakdown-${production.name.replace(/\s+/g, '-').toLowerCase()}.pdf`);
+  return save(doc, `character-breakdown-${production.name.replace(/\s+/g, '-').toLowerCase()}.pdf`, preview);
 }

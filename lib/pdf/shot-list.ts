@@ -1,7 +1,7 @@
 import { jsPDF } from 'jspdf';
 import { PDFContext, header, sectionTitle, tableRow, save } from './base';
 
-export async function generateShotList({ production, crew, locations }: PDFContext) {
+export async function generateShotList({ production, crew, locations, preview }: PDFContext) {
   const doc = new jsPDF({ unit: 'mm', format: 'letter', orientation: 'l' });
   const pageW = doc.internal.pageSize.getWidth();
 
@@ -49,5 +49,5 @@ export async function generateShotList({ production, crew, locations }: PDFConte
     if (y > 185) { doc.addPage(); y = 20; }
   }
 
-  save(doc, `shot-list-${production.name.replace(/\s+/g, '-').toLowerCase()}.pdf`);
+  return save(doc, `shot-list-${production.name.replace(/\s+/g, '-').toLowerCase()}.pdf`, preview);
 }

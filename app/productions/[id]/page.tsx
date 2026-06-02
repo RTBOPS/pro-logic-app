@@ -11,7 +11,7 @@ import {
   Search, Filter, Plus
 } from 'lucide-react';
 import { DEPARTMENTS, deptColor, deptLabel, statusStyle } from '@/lib/departments';
-import { sendConfirmationEmail } from '@/lib/notifications';
+import { sendConfirmationEmail, sendSMS } from '@/lib/notifications';
 
 const STATUSES = ['new', 'active', 'completed', 'cancelled'];
 const STATUS_COLOR: Record<string, string> = {
@@ -172,6 +172,20 @@ export default function ProductionDetail({ params }: { params: { id: string } })
   const sendAllPending = async () => {
     for (const m of assignedCrew.filter(c => c.confirmation_status === 'pending' && c.email))
       await sendConfirmation(m);
+  };
+
+  const sendSMSToMember = async (member: any) => {
+    if (!member.phone) { alert('No phone number for this crew member.'); return; }
+    setSending(member.id + '-sms');
+    const location = locations.find((l: any) => l.id === production?.location_id);
+    const ok = await sendSMS({
+      to: member.phone, crewName: member.name, role: member.role || '',
+      productionName: production?.name, client: production?.client,
+      location: location?.name,
+      shootDates: production?.start_date ? `${production.start_date} → ${production.end_date || ''}` : undefined,
+    });
+    if (!ok) alert('SMS failed — check Twilio credentials in environment variables.');
+    setSending(null);
   };
 
   if (loading) return <div className="p-8 text-gray-400 text-sm">Loading…</div>;
@@ -389,7 +403,11 @@ export default function ProductionDetail({ params }: { params: { id: string } })
                             <Mail size={12} />
                           </button>
                         )}
-                        {c.phone && <a href={`tel:${c.phone}`} className="p-1.5 text-gray-400 hover:text-green-600" title={c.phone}>📱</a>}
+                        {c.phone && (
+                          <button onClick={() => sendSMSToMember(c)} disabled={sending === c.id + '-sms'} title="Send SMS notification" className="p-1.5 text-gray-400 hover:text-green-600 disabled:opacity-50">
+                            💬
+                          </button>
+                        )}
                         <button onClick={() => removeCrew(c.id)} className="p-1.5 text-gray-400 hover:text-red-500"><X size={12} /></button>
                       </div>
                     </div>

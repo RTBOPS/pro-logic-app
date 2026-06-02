@@ -1,7 +1,7 @@
 import { jsPDF } from 'jspdf';
 import { PDFContext, header, save } from './base';
 
-export async function generateNDA({ production }: PDFContext) {
+export async function generateNDA({ production, preview }: PDFContext) {
   const doc = new jsPDF({ unit: 'mm', format: 'letter' });
   const pageW = doc.internal.pageSize.getWidth();
   const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
@@ -78,5 +78,5 @@ export async function generateNDA({ production }: PDFContext) {
   doc.text('Title / Role', 15, y);
   doc.text('Title / Role', 15 + sigW + 10, y);
 
-  save(doc, `nda-${production.name.replace(/\s+/g, '-').toLowerCase()}.pdf`);
+  return save(doc, `nda-${production.name.replace(/\s+/g, '-').toLowerCase()}.pdf`, preview);
 }

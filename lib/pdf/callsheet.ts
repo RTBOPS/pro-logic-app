@@ -1,7 +1,7 @@
 import { jsPDF } from 'jspdf';
 import { PDFContext, header, sectionTitle, tableRow, save } from './base';
 
-export async function generateCallSheet({ production, crew, locations, inventory }: PDFContext) {
+export async function generateCallSheet({ production, crew, locations, inventory, preview }: PDFContext) {
   const doc = new jsPDF({ unit: 'mm', format: 'letter' });
   const pageW = doc.internal.pageSize.getWidth();
   const today = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
@@ -90,5 +90,5 @@ export async function generateCallSheet({ production, crew, locations, inventory
     if (y > 240) { doc.addPage(); y = 20; }
   });
 
-  save(doc, `call-sheet-${production.name.replace(/\s+/g, '-').toLowerCase()}.pdf`);
+  return save(doc, `call-sheet-${production.name.replace(/\s+/g, '-').toLowerCase()}.pdf`, preview);
 }

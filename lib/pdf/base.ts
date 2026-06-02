@@ -5,6 +5,7 @@ export type PDFContext = {
   crew: any[];
   locations: any[];
   inventory: any[];
+  preview?: boolean;
 };
 
 export function createDoc(orientation: 'p' | 'l' = 'p'): jsPDF {
@@ -87,7 +88,8 @@ export function tableRow(
   return y + 6;
 }
 
-export function save(doc: jsPDF, filename: string) {
+export function save(doc: jsPDF, filename: string, preview = false): string | void {
   footer(doc);
+  if (preview) return doc.output('datauristring');
   doc.save(filename);
 }

@@ -46,7 +46,7 @@ export default function BlueprintPage() {
   return (
     <div className="p-6 h-screen flex flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between mb-4 shrink-0">
+      <div className="flex items-center justify-between mb-4 shrink-0 no-print">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Location Blueprint</h1>
           <p className="text-gray-500 text-sm mt-0.5">Design your set layout and equipment placement</p>
@@ -87,12 +87,12 @@ export default function BlueprintPage() {
       ) : (
         <div className="flex-1 flex gap-4 overflow-hidden min-h-0">
           {/* Canvas */}
-          <div className="flex-1 overflow-hidden">
+          <div className="flex-1 overflow-hidden blueprint-canvas-wrap">
             <BlueprintCanvas items={items} onChange={setItems} productionId={selectedProduction} />
           </div>
 
           {/* Right panel: equipment + crew list */}
-          <div className="w-64 shrink-0 flex flex-col gap-4 overflow-y-auto">
+          <div className="w-64 shrink-0 flex flex-col gap-4 overflow-y-auto no-print">
             {/* Production info */}
             <div className="bg-zinc-900 text-white rounded-xl p-4">
               <div className="font-bold">{production?.name}</div>
@@ -157,8 +157,11 @@ export default function BlueprintPage() {
 
       <style>{`
         @media print {
-          body > * { display: none; }
-          .p-6 { display: block !important; padding: 0; }
+          body > div > aside,
+          body > div > div > div:first-child,
+          .no-print { display: none !important; }
+          body, html { height: auto !important; overflow: visible !important; }
+          .blueprint-canvas-wrap { width: 100vw !important; height: 100vh !important; }
         }
       `}</style>
     </div>

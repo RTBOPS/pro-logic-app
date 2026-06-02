@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useData } from '@/hooks/useData';
 import {
   FileText, Users, MapPin, Film, Shield, UserCheck,
-  ClipboardList, BookImage, Printer
+  ClipboardList, Printer, Eye, Download, X
 } from 'lucide-react';
 import { generateCallSheet } from '@/lib/pdf/callsheet';
 import { generateNDA } from '@/lib/pdf/nda';
@@ -15,62 +15,13 @@ import { generateStripboard } from '@/lib/pdf/stripboard';
 import { generateCharacterBreakdown } from '@/lib/pdf/character-breakdown';
 
 const DOCS = [
-  {
-    id: 'call-sheet',
-    title: 'Call Sheet',
-    desc: 'Daily production schedule for cast & crew',
-    icon: ClipboardList,
-    color: 'bg-blue-50 text-blue-600',
-    generate: generateCallSheet,
-  },
-  {
-    id: 'stripboard',
-    title: 'Stripboard',
-    desc: 'Professional scene scheduling board',
-    icon: Film,
-    color: 'bg-purple-50 text-purple-600',
-    generate: generateStripboard,
-  },
-  {
-    id: 'shot-list',
-    title: 'Shot List',
-    desc: 'Detailed list of all planned shots',
-    icon: FileText,
-    color: 'bg-green-50 text-green-600',
-    generate: generateShotList,
-  },
-  {
-    id: 'nda',
-    title: 'Non-Disclosure Agreement',
-    desc: 'NDA pre-filled with production data',
-    icon: Shield,
-    color: 'bg-red-50 text-red-600',
-    generate: generateNDA,
-  },
-  {
-    id: 'character-breakdown',
-    title: 'Character Breakdown',
-    desc: 'Character profiles for casting & production',
-    icon: UserCheck,
-    color: 'bg-orange-50 text-orange-600',
-    generate: generateCharacterBreakdown,
-  },
-  {
-    id: 'location-release',
-    title: 'Location Release Agreement',
-    desc: 'Permission to film at a location',
-    icon: MapPin,
-    color: 'bg-teal-50 text-teal-600',
-    generate: generateLocationRelease,
-  },
-  {
-    id: 'crew-deal',
-    title: 'Crew Deal Memo & Contract',
-    desc: 'Standard crew deal memo with payment terms',
-    icon: Users,
-    color: 'bg-indigo-50 text-indigo-600',
-    generate: generateCrewDeal,
-  },
+  { id: 'call-sheet', title: 'Call Sheet', desc: 'Daily production schedule for cast & crew', icon: ClipboardList, color: 'bg-blue-50 text-blue-600', generate: generateCallSheet },
+  { id: 'stripboard', title: 'Stripboard', desc: 'Professional scene scheduling board', icon: Film, color: 'bg-purple-50 text-purple-600', generate: generateStripboard },
+  { id: 'shot-list', title: 'Shot List', desc: 'Detailed list of all planned shots', icon: FileText, color: 'bg-green-50 text-green-600', generate: generateShotList },
+  { id: 'nda', title: 'Non-Disclosure Agreement', desc: 'NDA pre-filled with production data', icon: Shield, color: 'bg-red-50 text-red-600', generate: generateNDA },
+  { id: 'character-breakdown', title: 'Character Breakdown', desc: 'Character profiles for casting & production', icon: UserCheck, color: 'bg-orange-50 text-orange-600', generate: generateCharacterBreakdown },
+  { id: 'location-release', title: 'Location Release Agreement', desc: 'Permission to film at a location', icon: MapPin, color: 'bg-teal-50 text-teal-600', generate: generateLocationRelease },
+  { id: 'crew-deal', title: 'Crew Deal Memo & Contract', desc: 'Standard crew deal memo with payment terms', icon: Users, color: 'bg-indigo-50 text-indigo-600', generate: generateCrewDeal },
 ];
 
 export default function DocumentsPage() {
@@ -80,21 +31,39 @@ export default function DocumentsPage() {
   const { data: inventory } = useData('inventory');
   const [selectedProduction, setSelectedProduction] = useState('');
   const [generating, setGenerating] = useState<string | null>(null);
+  const [preview, setPreview] = useState<{ title: string; dataUri: string; docItem: typeof DOCS[0] } | null>(null);
 
-  const handleGenerate = async (doc: typeof DOCS[0]) => {
-    if (!selectedProduction) {
-      alert('Please select a production first.');
-      return;
-    }
+  const getContext = () => {
     const production = productions.find((p: any) => p.id === selectedProduction);
-    if (!production) return;
+    return { production, crew, locations, inventory };
+  };
 
-    setGenerating(doc.id);
+  const handlePreview = async (docItem: typeof DOCS[0]) => {
+    if (!selectedProduction) { alert('Please select a production first.'); return; }
+    const ctx = getContext();
+    if (!ctx.production) return;
+    setGenerating(docItem.id + '-preview');
     try {
-      await doc.generate({ production, crew, locations, inventory });
+      const dataUri = await docItem.generate({ ...ctx, preview: true }) as string;
+      setPreview({ title: docItem.title, dataUri, docItem });
     } catch (e) {
       console.error(e);
-      alert('Error generating document. Please try again.');
+      alert('Error generating preview.');
+    } finally {
+      setGenerating(null);
+    }
+  };
+
+  const handleDownload = async (docItem: typeof DOCS[0]) => {
+    if (!selectedProduction) { alert('Please select a production first.'); return; }
+    const ctx = getContext();
+    if (!ctx.production) return;
+    setGenerating(docItem.id + '-download');
+    try {
+      await docItem.generate({ ...ctx, preview: false });
+    } catch (e) {
+      console.error(e);
+      alert('Error generating document.');
     } finally {
       setGenerating(null);
     }
@@ -107,7 +76,6 @@ export default function DocumentsPage() {
         <p className="text-gray-500 text-sm mt-1">Generate professional production documents as PDF</p>
       </div>
 
-      {/* Production selector */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-8">
         <label className="block text-sm font-medium text-gray-700 mb-2">Select production</label>
         <select
@@ -125,29 +93,64 @@ export default function DocumentsPage() {
         )}
       </div>
 
-      {/* Document grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {DOCS.map(docItem => (
-          <div
-            key={docItem.id}
-            className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex flex-col"
-          >
+          <div key={docItem.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex flex-col">
             <div className={`inline-flex p-2.5 rounded-xl mb-3 w-fit ${docItem.color}`}>
               <docItem.icon size={20} />
             </div>
             <h3 className="font-semibold text-gray-900 mb-1">{docItem.title}</h3>
             <p className="text-xs text-gray-400 mb-4 flex-1">{docItem.desc}</p>
-            <button
-              onClick={() => handleGenerate(docItem)}
-              disabled={!selectedProduction || generating === docItem.id}
-              className="flex items-center justify-center gap-2 w-full bg-gray-900 text-white py-2 rounded-xl text-sm font-medium hover:bg-black disabled:opacity-40 transition-colors"
-            >
-              <Printer size={14} />
-              {generating === docItem.id ? 'Generating…' : 'Download PDF'}
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={() => handlePreview(docItem)}
+                disabled={!selectedProduction || generating !== null}
+                className="flex items-center justify-center gap-1.5 flex-1 border border-gray-200 text-gray-700 py-2 rounded-xl text-sm font-medium hover:bg-gray-50 disabled:opacity-40 transition-colors"
+              >
+                <Eye size={13} />
+                {generating === docItem.id + '-preview' ? 'Loading…' : 'Preview'}
+              </button>
+              <button
+                onClick={() => handleDownload(docItem)}
+                disabled={!selectedProduction || generating !== null}
+                className="flex items-center justify-center gap-1.5 flex-1 bg-gray-900 text-white py-2 rounded-xl text-sm font-medium hover:bg-black disabled:opacity-40 transition-colors"
+              >
+                <Download size={13} />
+                {generating === docItem.id + '-download' ? 'Generating…' : 'Download'}
+              </button>
+            </div>
           </div>
         ))}
       </div>
+
+      {/* PDF Preview Modal */}
+      {preview && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex flex-col items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl flex flex-col" style={{ height: '90vh' }}>
+            <div className="flex items-center justify-between px-5 py-3 border-b shrink-0">
+              <h2 className="font-semibold text-gray-900">{preview.title} — Preview</h2>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handleDownload(preview.docItem)}
+                  disabled={generating !== null}
+                  className="flex items-center gap-1.5 bg-gray-900 text-white px-4 py-1.5 rounded-lg text-sm font-medium hover:bg-black disabled:opacity-40"
+                >
+                  <Download size={13} />
+                  {generating ? 'Downloading…' : 'Download PDF'}
+                </button>
+                <button onClick={() => setPreview(null)} className="p-1.5 text-gray-400 hover:text-gray-700">
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+            <iframe
+              src={preview.dataUri}
+              className="flex-1 w-full rounded-b-2xl"
+              title="PDF Preview"
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

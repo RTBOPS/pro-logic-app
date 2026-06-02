@@ -10,7 +10,7 @@ const STRIP_COLORS: Record<string, [number, number, number]> = {
   ext: [220, 240, 255],
 };
 
-export async function generateStripboard({ production, locations, crew }: PDFContext) {
+export async function generateStripboard({ production, locations, crew, preview }: PDFContext) {
   const doc = new jsPDF({ unit: 'mm', format: 'letter', orientation: 'l' });
   const pageW = doc.internal.pageSize.getWidth();
 
@@ -109,5 +109,5 @@ export async function generateStripboard({ production, locations, crew }: PDFCon
   doc.setFont('helvetica', 'bold');
   doc.text(`Total Scenes: ${scenes.length}  |  Total Shoot Days: 4  |  Production: ${production.name}`, 10, y);
 
-  save(doc, `stripboard-${production.name.replace(/\s+/g, '-').toLowerCase()}.pdf`);
+  return save(doc, `stripboard-${production.name.replace(/\s+/g, '-').toLowerCase()}.pdf`, preview);
 }

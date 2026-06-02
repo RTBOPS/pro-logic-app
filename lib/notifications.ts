@@ -58,3 +58,28 @@ export async function sendConfirmationEmail(opts: {
 
   return res.ok;
 }
+
+export async function sendSMS(opts: {
+  to: string;
+  crewName: string;
+  role: string;
+  productionName: string;
+  client: string;
+  shootDates?: string;
+  location?: string;
+}) {
+  const message = [
+    `PRO-LOGIC: Hi ${opts.crewName}, you've been added to "${opts.productionName}" (${opts.client}) as ${opts.role}.`,
+    opts.shootDates ? `Dates: ${opts.shootDates}.` : '',
+    opts.location ? `Location: ${opts.location}.` : '',
+    'Reply STOP to opt out.',
+  ].filter(Boolean).join(' ');
+
+  const res = await fetch('/api/send-sms', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ to: opts.to, message }),
+  });
+
+  return res.ok;
+}

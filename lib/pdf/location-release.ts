@@ -1,7 +1,7 @@
 import { jsPDF } from 'jspdf';
 import { PDFContext, header, save } from './base';
 
-export async function generateLocationRelease({ production, locations }: PDFContext) {
+export async function generateLocationRelease({ production, locations, preview }: PDFContext) {
   const doc = new jsPDF({ unit: 'mm', format: 'letter' });
   const pageW = doc.internal.pageSize.getWidth();
   const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
@@ -86,5 +86,5 @@ export async function generateLocationRelease({ production, locations }: PDFCont
     });
   }
 
-  save(doc, `location-release-${production.name.replace(/\s+/g, '-').toLowerCase()}.pdf`);
+  return save(doc, `location-release-${production.name.replace(/\s+/g, '-').toLowerCase()}.pdf`, preview);
 }

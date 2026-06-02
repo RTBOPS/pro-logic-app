@@ -12,6 +12,22 @@ import { DEPARTMENTS, deptColor, deptLabel } from '@/lib/departments';
 const DEFAULT_PICTURE = 'https://img.freepik.com/free-photo/portrait-white-man-isolated_53876-40306.jpg';
 
 const UNION_STATUSES = ['Non-Union', 'Union', 'SAG-AFTRA', 'IATSE', 'Teamsters', 'Other'];
+
+const ROLES_BY_DEPT: Record<string, string[]> = {
+  production: ['Executive Producer', 'Producer', 'Line Producer', 'Production Manager', 'Production Coordinator', 'Production Assistant', 'Unit Production Manager', 'Post Production Supervisor'],
+  direction: ['Director', '1st AD', '2nd AD', 'Script Supervisor', 'Continuity Supervisor'],
+  camera: ['Director of Photography', 'Camera Operator', '1st AC', '2nd AC', 'DIT', 'Steadicam Operator', 'Camera PA', 'Drone Operator'],
+  electric: ['Gaffer', 'Best Boy Electric', 'Electrician', 'Lighting Technician', 'Dimmer Board Operator'],
+  grip: ['Key Grip', 'Best Boy Grip', 'Grip', 'Dolly Grip', 'Rigging Grip'],
+  audio: ['Production Sound Mixer', 'Boom Operator', 'Sound Assistant', 'Playback Operator'],
+  art: ['Production Designer', 'Art Director', 'Set Decorator', 'Prop Master', 'Prop Assistant', 'Set Dresser', 'Scenic Painter'],
+  wardrobe: ['Costume Designer', 'Wardrobe Stylist', 'Wardrobe Assistant', 'Key Makeup Artist', 'Makeup Artist', 'Key Hair Stylist', 'Hair Stylist'],
+  vfx: ['VFX Supervisor', 'VFX Producer', 'Compositor', 'Motion Graphics', 'Colorist', 'Editor', 'Assistant Editor'],
+  cast: ['Lead Actor', 'Supporting Actor', 'Day Player', 'Stand-In', 'Stunt Performer', 'Voice Actor'],
+  transportation: ['Transportation Coordinator', 'Driver Captain', 'Driver', 'Picture Car Coordinator'],
+  catering: ['Craft Service', 'Catering Manager', 'Chef'],
+  other: ['Other'],
+};
 const CLASSIFICATIONS = ['Crew', 'Cast', 'Extra', 'Vendor'];
 const AVAILABILITY_STATUSES = ['Available', 'Booked', 'Hold', 'On Leave', 'Retired'];
 const PAYMENT_METHODS = ['ACH', 'Check', 'Wire', 'Agent', 'Cash', 'PayPal', 'Venmo'];
@@ -369,7 +385,22 @@ export default function CrewPage() {
                       {DEPARTMENTS.map(d => <option key={d.id} value={d.id}>{d.label}</option>)}
                     </select>
                   </div>
-                  {fld('Role / Position', 'role', 'DP, Gaffer, Actor…')}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Role / Position</label>
+                    <select className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none"
+                      value={form.role} onChange={e => setForm({ ...form, role: e.target.value })}>
+                      <option value="">— Select role —</option>
+                      {(ROLES_BY_DEPT[form.department] || ROLES_BY_DEPT.other).map(r => (
+                        <option key={r} value={r}>{r}</option>
+                      ))}
+                      <option value="Other">Other / Custom</option>
+                    </select>
+                    {form.role === 'Other' && (
+                      <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none mt-1"
+                        placeholder="Type custom role…"
+                        onChange={e => setForm({ ...form, role: e.target.value })} />
+                    )}
+                  </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   {slct('Union Status', 'union_status', UNION_STATUSES)}
