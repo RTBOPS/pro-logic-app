@@ -17,7 +17,7 @@ const STATUS_COLOR: Record<string, string> = {
   cancelled: 'bg-red-100 text-red-600',
 };
 
-const empty = { name: '', client: '', status: 'new', location_id: '' };
+const empty = { name: '', client: '', status: 'new', location_id: '', start_date: '', end_date: '' };
 
 export default function ProductionsPage() {
   const { data: productions, loading } = useData('productions');
@@ -28,7 +28,7 @@ export default function ProductionsPage() {
 
   const openCreate = () => { setForm(empty); setModal('create'); };
   const openEdit = (p: any) => {
-    setForm({ name: p.name, client: p.client, status: p.status, location_id: p.location_id || '' });
+    setForm({ name: p.name, client: p.client, status: p.status, location_id: p.location_id || '', start_date: p.start_date || '', end_date: p.end_date || '' });
     setEditId(p.id);
     setModal('edit');
   };
@@ -77,6 +77,7 @@ export default function ProductionsPage() {
               <tr>
                 <th className="text-left px-6 py-3">Name</th>
                 <th className="text-left px-6 py-3">Client</th>
+                <th className="text-left px-6 py-3">Dates</th>
                 <th className="text-left px-6 py-3">Status</th>
                 <th className="text-left px-6 py-3">Location</th>
                 <th className="px-6 py-3" />
@@ -94,6 +95,13 @@ export default function ProductionsPage() {
                       </Link>
                     </td>
                     <td className="px-6 py-4 text-gray-600">{p.client}</td>
+                    <td className="px-6 py-4 text-gray-500 text-xs">
+                      {p.start_date ? (
+                        <span>{new Date(p.start_date + 'T12:00:00').toLocaleDateString('en', { month: 'short', day: 'numeric', year: 'numeric' })}
+                          {p.end_date && <> → {new Date(p.end_date + 'T12:00:00').toLocaleDateString('en', { month: 'short', day: 'numeric', year: 'numeric' })}</>}
+                        </span>
+                      ) : '—'}
+                    </td>
                     <td className="px-6 py-4">
                       <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize ${STATUS_COLOR[p.status] || 'bg-gray-100 text-gray-600'}`}>
                         {p.status}
@@ -151,6 +159,18 @@ export default function ProductionsPage() {
                   <option key={s} value={s} className="capitalize">{s}</option>
                 ))}
               </select>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Start date</label>
+                <input type="date" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-black"
+                  value={form.start_date} onChange={e => setForm({ ...form, start_date: e.target.value })} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">End date</label>
+                <input type="date" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-black"
+                  value={form.end_date} onChange={e => setForm({ ...form, end_date: e.target.value })} />
+              </div>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>

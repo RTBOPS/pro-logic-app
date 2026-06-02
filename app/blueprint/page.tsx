@@ -88,7 +88,7 @@ export default function BlueprintPage() {
         <div className="flex-1 flex gap-4 overflow-hidden min-h-0">
           {/* Canvas */}
           <div className="flex-1 overflow-hidden">
-            <BlueprintCanvas items={items} onChange={setItems} />
+            <BlueprintCanvas items={items} onChange={setItems} productionId={selectedProduction} />
           </div>
 
           {/* Right panel: equipment + crew list */}
