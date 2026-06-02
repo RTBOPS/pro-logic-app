@@ -11,15 +11,45 @@ import { DEPARTMENTS, deptColor, deptLabel } from '@/lib/departments';
 
 const DEFAULT_PICTURE = 'https://img.freepik.com/free-photo/portrait-white-man-isolated_53876-40306.jpg';
 
+const UNION_STATUSES = ['Non-Union', 'Union', 'SAG-AFTRA', 'IATSE', 'Teamsters', 'Other'];
+const CLASSIFICATIONS = ['Crew', 'Cast', 'Extra', 'Vendor'];
+const AVAILABILITY_STATUSES = ['Available', 'Booked', 'Hold', 'On Leave', 'Retired'];
+const PAYMENT_METHODS = ['ACH', 'Check', 'Wire', 'Agent', 'Cash', 'PayPal', 'Venmo'];
+const TAX_FORMS = ['W-9 Received', 'W-9 Pending', 'W-9 Needed', '1099 Filed', 'W-8 (International)', 'N/A'];
+const CURRENCIES = ['USD', 'EUR', 'GBP', 'MXN', 'CAD', 'AUD'];
+
 const emptyForm = {
-  name: '', last_name: '', role: '', department: 'other', picture: DEFAULT_PICTURE,
-  phone: '', email: '', address: '', dob: '', notes: '',
+  // Identity
+  name: '', last_name: '', person_code: '', role: '', department: 'other',
+  classification: 'Crew', union_status: 'Non-Union', status: 'Available',
+  picture: DEFAULT_PICTURE, headshot_url: '', resume_url: '', portfolio_url: '',
+  // Contact
+  phone: '', email: '', city: '', state_country: '',
+  emergency_contact_name: '', emergency_contact_phone: '',
+  // Personal
+  dob: '', gender: '', shirt_size: '', shoe_size: '',
+  dietary_restrictions: '', allergies: '',
+  driver_license: '', passport_required: false, passport_number: '',
+  work_permit_required: false, work_permit_status: '',
+  // Skills
+  skills: '', certifications: '', languages: '',
+  // Rates
+  daily_rate_usd: '', weekly_rate_usd: '', overtime_rate: '1.5x',
+  currency: 'USD', payment_method: 'ACH', tax_form_status: 'W-9 Needed',
+  // Agent
+  agent_manager_name: '', agent_manager_email: '', agent_manager_phone: '',
+  // Availability
+  availability_start: '', availability_end: '',
+  transport_needed: false, lodging_needed: false,
+  // Notes
+  notes: '',
 };
 
 export default function CrewPage() {
   const { data: crew, loading } = useData('crew');
   const [modal, setModal] = useState<'create' | 'edit' | 'merge' | null>(null);
   const [form, setForm] = useState(emptyForm);
+  const [formTab, setFormTab] = useState<'identity' | 'personal' | 'rates' | 'availability'>('identity');
   const [editId, setEditId] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -50,15 +80,37 @@ export default function CrewPage() {
     })).filter(d => d.members.length > 0);
   }, [filtered]);
 
-  const openCreate = () => { setForm(emptyForm); setModal('create'); };
+  const openCreate = () => { setForm(emptyForm); setFormTab('identity'); setModal('create'); };
   const openEdit = (c: any) => {
     setForm({
-      name: c.name || '', last_name: c.last_name || '', role: c.role || '',
-      department: c.department || 'other', picture: c.picture || DEFAULT_PICTURE,
-      phone: c.phone || '', email: c.email || '', address: c.address || '',
-      dob: c.dob || '', notes: c.notes || '',
+      name: c.name || '', last_name: c.last_name || '', person_code: c.person_code || '',
+      role: c.role || '', department: c.department || 'other',
+      classification: c.classification || 'Crew', union_status: c.union_status || 'Non-Union',
+      status: c.status || 'Available',
+      picture: c.picture || DEFAULT_PICTURE, headshot_url: c.headshot_url || '',
+      resume_url: c.resume_url || '', portfolio_url: c.portfolio_url || '',
+      phone: c.phone || '', email: c.email || '',
+      city: c.city || '', state_country: c.state_country || '',
+      emergency_contact_name: c.emergency_contact_name || '',
+      emergency_contact_phone: c.emergency_contact_phone || '',
+      dob: c.dob || '', gender: c.gender || '',
+      shirt_size: c.shirt_size || '', shoe_size: c.shoe_size || '',
+      dietary_restrictions: c.dietary_restrictions || '', allergies: c.allergies || '',
+      driver_license: c.driver_license || '',
+      passport_required: c.passport_required || false, passport_number: c.passport_number || '',
+      work_permit_required: c.work_permit_required || false, work_permit_status: c.work_permit_status || '',
+      skills: c.skills || '', certifications: c.certifications || '', languages: c.languages || '',
+      daily_rate_usd: c.daily_rate_usd ?? '', weekly_rate_usd: c.weekly_rate_usd ?? '',
+      overtime_rate: c.overtime_rate || '1.5x', currency: c.currency || 'USD',
+      payment_method: c.payment_method || 'ACH', tax_form_status: c.tax_form_status || 'W-9 Needed',
+      agent_manager_name: c.agent_manager_name || '', agent_manager_email: c.agent_manager_email || '',
+      agent_manager_phone: c.agent_manager_phone || '',
+      availability_start: c.availability_start || '', availability_end: c.availability_end || '',
+      transport_needed: c.transport_needed || false, lodging_needed: c.lodging_needed || false,
+      notes: c.notes || '',
     });
     setEditId(c.id);
+    setFormTab('identity');
     setModal('edit');
   };
   const close = () => { setModal(null); setEditId(null); };
@@ -94,33 +146,43 @@ export default function CrewPage() {
     const a = crew.find((c: any) => c.id === mergeA);
     const b = crew.find((c: any) => c.id === mergeB);
     if (!a || !b) return;
-    const merged = {
-      name: a.name || b.name,
-      last_name: a.last_name || b.last_name,
-      role: a.role || b.role,
-      department: a.department || b.department || 'other',
-      picture: a.picture !== DEFAULT_PICTURE ? a.picture : b.picture,
-      phone: a.phone || b.phone,
-      email: a.email || b.email,
-      address: a.address || b.address,
-      dob: a.dob || b.dob,
-      notes: [a.notes, b.notes].filter(Boolean).join(' | '),
-    };
+    const pick = (ka: any, kb: any) => ka || kb;
+    const merged: any = { ...b, ...Object.fromEntries(Object.entries(a).filter(([, v]) => v !== undefined && v !== '' && v !== false)) };
+    merged.notes = [a.notes, b.notes].filter(Boolean).join(' | ');
+    merged.picture = a.picture !== DEFAULT_PICTURE ? a.picture : b.picture;
     await updateDoc(doc(db, 'crew', mergeA), merged);
     await deleteDoc(doc(db, 'crew', mergeB));
     setMergeA(''); setMergeB(''); setModal(null);
   };
 
-  const field = (label: string, key: keyof typeof emptyForm, placeholder?: string, type = 'text') => (
+  const fld = (label: string, key: keyof typeof emptyForm, placeholder?: string, type = 'text') => (
     <div>
       <label className="block text-xs font-medium text-gray-600 mb-1">{label}</label>
       <input
         type={type}
         className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-black"
-        value={form[key]}
+        value={form[key] as string}
         onChange={e => setForm({ ...form, [key]: e.target.value })}
         placeholder={placeholder}
       />
+    </div>
+  );
+
+  const slct = (label: string, key: keyof typeof emptyForm, options: string[]) => (
+    <div>
+      <label className="block text-xs font-medium text-gray-600 mb-1">{label}</label>
+      <select className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none"
+        value={form[key] as string} onChange={e => setForm({ ...form, [key]: e.target.value })}>
+        {options.map(o => <option key={o} value={o}>{o}</option>)}
+      </select>
+    </div>
+  );
+
+  const chk = (label: string, key: keyof typeof emptyForm) => (
+    <div className="flex items-center gap-2">
+      <input type="checkbox" checked={form[key] as boolean}
+        onChange={e => setForm({ ...form, [key]: e.target.checked })} className="rounded" />
+      <label className="text-sm text-gray-700">{label}</label>
     </div>
   );
 
@@ -256,74 +318,162 @@ export default function CrewPage() {
 
       {/* Create / Edit Modal */}
       {(modal === 'create' || modal === 'edit') && (
-        <Modal title={modal === 'create' ? 'Add Crew Member' : 'Edit Crew Member'} onClose={close}>
-          <div className="space-y-3 max-h-[70vh] overflow-y-auto pr-1">
-            {/* Photo */}
-            <div className="flex items-center gap-4">
-              <img src={form.picture || DEFAULT_PICTURE} className="w-16 h-16 rounded-full object-cover border border-gray-200" alt="" />
-              <div className="flex-1">
-                <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
-                <button
-                  onClick={() => fileRef.current?.click()}
-                  disabled={uploading}
-                  className="flex items-center gap-2 border border-dashed border-gray-300 rounded-lg px-3 py-2 text-xs text-gray-500 hover:bg-gray-50 w-full justify-center"
-                >
-                  <Upload size={12} /> {uploading ? 'Uploading…' : 'Upload photo'}
-                </button>
-                <div className="mt-1">
-                  <input
-                    className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none"
-                    value={form.picture}
-                    onChange={e => setForm({ ...form, picture: e.target.value })}
-                    placeholder="Or paste image URL"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              {field('First name *', 'name', 'First name')}
-              {field('Last name *', 'last_name', 'Last name')}
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Department</label>
-                <select
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none"
-                  value={form.department}
-                  onChange={e => setForm({ ...form, department: e.target.value })}
-                >
-                  {DEPARTMENTS.map(d => <option key={d.id} value={d.id}>{d.label}</option>)}
-                </select>
-              </div>
-              {field('Role / Position', 'role', 'e.g. Gaffer, DP…')}
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              {field('Phone', 'phone', '+1 555…', 'tel')}
-              {field('Email', 'email', 'crew@email.com', 'email')}
-            </div>
-            {field('Address', 'address', 'Street, City, State')}
-            {field('Date of birth', 'dob', '', 'date')}
-
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Notes</label>
-              <textarea
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none resize-none"
-                rows={2}
-                value={form.notes}
-                onChange={e => setForm({ ...form, notes: e.target.value })}
-                placeholder="Rates, special requirements…"
-              />
-            </div>
+        <Modal title={modal === 'create' ? 'Add Crew / Cast Member' : 'Edit Member'} onClose={close}>
+          {/* Tabs */}
+          <div className="flex gap-0 border-b mb-4 -mx-1">
+            {([
+              { id: 'identity', label: 'Identity' },
+              { id: 'personal', label: 'Personal' },
+              { id: 'rates', label: 'Rates & Docs' },
+              { id: 'availability', label: 'Availability' },
+            ] as const).map(t => (
+              <button key={t.id} onClick={() => setFormTab(t.id)}
+                className={`px-3 py-2 text-xs transition-colors border-b-2 ${formTab === t.id ? 'border-black text-black font-medium' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>
+                {t.label}
+              </button>
+            ))}
           </div>
+
+          <div className="space-y-3 max-h-[55vh] overflow-y-auto pr-1">
+
+            {formTab === 'identity' && (
+              <>
+                {/* Photo */}
+                <div className="flex items-center gap-3 mb-1">
+                  <img src={form.picture || DEFAULT_PICTURE} className="w-14 h-14 rounded-full object-cover border border-gray-200 shrink-0" alt="" />
+                  <div className="flex-1 space-y-1">
+                    <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+                    <button onClick={() => fileRef.current?.click()} disabled={uploading}
+                      className="flex items-center gap-1.5 border border-dashed border-gray-300 rounded-lg px-3 py-1.5 text-xs text-gray-500 hover:bg-gray-50 w-full justify-center">
+                      <Upload size={11} /> {uploading ? 'Uploading…' : 'Upload photo'}
+                    </button>
+                    <input className="w-full border border-gray-200 rounded-lg px-2 py-1 text-xs focus:outline-none"
+                      value={form.picture} onChange={e => setForm({ ...form, picture: e.target.value })}
+                      placeholder="Or paste image URL" />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  {fld('First name *', 'name', 'First name')}
+                  {fld('Last name *', 'last_name', 'Last name')}
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  {fld('Person Code', 'person_code', 'CREW-001')}
+                  {slct('Classification', 'classification', CLASSIFICATIONS)}
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Department</label>
+                    <select className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none"
+                      value={form.department} onChange={e => setForm({ ...form, department: e.target.value })}>
+                      {DEPARTMENTS.map(d => <option key={d.id} value={d.id}>{d.label}</option>)}
+                    </select>
+                  </div>
+                  {fld('Role / Position', 'role', 'DP, Gaffer, Actor…')}
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  {slct('Union Status', 'union_status', UNION_STATUSES)}
+                  {slct('Status', 'status', AVAILABILITY_STATUSES)}
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  {fld('Phone', 'phone', '+1 555…', 'tel')}
+                  {fld('Email', 'email', 'crew@email.com', 'email')}
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  {fld('City', 'city', 'Austin')}
+                  {fld('State / Country', 'state_country', 'TX, USA')}
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  {fld('Emergency Contact', 'emergency_contact_name', 'Contact name')}
+                  {fld('Emergency Phone', 'emergency_contact_phone', '+1 555…', 'tel')}
+                </div>
+                <div className="grid grid-cols-3 gap-3">
+                  {fld('Headshot URL', 'headshot_url', 'https://…')}
+                  {fld('Resume URL', 'resume_url', 'https://…')}
+                  {fld('Portfolio URL', 'portfolio_url', 'https://…')}
+                </div>
+              </>
+            )}
+
+            {formTab === 'personal' && (
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  {fld('Date of birth', 'dob', '', 'date')}
+                  {fld('Gender', 'gender', 'Male / Female / Non-binary…')}
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  {fld('Shirt size', 'shirt_size', 'S / M / L / XL')}
+                  {fld('Shoe size', 'shoe_size', '10 / 42')}
+                </div>
+                {fld('Dietary restrictions', 'dietary_restrictions', 'Vegetarian, Gluten-free…')}
+                {fld('Allergies', 'allergies', 'Peanuts, Shellfish…')}
+                {fld('Driver\'s license', 'driver_license', 'Yes / DL number')}
+                <div className="grid grid-cols-2 gap-3">
+                  {chk('Passport required', 'passport_required')}
+                  {fld('Passport number', 'passport_number', 'XX0000000')}
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  {chk('Work permit required', 'work_permit_required')}
+                  {fld('Work permit status', 'work_permit_status', 'Approved / Pending…')}
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Skills</label>
+                  <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none"
+                    value={form.skills} onChange={e => setForm({ ...form, skills: e.target.value })}
+                    placeholder="Cinematography; Drone; Color grading" />
+                </div>
+                {fld('Certifications', 'certifications', 'OSHA 10; FAA Part 107; First Aid')}
+                {fld('Languages', 'languages', 'English; Spanish')}
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Notes</label>
+                  <textarea className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none resize-none"
+                    rows={3} value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} />
+                </div>
+              </>
+            )}
+
+            {formTab === 'rates' && (
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  {fld('Daily rate (USD)', 'daily_rate_usd', '750', 'number')}
+                  {fld('Weekly rate (USD)', 'weekly_rate_usd', '3500', 'number')}
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  {fld('Overtime rate', 'overtime_rate', '1.5x')}
+                  {slct('Currency', 'currency', CURRENCIES)}
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  {slct('Payment method', 'payment_method', PAYMENT_METHODS)}
+                  {slct('Tax form status', 'tax_form_status', TAX_FORMS)}
+                </div>
+                <div className="border-t pt-3 mt-1">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Agent / Manager</p>
+                  {fld('Name', 'agent_manager_name', 'Agent name')}
+                  <div className="grid grid-cols-2 gap-3 mt-2">
+                    {fld('Email', 'agent_manager_email', 'agent@agency.com', 'email')}
+                    {fld('Phone', 'agent_manager_phone', '+1 555…', 'tel')}
+                  </div>
+                </div>
+              </>
+            )}
+
+            {formTab === 'availability' && (
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  {fld('Available from', 'availability_start', '', 'date')}
+                  {fld('Available until', 'availability_end', '', 'date')}
+                </div>
+                <div className="flex gap-6 py-2">
+                  {chk('Transport needed', 'transport_needed')}
+                  {chk('Lodging needed', 'lodging_needed')}
+                </div>
+              </>
+            )}
+          </div>
+
           <div className="flex gap-3 pt-4 border-t mt-4">
-            <button
-              onClick={save}
-              disabled={!form.name || !form.last_name}
-              className="flex-1 bg-blue-600 text-white py-2 rounded-lg text-sm font-medium disabled:opacity-40 hover:bg-blue-700"
-            >
+            <button onClick={save} disabled={!form.name || !form.last_name}
+              className="flex-1 bg-blue-600 text-white py-2 rounded-lg text-sm font-medium disabled:opacity-40 hover:bg-blue-700">
               {modal === 'create' ? 'Add member' : 'Save changes'}
             </button>
             <button onClick={close} className="px-4 py-2 text-sm text-gray-500 hover:text-gray-800">Cancel</button>

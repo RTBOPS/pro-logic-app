@@ -8,28 +8,68 @@ import Modal from '@/components/Modal';
 import Link from 'next/link';
 import { Plus, Pencil, Trash2, ChevronRight } from 'lucide-react';
 
-const STATUSES = ['new', 'active', 'completed', 'cancelled'];
+const STATUSES = ['Planning', 'Pre-Production', 'Active', 'On Hold', 'Completed', 'Cancelled'];
+const PROD_TYPES = ['Commercial', 'Corporate Video', 'Music Video', 'Feature Film', 'Short Film', 'Documentary', 'Live Event', 'Social Content', 'Other'];
+const BILLING_STATUSES = ['Estimate', 'Quoted', 'Pending', 'Invoiced', 'Paid', 'Overdue'];
+const ASPECT_RATIOS = ['16:9', '9:16', '4:3', '1:1', '2.39:1', '2.35:1', '1.85:1', '2:1'];
+const RESOLUTIONS = ['4K UHD', '4K DCI', '6K', '8K', '2K', '1080p', '720p'];
+const FRAME_RATES = ['23.976 fps', '24 fps', '25 fps', '29.97 fps', '30 fps', '50 fps', '59.94 fps', '60 fps', '120 fps'];
 
 const STATUS_COLOR: Record<string, string> = {
-  new: 'bg-blue-100 text-blue-700',
-  active: 'bg-green-100 text-green-700',
-  completed: 'bg-gray-100 text-gray-600',
-  cancelled: 'bg-red-100 text-red-600',
+  Planning:        'bg-blue-100 text-blue-700',
+  'Pre-Production':'bg-purple-100 text-purple-700',
+  Active:          'bg-green-100 text-green-700',
+  'On Hold':       'bg-yellow-100 text-yellow-700',
+  Completed:       'bg-gray-100 text-gray-600',
+  Cancelled:       'bg-red-100 text-red-600',
 };
 
-const empty = { name: '', client: '', status: 'new', location_id: '', start_date: '', end_date: '' };
+const empty = {
+  // Basic
+  name: '', production_code: '', production_type: '', client: '', agency: '',
+  production_company: '', status: 'Planning', project_description: '',
+  // Key crew
+  director: '', producer: '', line_producer: '', production_manager: '',
+  // Dates & location
+  start_date: '', end_date: '', prep_start_date: '', wrap_date: '',
+  country: '', city: '', primary_location: '', additional_locations: '',
+  location_id: '',
+  // Finance
+  budget_estimate_usd: '', currency: 'USD', billing_status: '', payment_terms: '',
+  // Logistics
+  call_time: '', wrap_time: '', crew_call_location: '', basecamp_location: '',
+  parking_location: '', hospital_nearest: '',
+  emergency_contact_name: '', emergency_contact_phone: '',
+  // Legal
+  insurance_required: false, permit_required: false, permit_status: '',
+  location_release_status: '', talent_release_status: '', music_rights_status: '',
+  // Crew & Equipment needs
+  equipment_needed: '', vehicles_needed: '', catering_needed: false,
+  lodging_needed: false, travel_needed: false,
+  number_of_crew: '', number_of_cast: '', number_of_extras: '',
+  // Technical
+  power_requirements: '', voltage_standard: '', generator_required: false,
+  data_storage_plan: '', deliverables: '',
+  aspect_ratio: '16:9', resolution: '4K UHD', frame_rate: '23.976 fps',
+  audio_format: '48 kHz WAV',
+};
 
 export default function ProductionsPage() {
   const { data: productions, loading } = useData('productions');
   const { data: locations } = useData('locations');
   const [modal, setModal] = useState<'create' | 'edit' | null>(null);
   const [form, setForm] = useState(empty);
+  const [formTab, setFormTab] = useState<'basic' | 'dates' | 'logistics' | 'technical'>('basic');
   const [editId, setEditId] = useState<string | null>(null);
 
-  const openCreate = () => { setForm(empty); setModal('create'); };
+  const openCreate = () => { setForm(empty); setFormTab('basic'); setModal('create'); };
   const openEdit = (p: any) => {
-    setForm({ name: p.name, client: p.client, status: p.status, location_id: p.location_id || '', start_date: p.start_date || '', end_date: p.end_date || '' });
+    const keys = Object.keys(empty) as (keyof typeof empty)[];
+    const f: any = {};
+    for (const k of keys) f[k] = p[k] ?? (empty[k]);
+    setForm(f);
     setEditId(p.id);
+    setFormTab('basic');
     setModal('edit');
   };
   const close = () => { setModal(null); setEditId(null); };
@@ -128,78 +168,196 @@ export default function ProductionsPage() {
 
       {modal && (
         <Modal title={modal === 'create' ? 'New Production' : 'Edit Production'} onClose={close}>
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Name *</label>
-              <input
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-black"
-                value={form.name}
-                onChange={e => setForm({ ...form, name: e.target.value })}
-                placeholder="Production name"
-                autoFocus
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Client *</label>
-              <input
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-black"
-                value={form.client}
-                onChange={e => setForm({ ...form, client: e.target.value })}
-                placeholder="Client name"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-              <select
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-black"
-                value={form.status}
-                onChange={e => setForm({ ...form, status: e.target.value })}
-              >
-                {STATUSES.map(s => (
-                  <option key={s} value={s} className="capitalize">{s}</option>
-                ))}
-              </select>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Start date</label>
-                <input type="date" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-black"
-                  value={form.start_date} onChange={e => setForm({ ...form, start_date: e.target.value })} />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">End date</label>
-                <input type="date" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-black"
-                  value={form.end_date} onChange={e => setForm({ ...form, end_date: e.target.value })} />
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
-              <select
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-black"
-                value={form.location_id}
-                onChange={e => setForm({ ...form, location_id: e.target.value })}
-              >
-                <option value="">— None —</option>
-                {locations.map((l: any) => (
-                  <option key={l.id} value={l.id}>{l.name}</option>
-                ))}
-              </select>
-            </div>
-            <div className="flex gap-3 pt-2">
-              <button
-                onClick={save}
-                disabled={!form.name || !form.client}
-                className="flex-1 bg-black text-white py-2 rounded-lg text-sm font-medium disabled:opacity-40 hover:bg-zinc-800 transition-colors"
-              >
-                {modal === 'create' ? 'Create' : 'Save changes'}
+          {/* Tabs */}
+          <div className="flex gap-0 border-b mb-4 -mx-1">
+            {([
+              { id: 'basic', label: 'Basic Info' },
+              { id: 'dates', label: 'Dates & Location' },
+              { id: 'logistics', label: 'Logistics' },
+              { id: 'technical', label: 'Technical' },
+            ] as const).map(t => (
+              <button key={t.id} onClick={() => setFormTab(t.id)}
+                className={`px-3 py-2 text-xs transition-colors border-b-2 ${formTab === t.id ? 'border-black text-black font-medium' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>
+                {t.label}
               </button>
-              <button onClick={close} className="px-4 py-2 text-sm text-gray-500 hover:text-gray-800">
-                Cancel
-              </button>
-            </div>
+            ))}
+          </div>
+
+          <div className="space-y-3 max-h-[55vh] overflow-y-auto pr-1">
+            {formTab === 'basic' && (
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  <PF label="Name *" k="name" form={form} setForm={setForm} placeholder="Production name" />
+                  <PF label="Production Code" k="production_code" form={form} setForm={setForm} placeholder="PL-2026-001" />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <PF label="Client *" k="client" form={form} setForm={setForm} placeholder="Client company" />
+                  <PF label="Agency" k="agency" form={form} setForm={setForm} placeholder="Ad agency" />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <PF label="Production Company" k="production_company" form={form} setForm={setForm} placeholder="PRO-LOGIC Studio" />
+                  <PSel label="Type" k="production_type" form={form} setForm={setForm} options={PROD_TYPES} />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <PSel label="Status" k="status" form={form} setForm={setForm} options={STATUSES} />
+                  <PSel label="Billing Status" k="billing_status" form={form} setForm={setForm} options={BILLING_STATUSES} />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <PF label="Budget (USD)" k="budget_estimate_usd" form={form} setForm={setForm} placeholder="0" type="number" />
+                  <PF label="Payment Terms" k="payment_terms" form={form} setForm={setForm} placeholder="Net 30 / 50% deposit" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Project Description</label>
+                  <textarea className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none resize-none"
+                    rows={2} value={form.project_description}
+                    onChange={e => setForm({ ...form, project_description: e.target.value })} />
+                </div>
+                <div className="border-t pt-2 mt-1">
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Key Crew</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <PF label="Director" k="director" form={form} setForm={setForm} />
+                    <PF label="Producer" k="producer" form={form} setForm={setForm} />
+                    <PF label="Line Producer" k="line_producer" form={form} setForm={setForm} />
+                    <PF label="Production Manager" k="production_manager" form={form} setForm={setForm} />
+                  </div>
+                </div>
+              </>
+            )}
+
+            {formTab === 'dates' && (
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  <PF label="Prep Start" k="prep_start_date" form={form} setForm={setForm} type="date" />
+                  <PF label="Shoot Start" k="start_date" form={form} setForm={setForm} type="date" />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <PF label="Shoot End" k="end_date" form={form} setForm={setForm} type="date" />
+                  <PF label="Wrap Date" k="wrap_date" form={form} setForm={setForm} type="date" />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <PF label="Call Time" k="call_time" form={form} setForm={setForm} placeholder="06:00" />
+                  <PF label="Wrap Time" k="wrap_time" form={form} setForm={setForm} placeholder="18:00" />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <PF label="Country" k="country" form={form} setForm={setForm} placeholder="USA" />
+                  <PF label="City" k="city" form={form} setForm={setForm} placeholder="Austin, TX" />
+                </div>
+                <PF label="Primary Location" k="primary_location" form={form} setForm={setForm} placeholder="Circuit of the Americas" />
+                <PF label="Additional Locations" k="additional_locations" form={form} setForm={setForm} placeholder="Downtown; Hill Country" />
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Location (from saved locations)</label>
+                  <select className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none"
+                    value={form.location_id} onChange={e => setForm({ ...form, location_id: e.target.value })}>
+                    <option value="">— None —</option>
+                    {locations.map((l: any) => <option key={l.id} value={l.id}>{l.name}</option>)}
+                  </select>
+                </div>
+              </>
+            )}
+
+            {formTab === 'logistics' && (
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  <PF label="Crew Call Location" k="crew_call_location" form={form} setForm={setForm} />
+                  <PF label="Basecamp Location" k="basecamp_location" form={form} setForm={setForm} />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <PF label="Parking Location" k="parking_location" form={form} setForm={setForm} />
+                  <PF label="Nearest Hospital" k="hospital_nearest" form={form} setForm={setForm} />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <PF label="Emergency Contact" k="emergency_contact_name" form={form} setForm={setForm} />
+                  <PF label="Emergency Phone" k="emergency_contact_phone" form={form} setForm={setForm} type="tel" />
+                </div>
+                <div className="grid grid-cols-3 gap-3">
+                  <PF label="# Crew" k="number_of_crew" form={form} setForm={setForm} type="number" />
+                  <PF label="# Cast" k="number_of_cast" form={form} setForm={setForm} type="number" />
+                  <PF label="# Extras" k="number_of_extras" form={form} setForm={setForm} type="number" />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <PF label="Permit Status" k="permit_status" form={form} setForm={setForm} placeholder="Approved / In Progress…" />
+                  <PF label="Location Release" k="location_release_status" form={form} setForm={setForm} placeholder="Approved / Pending…" />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <PF label="Talent Release" k="talent_release_status" form={form} setForm={setForm} placeholder="Required / Pending…" />
+                  <PF label="Music Rights" k="music_rights_status" form={form} setForm={setForm} placeholder="Cleared / Pending…" />
+                </div>
+                <div className="flex gap-6 py-1 flex-wrap">
+                  <PCk label="Insurance required" k="insurance_required" form={form} setForm={setForm} />
+                  <PCk label="Permit required" k="permit_required" form={form} setForm={setForm} />
+                  <PCk label="Catering" k="catering_needed" form={form} setForm={setForm} />
+                  <PCk label="Lodging" k="lodging_needed" form={form} setForm={setForm} />
+                  <PCk label="Travel" k="travel_needed" form={form} setForm={setForm} />
+                </div>
+                <PF label="Vehicles needed" k="vehicles_needed" form={form} setForm={setForm} placeholder="Production van; Cube truck" />
+                <PF label="Equipment summary" k="equipment_needed" form={form} setForm={setForm} placeholder="Camera package; Lighting; Grip truck" />
+              </>
+            )}
+
+            {formTab === 'technical' && (
+              <>
+                <div className="grid grid-cols-3 gap-3">
+                  <PSel label="Aspect Ratio" k="aspect_ratio" form={form} setForm={setForm} options={ASPECT_RATIOS} />
+                  <PSel label="Resolution" k="resolution" form={form} setForm={setForm} options={RESOLUTIONS} />
+                  <PSel label="Frame Rate" k="frame_rate" form={form} setForm={setForm} options={FRAME_RATES} />
+                </div>
+                <PF label="Audio Format" k="audio_format" form={form} setForm={setForm} placeholder="48 kHz WAV" />
+                <div className="grid grid-cols-2 gap-3">
+                  <PF label="Power Requirements" k="power_requirements" form={form} setForm={setForm} placeholder="High draw; 2x 6500W" />
+                  <PF label="Voltage Standard" k="voltage_standard" form={form} setForm={setForm} placeholder="120V / 240V" />
+                </div>
+                <PCk label="Generator required" k="generator_required" form={form} setForm={setForm} />
+                <PF label="Data Storage Plan" k="data_storage_plan" form={form} setForm={setForm} placeholder="Dual SSD + cloud copy" />
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Deliverables</label>
+                  <textarea className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none resize-none"
+                    rows={2} value={form.deliverables}
+                    onChange={e => setForm({ ...form, deliverables: e.target.value })}
+                    placeholder="30s master; 15s cutdown; social crops" />
+                </div>
+              </>
+            )}
+          </div>
+
+          <div className="flex gap-3 pt-4 border-t mt-4">
+            <button onClick={save} disabled={!form.name || !form.client}
+              className="flex-1 bg-black text-white py-2 rounded-lg text-sm font-medium disabled:opacity-40 hover:bg-zinc-800">
+              {modal === 'create' ? 'Create' : 'Save changes'}
+            </button>
+            <button onClick={close} className="px-4 py-2 text-sm text-gray-500 hover:text-gray-800">Cancel</button>
           </div>
         </Modal>
       )}
+    </div>
+  );
+}
+
+function PF({ label, k, form, setForm, placeholder = '', type = 'text' }: { label: string; k: string; form: any; setForm: any; placeholder?: string; type?: string }) {
+  return (
+    <div>
+      <label className="block text-xs font-medium text-gray-700 mb-1">{label}</label>
+      <input type={type} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-black"
+        value={form[k] ?? ''} onChange={e => setForm((f: any) => ({ ...f, [k]: e.target.value }))} placeholder={placeholder} />
+    </div>
+  );
+}
+function PSel({ label, k, form, setForm, options }: { label: string; k: string; form: any; setForm: any; options: string[] }) {
+  return (
+    <div>
+      <label className="block text-xs font-medium text-gray-700 mb-1">{label}</label>
+      <select className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none"
+        value={form[k] ?? ''} onChange={e => setForm((f: any) => ({ ...f, [k]: e.target.value }))}>
+        <option value="">—</option>
+        {options.map(o => <option key={o} value={o}>{o}</option>)}
+      </select>
+    </div>
+  );
+}
+function PCk({ label, k, form, setForm }: { label: string; k: string; form: any; setForm: any }) {
+  return (
+    <div className="flex items-center gap-2">
+      <input type="checkbox" checked={!!form[k]} onChange={e => setForm((f: any) => ({ ...f, [k]: e.target.checked }))} className="rounded" />
+      <label className="text-sm text-gray-700">{label}</label>
     </div>
   );
 }
