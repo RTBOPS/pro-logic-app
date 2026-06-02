@@ -1,65 +1,101 @@
-import Image from "next/image";
+'use client';
 
-export default function Home() {
+import { useData } from '@/hooks/useData';
+import { Film, Users, Package, MapPin } from 'lucide-react';
+import Link from 'next/link';
+
+const STATUS_COLOR: Record<string, string> = {
+  new: 'bg-blue-100 text-blue-700',
+  active: 'bg-green-100 text-green-700',
+  completed: 'bg-gray-100 text-gray-600',
+  cancelled: 'bg-red-100 text-red-600',
+};
+
+export default function Dashboard() {
+  const { data: productions, loading: lp } = useData('productions');
+  const { data: crew, loading: lc } = useData('crew');
+  const { data: inventory, loading: li } = useData('inventory');
+  const { data: locations } = useData('locations');
+
+  const stats = [
+    { label: 'Productions', value: productions.length, icon: Film, href: '/productions', color: 'text-purple-600 bg-purple-50' },
+    { label: 'Crew', value: crew.length, icon: Users, href: '/crew', color: 'text-blue-600 bg-blue-50' },
+    { label: 'Equipment', value: inventory.length, icon: Package, href: '/inventory', color: 'text-green-600 bg-green-50' },
+    { label: 'Locations', value: locations.length, icon: MapPin, href: '/locations', color: 'text-orange-600 bg-orange-50' },
+  ];
+
+  const recent = productions.slice(0, 4);
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <div className="p-8">
+      <div className="mb-8">
+        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+        <p className="text-gray-500 text-sm mt-1">Overview of your studio operations</p>
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
+        {stats.map(({ label, value, icon: Icon, href, color }) => (
+          <Link key={href} href={href}>
+            <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition-shadow cursor-pointer">
+              <div className={`inline-flex p-2 rounded-lg mb-3 ${color}`}>
+                <Icon size={20} />
+              </div>
+              <div className="text-2xl font-bold text-gray-900">
+                {lp || lc || li ? '—' : value}
+              </div>
+              <div className="text-sm text-gray-500 mt-0.5">{label}</div>
+            </div>
+          </Link>
+        ))}
+      </div>
+
+      {/* Recent productions */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="flex items-center justify-between px-6 py-4 border-b">
+          <h2 className="font-semibold text-gray-800">Recent Productions</h2>
+          <Link href="/productions" className="text-sm text-blue-600 hover:underline">
+            View all
+          </Link>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+        {lp ? (
+          <div className="p-6 text-gray-400 text-sm">Loading…</div>
+        ) : recent.length === 0 ? (
+          <div className="p-6 text-gray-400 text-sm">No productions yet.</div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
+              <tr>
+                <th className="text-left px-6 py-3">Name</th>
+                <th className="text-left px-6 py-3">Client</th>
+                <th className="text-left px-6 py-3">Status</th>
+                <th className="text-left px-6 py-3">Location</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {recent.map((p: any) => {
+                const loc = locations.find((l: any) => l.id === p.location_id);
+                return (
+                  <tr key={p.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-3 font-medium text-gray-900">
+                      <Link href={`/productions/${p.id}`} className="hover:underline">
+                        {p.name}
+                      </Link>
+                    </td>
+                    <td className="px-6 py-3 text-gray-600">{p.client}</td>
+                    <td className="px-6 py-3">
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize ${STATUS_COLOR[p.status] || 'bg-gray-100 text-gray-600'}`}>
+                        {p.status}
+                      </span>
+                    </td>
+                    <td className="px-6 py-3 text-gray-500">{loc?.name || '—'}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
     </div>
   );
 }
