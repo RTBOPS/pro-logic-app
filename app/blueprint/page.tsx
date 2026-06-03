@@ -157,11 +157,12 @@ export default function BlueprintPage() {
 
       <style>{`
         @media print {
-          body > div > aside,
-          body > div > div > div:first-child,
-          .no-print { display: none !important; }
-          body, html { height: auto !important; overflow: visible !important; }
-          .blueprint-canvas-wrap { width: 100vw !important; height: 100vh !important; }
+          * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+          aside, nav, .no-print { display: none !important; visibility: hidden !important; }
+          body, html { margin: 0; padding: 0; height: auto; overflow: visible; }
+          body > div { display: block !important; }
+          .blueprint-canvas-wrap { position: fixed !important; top: 0; left: 0; width: 100vw !important; height: 100vh !important; z-index: 9999; background: white; }
+          canvas { width: 100% !important; height: 100% !important; }
         }
       `}</style>
     </div>

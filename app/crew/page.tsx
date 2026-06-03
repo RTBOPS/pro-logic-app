@@ -43,7 +43,7 @@ const emptyForm = {
   classification: 'Crew', union_status: 'Non-Union', status: 'Available',
   picture: DEFAULT_PICTURE, headshot_url: '', resume_url: '', portfolio_url: '',
   // Contact
-  phone: '', email: '', city: '', state_country: '',
+  phone: '', email: '', address: '', city: '', state: '', country: 'USA', zip: '',
   emergency_contact_name: '', emergency_contact_phone: '',
   // Personal
   dob: '', gender: '', shirt_size: '', shoe_size: '',
@@ -109,7 +109,7 @@ export default function CrewPage() {
       picture: c.picture || DEFAULT_PICTURE, headshot_url: c.headshot_url || '',
       resume_url: c.resume_url || '', portfolio_url: c.portfolio_url || '',
       phone: c.phone || '', email: c.email || '',
-      city: c.city || '', state_country: c.state_country || '',
+      address: c.address || '', city: c.city || '', state: c.state || c.state_country?.split(',')[0]?.trim() || '', country: c.country || 'USA', zip: c.zip || '',
       emergency_contact_name: c.emergency_contact_name || '',
       emergency_contact_phone: c.emergency_contact_phone || '',
       dob: c.dob || '', gender: c.gender || '',
@@ -435,9 +435,14 @@ export default function CrewPage() {
                   {fld('Phone', 'phone', '+1 555…', 'tel')}
                   {fld('Email', 'email', 'crew@email.com', 'email')}
                 </div>
+                {fld('Address', 'address', '123 Main St')}
                 <div className="grid grid-cols-2 gap-3">
-                  {fld('City', 'city', 'Austin')}
-                  {fld('State / Country', 'state_country', 'TX, USA')}
+                  {fld('City', 'city', 'Los Angeles')}
+                  {fld('State', 'state', 'CA')}
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  {fld('ZIP', 'zip', '90001')}
+                  {fld('Country', 'country', 'USA')}
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   {fld('Emergency Contact', 'emergency_contact_name', 'Contact name')}

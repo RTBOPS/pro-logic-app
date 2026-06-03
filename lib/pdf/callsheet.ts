@@ -39,7 +39,7 @@ function maybeNewPage(doc: jsPDF, y: number, margin = 260): number {
 }
 /* ─────────────────────────────────────────────────── */
 
-export async function generateCallSheet({ production, crew, locations, inventory, preview }: PDFContext) {
+export async function generateCallSheet({ production, crew, locations, inventory, preview, weather }: PDFContext) {
   const doc = new jsPDF({ unit: 'mm', format: 'letter' });
   const pageW = doc.internal.pageSize.getWidth();
   const today = new Date();
@@ -103,6 +103,13 @@ export async function generateCallSheet({ production, crew, locations, inventory
   doc.setTextColor(100, 100, 100);
   const safety = 'Safety first. All crew must follow set safety protocols.';
   doc.text(safety, cx + (colW - 2) / 2, y + 42, { align: 'center' });
+  // Weather
+  if (weather) {
+    const wStr = `${weather.temp_high}°/${weather.temp_low}°F · ${weather.description} · ${weather.precipitation}% rain`;
+    doc.setFontSize(7);
+    doc.setTextColor(60, 100, 180);
+    doc.text(wStr, cx + (colW - 2) / 2, y + 49, { align: 'center' });
+  }
   doc.setTextColor(0, 0, 0);
 
   // Right: call times table
@@ -146,8 +153,13 @@ export async function generateCallSheet({ production, crew, locations, inventory
       doc.setFontSize(7.5);
       bold(doc); doc.text(String(idx + 1), lxs[0], y + 5); normal(doc);
       doc.setTextColor(0, 80, 180);
-      doc.text(loc.name || '', lxs[1], y + 3); doc.setTextColor(80, 80, 80);
-      doc.text([loc.address || '', [loc.city, loc.state].filter(Boolean).join(', ')].filter(Boolean).join('\n'), lxs[1], y + 6.5, { maxWidth: 54 });
+      doc.text(loc.name || '', lxs[1], y + 3);
+      doc.setFontSize(6); doc.setTextColor(0, 100, 200);
+      const addr = [loc.address, [loc.city, loc.state].filter(Boolean).join(', ')].filter(Boolean).join(', ');
+      const mapUrl = `maps.google.com/?q=${encodeURIComponent(addr)}`;
+      doc.text(mapUrl, lxs[1], y + 7, { maxWidth: 54 });
+      doc.setFontSize(7.5); doc.setTextColor(80, 80, 80);
+      doc.text(addr, lxs[1], y + 10, { maxWidth: 54 });
       doc.setTextColor(0, 0, 0);
       doc.text(loc.parking_info || '—', lxs[2], y + 5, { maxWidth: 44 });
       doc.text(loc.nearest_hospital || '—', lxs[3], y + 5, { maxWidth: 40 });

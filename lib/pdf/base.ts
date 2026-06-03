@@ -6,6 +6,7 @@ export type PDFContext = {
   locations: any[];
   inventory: any[];
   preview?: boolean;
+  weather?: { temp_high: number; temp_low: number; description: string; icon: string; precipitation: number } | null;
 };
 
 export function createDoc(orientation: 'p' | 'l' = 'p'): jsPDF {

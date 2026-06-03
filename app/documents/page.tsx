@@ -33,14 +33,27 @@ export default function DocumentsPage() {
   const [generating, setGenerating] = useState<string | null>(null);
   const [preview, setPreview] = useState<{ title: string; dataUri: string; docItem: typeof DOCS[0] } | null>(null);
 
-  const getContext = () => {
+  const getContext = async (includeWeather = false) => {
     const production = productions.find((p: any) => p.id === selectedProduction);
-    return { production, crew, locations, inventory };
+    let weather = null;
+    if (includeWeather && production) {
+      try {
+        const loc = locations.find((l: any) => l.id === production.location_id);
+        const city = loc?.city || production.city || production.primary_location;
+        if (city) {
+          const res = await fetch(`/api/weather?city=${encodeURIComponent(city)}`);
+          const data = await res.json();
+          weather = data.forecast?.[0] || null;
+        }
+      } catch {}
+    }
+    return { production, crew, locations, inventory, weather };
   };
 
   const handlePreview = async (docItem: typeof DOCS[0]) => {
     if (!selectedProduction) { alert('Please select a production first.'); return; }
-    const ctx = getContext();
+    const isCallSheet = docItem.id === 'call-sheet';
+    const ctx = await getContext(isCallSheet);
     if (!ctx.production) return;
     setGenerating(docItem.id + '-preview');
     try {
@@ -56,7 +69,7 @@ export default function DocumentsPage() {
 
   const handleDownload = async (docItem: typeof DOCS[0]) => {
     if (!selectedProduction) { alert('Please select a production first.'); return; }
-    const ctx = getContext();
+    const ctx = await getContext(docItem.id === 'call-sheet');
     if (!ctx.production) return;
     setGenerating(docItem.id + '-download');
     try {
