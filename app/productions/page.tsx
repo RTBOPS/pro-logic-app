@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useData } from '@/hooks/useData';
+import { useRouter } from 'next/navigation';
 import { addDoc, updateDoc, deleteDoc, collection, doc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import Modal from '@/components/Modal';
@@ -55,9 +56,12 @@ const empty = {
 };
 
 export default function ProductionsPage() {
+  const router = useRouter();
   const { data: productions, loading } = useData('productions');
   const { data: locations } = useData('locations');
   const { data: crew } = useData('crew');
+  const { data: inventory } = useData('inventory');
+  const { data: transportation } = useData('transportation');
   const [modal, setModal] = useState<'create' | 'edit' | null>(null);
   const [form, setForm] = useState(empty);
   const [formTab, setFormTab] = useState<'basic' | 'dates' | 'logistics' | 'technical'>('basic');
@@ -151,11 +155,11 @@ export default function ProductionsPage() {
               {productions.map((p: any) => {
                 const loc = locations.find((l: any) => l.id === p.location_id);
                 return (
-                  <tr key={p.id} className="hover:bg-gray-50 group">
+                  <tr key={p.id} className="hover:bg-blue-50 cursor-pointer group" onClick={() => router.push(`/productions/${p.id}`)}>
                     <td className="px-6 py-4 font-medium text-gray-900">
-                      <Link href={`/productions/${p.id}`} className="flex items-center gap-1 hover:text-blue-600">
-                        {p.name}<ChevronRight size={14} className="opacity-0 group-hover:opacity-100 transition-opacity" />
-                      </Link>
+                      <div className="flex items-center gap-1">
+                        {p.name}<ChevronRight size={14} className="opacity-0 group-hover:opacity-100 transition-opacity text-blue-500" />
+                      </div>
                     </td>
                     <td className="px-6 py-4 text-gray-600">{p.client}</td>
                     <td className="px-6 py-4 text-gray-500 text-xs">
@@ -165,7 +169,7 @@ export default function ProductionsPage() {
                       <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize ${STATUS_COLOR[p.status]||'bg-gray-100 text-gray-600'}`}>{p.status}</span>
                     </td>
                     <td className="px-6 py-4 text-gray-500">{loc?.name||'—'}</td>
-                    <td className="px-6 py-4">
+                    <td className="px-6 py-4" onClick={e => e.stopPropagation()}>
                       <div className="flex items-center gap-2 justify-end">
                         <button onClick={() => openEdit(p)} className="text-gray-400 hover:text-gray-700 transition-colors"><Pencil size={15}/></button>
                         <button onClick={() => remove(p.id)} className="text-gray-400 hover:text-red-600 transition-colors"><Trash2 size={15}/></button>
@@ -313,8 +317,55 @@ export default function ProductionsPage() {
                   <PCk label="Lodging" k="lodging_needed" form={form} setForm={setForm} />
                   <PCk label="Travel" k="travel_needed" form={form} setForm={setForm} />
                 </div>
-                <PF label="Vehicles needed" k="vehicles_needed" form={form} setForm={setForm} placeholder="Production van; Cube truck" />
-                <PF label="Equipment summary" k="equipment_needed" form={form} setForm={setForm} placeholder="Camera package; Lighting; Grip truck" />
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Vehicles needed <span className="text-gray-400 font-normal">(from Transportation)</span></label>
+                  {transportation.length === 0 ? (
+                    <p className="text-xs text-gray-400 border border-dashed border-gray-200 rounded-lg px-3 py-2">No vehicles yet — add them in <strong>Transportation</strong> first.</p>
+                  ) : (
+                    <div className="border border-gray-200 rounded-lg overflow-hidden divide-y divide-gray-100">
+                      {transportation.map((v: any) => {
+                        const selected = (form.vehicles_needed || '').split(';').filter(Boolean).includes(v.name);
+                        return (
+                          <label key={v.id} className={`flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-gray-50 ${selected ? 'bg-blue-50' : ''}`}>
+                            <input type="checkbox" checked={selected} className="rounded"
+                              onChange={e => {
+                                const parts = (form.vehicles_needed || '').split(';').filter(Boolean);
+                                const updated = e.target.checked ? [...parts, v.name] : parts.filter(x => x !== v.name);
+                                setForm((f: any) => ({ ...f, vehicles_needed: updated.join(';') }));
+                              }} />
+                            <span className="text-sm text-gray-800">{v.name}</span>
+                            {v.type && <span className="text-xs text-gray-400">{v.type}</span>}
+                            {v.plate && <span className="text-xs text-gray-400 ml-auto">{v.plate}</span>}
+                          </label>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Equipment needed <span className="text-gray-400 font-normal">(from Inventory)</span></label>
+                  {inventory.length === 0 ? (
+                    <p className="text-xs text-gray-400 border border-dashed border-gray-200 rounded-lg px-3 py-2">No inventory yet — add items in <strong>Inventory</strong> first.</p>
+                  ) : (
+                    <div className="border border-gray-200 rounded-lg overflow-hidden max-h-40 overflow-y-auto divide-y divide-gray-100">
+                      {inventory.map((i: any) => {
+                        const selected = (form.equipment_needed || '').split(';').filter(Boolean).includes(i.name);
+                        return (
+                          <label key={i.id} className={`flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-gray-50 ${selected ? 'bg-blue-50' : ''}`}>
+                            <input type="checkbox" checked={selected} className="rounded"
+                              onChange={e => {
+                                const parts = (form.equipment_needed || '').split(';').filter(Boolean);
+                                const updated = e.target.checked ? [...parts, i.name] : parts.filter(x => x !== i.name);
+                                setForm((f: any) => ({ ...f, equipment_needed: updated.join(';') }));
+                              }} />
+                            <span className="text-sm text-gray-800 truncate">{i.name}</span>
+                            {i.brand && <span className="text-xs text-gray-400 shrink-0">{i.brand}</span>}
+                          </label>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               </>
             )}
 

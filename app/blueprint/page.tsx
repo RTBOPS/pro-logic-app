@@ -44,16 +44,16 @@ export default function BlueprintPage() {
   );
 
   return (
-    <div className="p-6 h-screen flex flex-col">
+    <div className="flex flex-col h-screen">
       {/* Header */}
-      <div className="flex items-center justify-between mb-4 shrink-0 no-print">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Location Blueprint</h1>
-          <p className="text-gray-500 text-sm mt-0.5">Design your set layout and equipment placement</p>
+      <div className="flex items-center justify-between px-4 md:px-6 py-3 border-b bg-white shrink-0 no-print gap-2 flex-wrap">
+        <div className="hidden md:block">
+          <h1 className="text-xl font-bold text-gray-900">Location Blueprint</h1>
+          <p className="text-gray-500 text-xs mt-0.5">Set layout & equipment placement</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 flex-1 md:flex-none flex-wrap">
           <select
-            className="border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-700"
+            className="flex-1 md:flex-none border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-700 min-w-0"
             value={selectedProduction}
             onChange={e => setSelectedProduction(e.target.value)}
           >
@@ -62,18 +62,13 @@ export default function BlueprintPage() {
           </select>
           {selectedProduction && (
             <>
-              <button
-                onClick={save}
-                disabled={saving}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors ${saved ? 'bg-green-600 text-white' : 'bg-black text-white hover:bg-zinc-800'}`}
-              >
-                <Save size={14} /> {saving ? 'Saving…' : saved ? 'Saved!' : 'Save'}
+              <button onClick={save} disabled={saving}
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-colors ${saved ? 'bg-green-600 text-white' : 'bg-black text-white hover:bg-zinc-800'}`}>
+                <Save size={13} /> {saving ? '…' : saved ? '✓' : 'Save'}
               </button>
-              <button
-                onClick={() => window.print()}
-                className="flex items-center gap-2 border border-gray-200 text-gray-700 px-4 py-2 rounded-xl text-sm hover:bg-gray-50"
-              >
-                <Printer size={14} /> Print
+              <button onClick={() => window.print()}
+                className="flex items-center gap-1.5 border border-gray-200 text-gray-700 px-3 py-2 rounded-xl text-sm hover:bg-gray-50">
+                <Printer size={13} /> Print
               </button>
             </>
           )}
@@ -81,18 +76,18 @@ export default function BlueprintPage() {
       </div>
 
       {!selectedProduction ? (
-        <div className="flex-1 bg-white rounded-2xl border border-dashed border-gray-200 flex items-center justify-center text-gray-400">
+        <div className="flex-1 bg-white m-4 rounded-2xl border border-dashed border-gray-200 flex items-center justify-center text-gray-400 text-sm">
           Select a production to start designing your set layout.
         </div>
       ) : (
-        <div className="flex-1 flex gap-4 overflow-hidden min-h-0">
-          {/* Canvas */}
+        <div className="flex-1 flex flex-col md:flex-row gap-0 overflow-hidden min-h-0">
+          {/* Canvas — full screen on mobile */}
           <div className="flex-1 overflow-hidden blueprint-canvas-wrap">
             <BlueprintCanvas items={items} onChange={setItems} productionId={selectedProduction} />
           </div>
 
-          {/* Right panel: equipment + crew list */}
-          <div className="w-64 shrink-0 flex flex-col gap-4 overflow-y-auto no-print">
+          {/* Right panel — hidden on mobile, shown on md+ */}
+          <div className="hidden md:flex w-64 shrink-0 flex-col gap-4 overflow-y-auto p-2 no-print border-l bg-gray-50">
             {/* Production info */}
             <div className="bg-zinc-900 text-white rounded-xl p-4">
               <div className="font-bold">{production?.name}</div>

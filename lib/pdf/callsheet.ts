@@ -25,6 +25,20 @@ async function fetchMapDataUrl(address: string): Promise<string | null> {
   } catch { return null; }
 }
 
+/* ── Weather icon helper ─────────────────────────── */
+function weatherIcon(description: string): string {
+  const d = description.toLowerCase();
+  if (d.includes('thunder')) return '⛈';
+  if (d.includes('snow') || d.includes('blizzard')) return '❄️';
+  if (d.includes('heavy rain') || d.includes('heavy shower')) return '🌧';
+  if (d.includes('rain') || d.includes('drizzle') || d.includes('shower')) return '🌦';
+  if (d.includes('fog') || d.includes('mist') || d.includes('haze')) return '🌫';
+  if (d.includes('overcast') || d.includes('cloudy')) return '☁️';
+  if (d.includes('partly') || d.includes('mainly clear')) return '⛅';
+  if (d.includes('wind')) return '💨';
+  return '☀️';
+}
+
 /* ── PDF helpers ────────────────────────────────── */
 function bold(doc: jsPDF) { doc.setFont('helvetica', 'bold'); }
 function normal(doc: jsPDF) { doc.setFont('helvetica', 'normal'); }
@@ -148,7 +162,7 @@ export async function generateCallSheet({ production, crew, locations, inventory
 
   /* ── THREE-COLUMN BLOCK ── */
   const colW = (pageW - 20) / 3;
-  const blockH = 56;
+  const blockH = weather ? 66 : 56;
 
   // Left: production + studio info
   doc.setFillColor(248, 248, 248);
@@ -189,14 +203,21 @@ export async function generateCallSheet({ production, crew, locations, inventory
   doc.text(shootDate, cx + (colW - 2) / 2, y + 32, { align: 'center' });
   doc.setFontSize(6.5); doc.setTextColor(100, 100, 100);
   doc.text('Safety first. Follow all on-set safety protocols.', cx + (colW - 2) / 2, y + 40, { align: 'center' });
+  // Weather with icons
   if (weather) {
-    doc.setFontSize(7); doc.setTextColor(30, 100, 200);
-    doc.text(`☀ ${weather.temp_high}°/${weather.temp_low}°F · ${weather.description} · ${weather.precipitation}% rain`,
-      cx + (colW - 2) / 2, y + 48, { align: 'center' });
+    const wIcon = weatherIcon(weather.description);
+    doc.setFontSize(11);
+    doc.text(wIcon, cx + 4, y + 50);
+    doc.setFontSize(8); bold(doc); doc.setTextColor(30, 70, 180);
+    doc.text(`${weather.temp_high}° / ${weather.temp_low}°F`, cx + 12, y + 50);
+    doc.setFontSize(6.5); normal(doc); doc.setTextColor(80, 80, 80);
+    doc.text(weather.description, cx + 12, y + 54.5);
+    doc.setFontSize(6); doc.setTextColor(0, 120, 200);
+    doc.text(`💧 ${weather.precipitation}% · 💨 ${weather.wind_speed || '—'} mph`, cx + 12, y + 59);
   }
   doc.setTextColor(0, 0, 0);
 
-  // Right: call times + QR code
+  // Right: call times only (no QR here)
   const rx = 10 + colW * 2 + 2;
   doc.setFillColor(248, 248, 248);
   doc.rect(rx, y, colW - 2, blockH, 'F');
@@ -218,13 +239,6 @@ export async function generateCallSheet({ production, crew, locations, inventory
     normal(doc); doc.text(time, rx + colW - 4, ry, { align: 'right' });
     ry += 6;
   });
-  // QR code
-  if (qrDataUrl) {
-    doc.addImage(qrDataUrl, 'PNG', rx + (colW - 2) / 2 - 8, y + blockH - 18, 16, 16);
-    doc.setFontSize(5.5); doc.setTextColor(120, 120, 120);
-    doc.text('Scan to import', rx + (colW - 2) / 2, y + blockH - 1, { align: 'center' });
-    doc.setTextColor(0, 0, 0);
-  }
 
   y += blockH + 4;
 
