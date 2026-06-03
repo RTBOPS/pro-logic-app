@@ -91,7 +91,7 @@ export default function ProductionsPage() {
   };
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-8">
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Productions</h1>
@@ -113,7 +113,30 @@ export default function ProductionsPage() {
         </div>
       ) : (
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          <table className="w-full text-sm">
+          {/* Mobile cards */}
+          <div className="md:hidden divide-y divide-gray-50">
+            {productions.map((p: any) => {
+              const loc = locations.find((l: any) => l.id === p.location_id);
+              return (
+                <div key={p.id} className="p-4">
+                  <div className="flex items-start justify-between gap-2">
+                    <Link href={`/productions/${p.id}`} className="flex-1 min-w-0">
+                      <div className="font-semibold text-gray-900 truncate">{p.name}</div>
+                      <div className="text-xs text-gray-500 mt-0.5">{p.client}{loc?.name ? ` · ${loc.name}` : ''}</div>
+                      {p.start_date && <div className="text-xs text-gray-400 mt-1">{new Date(p.start_date+'T12:00:00').toLocaleDateString('en',{month:'short',day:'numeric',year:'numeric'})}</div>}
+                    </Link>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLOR[p.status]||'bg-gray-100 text-gray-600'}`}>{p.status}</span>
+                      <button onClick={() => openEdit(p)} className="text-gray-400 hover:text-gray-700"><Pencil size={14}/></button>
+                      <button onClick={() => remove(p.id)} className="text-gray-400 hover:text-red-600"><Trash2 size={14}/></button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {/* Desktop table */}
+          <table className="hidden md:table w-full text-sm">
             <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
               <tr>
                 <th className="text-left px-6 py-3">Name</th>
@@ -131,32 +154,21 @@ export default function ProductionsPage() {
                   <tr key={p.id} className="hover:bg-gray-50 group">
                     <td className="px-6 py-4 font-medium text-gray-900">
                       <Link href={`/productions/${p.id}`} className="flex items-center gap-1 hover:text-blue-600">
-                        {p.name}
-                        <ChevronRight size={14} className="opacity-0 group-hover:opacity-100 transition-opacity" />
+                        {p.name}<ChevronRight size={14} className="opacity-0 group-hover:opacity-100 transition-opacity" />
                       </Link>
                     </td>
                     <td className="px-6 py-4 text-gray-600">{p.client}</td>
                     <td className="px-6 py-4 text-gray-500 text-xs">
-                      {p.start_date ? (
-                        <span>{new Date(p.start_date + 'T12:00:00').toLocaleDateString('en', { month: 'short', day: 'numeric', year: 'numeric' })}
-                          {p.end_date && <> → {new Date(p.end_date + 'T12:00:00').toLocaleDateString('en', { month: 'short', day: 'numeric', year: 'numeric' })}</>}
-                        </span>
-                      ) : '—'}
+                      {p.start_date ? (<span>{new Date(p.start_date+'T12:00:00').toLocaleDateString('en',{month:'short',day:'numeric',year:'numeric'})}{p.end_date&&<> → {new Date(p.end_date+'T12:00:00').toLocaleDateString('en',{month:'short',day:'numeric',year:'numeric'})}</>}</span>) : '—'}
                     </td>
                     <td className="px-6 py-4">
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize ${STATUS_COLOR[p.status] || 'bg-gray-100 text-gray-600'}`}>
-                        {p.status}
-                      </span>
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize ${STATUS_COLOR[p.status]||'bg-gray-100 text-gray-600'}`}>{p.status}</span>
                     </td>
-                    <td className="px-6 py-4 text-gray-500">{loc?.name || '—'}</td>
+                    <td className="px-6 py-4 text-gray-500">{loc?.name||'—'}</td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2 justify-end">
-                        <button onClick={() => openEdit(p)} className="text-gray-400 hover:text-gray-700 transition-colors">
-                          <Pencil size={15} />
-                        </button>
-                        <button onClick={() => remove(p.id)} className="text-gray-400 hover:text-red-600 transition-colors">
-                          <Trash2 size={15} />
-                        </button>
+                        <button onClick={() => openEdit(p)} className="text-gray-400 hover:text-gray-700 transition-colors"><Pencil size={15}/></button>
+                        <button onClick={() => remove(p.id)} className="text-gray-400 hover:text-red-600 transition-colors"><Trash2 size={15}/></button>
                       </div>
                     </td>
                   </tr>

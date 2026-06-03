@@ -1,21 +1,56 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import Sidebar from './Sidebar';
 import AuthGuard from './AuthGuard';
+import { Menu, X } from 'lucide-react';
 
 const PUBLIC_PATHS = ['/auth', '/confirm'];
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const path = usePathname();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const isPublic = PUBLIC_PATHS.some(p => path === p || path.startsWith(p + '/'));
+
+  // Close sidebar on route change
+  useEffect(() => { setSidebarOpen(false); }, [path]);
 
   if (isPublic) return <>{children}</>;
 
   return (
     <AuthGuard>
-      <Sidebar />
-      <main className="flex-1 overflow-auto">{children}</main>
+      {/* Mobile header bar */}
+      <div className="md:hidden fixed top-0 left-0 right-0 z-40 bg-zinc-900 flex items-center justify-between px-4 h-14 shrink-0">
+        <button onClick={() => setSidebarOpen(true)} className="text-white p-1">
+          <Menu size={22} />
+        </button>
+        <img src="/logo.png" alt="PRO-LOGIC" className="h-7 object-contain" style={{ filter: 'brightness(0) invert(1)' }} />
+        <div className="w-8" />
+      </div>
+
+      {/* Mobile overlay */}
+      {sidebarOpen && (
+        <div className="md:hidden fixed inset-0 z-50 flex">
+          <div className="absolute inset-0 bg-black/60" onClick={() => setSidebarOpen(false)} />
+          <div className="relative z-10 w-64 h-full">
+            <button onClick={() => setSidebarOpen(false)} className="absolute top-3 right-3 text-zinc-400 hover:text-white z-20">
+              <X size={20} />
+            </button>
+            <Sidebar />
+          </div>
+        </div>
+      )}
+
+      {/* Desktop sidebar */}
+      <div className="hidden md:flex md:shrink-0">
+        <Sidebar />
+      </div>
+
+      {/* Main content */}
+      <main className="flex-1 overflow-auto pt-14 md:pt-0">
+        {children}
+      </main>
     </AuthGuard>
   );
 }

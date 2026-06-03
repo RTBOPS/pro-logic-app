@@ -18,18 +18,10 @@ async function toDataUrl(url: string): Promise<string | null> {
   } catch { return null; }
 }
 
-/* ── Map image via Nominatim + OSM static tiles ── */
+/* ── Map image via our proxy (avoids CORS) ── */
 async function fetchMapDataUrl(address: string): Promise<string | null> {
   try {
-    const geoRes = await fetch(
-      `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address)}&format=json&limit=1`,
-      { headers: { 'Accept-Language': 'en' } }
-    );
-    const geo = await geoRes.json();
-    if (!geo.length) return null;
-    const { lat, lon } = geo[0];
-    const mapUrl = `https://staticmap.openstreetmap.de/staticmap.php?center=${lat},${lon}&zoom=15&size=400x200&maptype=mapnik&markers=${lat},${lon},ol-marker-red`;
-    return await toDataUrl(mapUrl);
+    return await toDataUrl(`/api/map?address=${encodeURIComponent(address)}`);
   } catch { return null; }
 }
 

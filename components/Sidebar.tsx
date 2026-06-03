@@ -47,7 +47,7 @@ export default function Sidebar() {
   };
 
   return (
-    <aside className="w-52 min-h-screen bg-zinc-900 text-white flex flex-col shrink-0">
+    <aside className="w-64 md:w-52 h-screen bg-zinc-900 text-white flex flex-col shrink-0 overflow-y-auto">
       <div className="px-5 py-4 border-b border-zinc-700 flex items-center gap-2.5">
         <Image src="/logo.png" alt="Pro-Logic" width={32} height={32} className="rounded" />
         <div>

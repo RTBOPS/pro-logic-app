@@ -27,7 +27,7 @@ export default function Dashboard() {
   const recent = productions.slice(0, 4);
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-8">
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
         <p className="text-gray-500 text-sm mt-1">Overview of your studio operations</p>
@@ -63,7 +63,25 @@ export default function Dashboard() {
         ) : recent.length === 0 ? (
           <div className="p-6 text-gray-400 text-sm">No productions yet.</div>
         ) : (
-          <table className="w-full text-sm">
+          <>
+          {/* Mobile: cards / Desktop: table */}
+          <div className="md:hidden divide-y divide-gray-50">
+            {recent.map((p: any) => {
+              const loc = locations.find((l: any) => l.id === p.location_id);
+              return (
+                <Link key={p.id} href={`/productions/${p.id}`} className="flex items-center justify-between px-4 py-3 hover:bg-gray-50 active:bg-gray-100">
+                  <div>
+                    <div className="font-medium text-gray-900 text-sm">{p.name}</div>
+                    <div className="text-xs text-gray-400">{p.client}{loc?.name ? ` · ${loc.name}` : ''}</div>
+                  </div>
+                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize shrink-0 ml-2 ${STATUS_COLOR[p.status] || 'bg-gray-100 text-gray-600'}`}>
+                    {p.status}
+                  </span>
+                </Link>
+              );
+            })}
+          </div>
+          <table className="hidden md:table w-full text-sm">
             <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
               <tr>
                 <th className="text-left px-6 py-3">Name</th>
@@ -78,15 +96,11 @@ export default function Dashboard() {
                 return (
                   <tr key={p.id} className="hover:bg-gray-50">
                     <td className="px-6 py-3 font-medium text-gray-900">
-                      <Link href={`/productions/${p.id}`} className="hover:underline">
-                        {p.name}
-                      </Link>
+                      <Link href={`/productions/${p.id}`} className="hover:underline">{p.name}</Link>
                     </td>
                     <td className="px-6 py-3 text-gray-600">{p.client}</td>
                     <td className="px-6 py-3">
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize ${STATUS_COLOR[p.status] || 'bg-gray-100 text-gray-600'}`}>
-                        {p.status}
-                      </span>
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize ${STATUS_COLOR[p.status] || 'bg-gray-100 text-gray-600'}`}>{p.status}</span>
                     </td>
                     <td className="px-6 py-3 text-gray-500">{loc?.name || '—'}</td>
                   </tr>
@@ -94,6 +108,7 @@ export default function Dashboard() {
               })}
             </tbody>
           </table>
+          </>
         )}
       </div>
     </div>

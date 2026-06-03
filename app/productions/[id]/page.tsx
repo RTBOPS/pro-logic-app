@@ -219,7 +219,7 @@ export default function ProductionDetail({ params }: { params: { id: string } })
     });
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-8">
       <Link href="/productions" className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-800 mb-5">
         <ArrowLeft size={14} /> Back to Productions
       </Link>

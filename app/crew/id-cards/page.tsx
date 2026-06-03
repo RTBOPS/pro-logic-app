@@ -45,7 +45,7 @@ export default function IDCardsPage() {
   const handlePrint = () => window.print();
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-8">
       <div className="flex items-center justify-between mb-6 no-print">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><IdCard size={22} /> ID Cards</h1>
