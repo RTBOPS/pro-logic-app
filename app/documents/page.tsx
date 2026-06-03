@@ -1,7 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useData } from '@/hooks/useData';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 import {
   FileText, Users, MapPin, Film, Shield, UserCheck,
   ClipboardList, Printer, Eye, Download, X
@@ -32,6 +34,11 @@ export default function DocumentsPage() {
   const [selectedProduction, setSelectedProduction] = useState('');
   const [generating, setGenerating] = useState<string | null>(null);
   const [preview, setPreview] = useState<{ title: string; dataUri: string; docItem: typeof DOCS[0] } | null>(null);
+  const [company, setCompany] = useState<any>(null);
+
+  useEffect(() => {
+    getDoc(doc(db, 'company', 'profile')).then(s => { if (s.exists()) setCompany(s.data()); });
+  }, []);
 
   const getContext = async (includeWeather = false) => {
     const production = productions.find((p: any) => p.id === selectedProduction);
@@ -47,7 +54,7 @@ export default function DocumentsPage() {
         }
       } catch {}
     }
-    return { production, crew, locations, inventory, weather };
+    return { production, crew, locations, inventory, weather, company };
   };
 
   const handlePreview = async (docItem: typeof DOCS[0]) => {
