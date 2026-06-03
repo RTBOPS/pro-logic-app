@@ -36,23 +36,29 @@ export async function GET(req: NextRequest) {
       `https://c.tile.openstreetmap.org/${zoom}/${x}/${y}.png`,
     ];
 
+    const fetchWithTimeout = async (url: string, ms: number): Promise<Response> => {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), ms);
+      try {
+        return await fetch(url, { headers: { 'User-Agent': 'PRO-LOGIC-Studio/1.0' }, signal: controller.signal });
+      } finally {
+        clearTimeout(timer);
+      }
+    };
+
     let tileBuffer: ArrayBuffer | null = null;
     for (const url of tileServers) {
       try {
-        const res = await fetch(url, {
-          headers: { 'User-Agent': 'PRO-LOGIC-Studio/1.0' },
-          signal: AbortSignal.timeout(8000),
-        });
+        const res = await fetchWithTimeout(url, 8000);
         if (res.ok) { tileBuffer = await res.arrayBuffer(); break; }
       } catch {}
     }
 
     if (!tileBuffer) {
-      // Fallback: try the static map service
       try {
-        const fallback = await fetch(
+        const fallback = await fetchWithTimeout(
           `https://staticmap.openstreetmap.de/staticmap.php?center=${lat},${lon}&zoom=${zoom}&size=400x200&maptype=mapnik`,
-          { headers: { 'User-Agent': 'PRO-LOGIC-Studio/1.0' }, signal: AbortSignal.timeout(10000) }
+          10000
         );
         if (fallback.ok) tileBuffer = await fallback.arrayBuffer();
       } catch {}
