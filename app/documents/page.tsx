@@ -45,16 +45,42 @@ export default function DocumentsPage() {
     let weather = null;
     if (includeWeather && production) {
       try {
+        // Try multiple city sources
         const loc = locations.find((l: any) => l.id === production.location_id);
-        const city = loc?.city || production.city || production.primary_location;
+        const city = loc?.city || loc?.address || production.city || production.primary_location || production.name;
         if (city) {
           const res = await fetch(`/api/weather?city=${encodeURIComponent(city)}`);
           const data = await res.json();
-          weather = data.forecast?.[0] || null;
+          if (!data.error && data.forecast?.length) {
+            // Find forecast day matching shoot date, or use first day
+            const targetDate = production.start_date;
+            weather = targetDate
+              ? data.forecast.find((f: any) => f.date === targetDate) || data.forecast[0]
+              : data.forecast[0];
+          }
         }
       } catch {}
     }
-    return { production, crew, locations, inventory, weather, company };
+    // Load individual crew call times from production's crew subcollection
+    let crewWithTimes = crew;
+    if (production && selectedProduction) {
+      try {
+        const { getDocs, collection } = await import('firebase/firestore');
+        const { db } = await import('@/lib/firebase');
+        const snap = await getDocs(collection(db, 'productions', selectedProduction, 'crew'));
+        const assignments = snap.docs.reduce((acc: any, d) => {
+          const data = d.data() as any;
+          if (data.crew_id) acc[data.crew_id] = data;
+          return acc;
+        }, {});
+        crewWithTimes = crew.map((c: any) => ({
+          ...c,
+          call_time: assignments[c.id]?.call_time || '',
+          confirmation_status: assignments[c.id]?.confirmation_status || '',
+        }));
+      } catch {}
+    }
+    return { production, crew: crewWithTimes, locations, inventory, weather, company };
   };
 
   const handlePreview = async (docItem: typeof DOCS[0]) => {

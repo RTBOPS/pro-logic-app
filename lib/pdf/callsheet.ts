@@ -22,10 +22,24 @@ async function toDataUrl(url: string): Promise<string | null> {
   } catch { return null; }
 }
 
-/* ── Map image via proxy ── */
-async function fetchMapDataUrl(address: string): Promise<string | null> {
-  try { return await toDataUrl(`/api/map?address=${encodeURIComponent(address)}`); }
-  catch { return null; }
+/* ── Invert image to white (for dark backgrounds) using Canvas ── */
+async function toWhite(dataUrl: string | null): Promise<string | null> {
+  if (!dataUrl) return null;
+  try {
+    return await new Promise(resolve => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.naturalWidth; canvas.height = img.naturalHeight;
+        const ctx = canvas.getContext('2d')!;
+        ctx.filter = 'invert(1) brightness(2)';
+        ctx.drawImage(img, 0, 0);
+        resolve(canvas.toDataURL('image/png'));
+      };
+      img.onerror = () => resolve(null);
+      img.src = dataUrl;
+    });
+  } catch { return null; }
 }
 
 /* ── Draw initials avatar (when no photo) ── */
@@ -120,8 +134,11 @@ function drawWeatherIcon(doc: jsPDF, x: number, y: number, description: string, 
 function bold(doc: jsPDF) { doc.setFont('helvetica', 'bold'); }
 function normal(doc: jsPDF) { doc.setFont('helvetica', 'normal'); }
 
+let _brandR = 20, _brandG = 20, _brandB = 20;
+function setBrand(r: number, g: number, b: number) { _brandR = r; _brandG = g; _brandB = b; }
+
 function section(doc: jsPDF, title: string, count: string, y: number, pageW: number): number {
-  doc.setFillColor(20, 20, 20);
+  doc.setFillColor(_brandR, _brandG, _brandB);
   doc.rect(10, y, pageW - 20, 7, 'F');
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(8.5); bold(doc);
@@ -157,11 +174,20 @@ export async function generateCallSheet({ production, crew, locations, inventory
     : new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
 
   /* ── PRE-FETCH IMAGES ── */
-  const [proLogicLogo, companyLogo, productionImage] = await Promise.all([
+  const [proLogicLogoRaw, companyLogo, productionImage] = await Promise.all([
     toDataUrl('/logo.png'),
     company?.logo_url ? toDataUrl(company.logo_url) : Promise.resolve(null),
     production.image_url ? toDataUrl(production.image_url) : Promise.resolve(null),
   ]);
+  // White versions for dark backgrounds
+  const proLogicLogoWhite = await toWhite(proLogicLogoRaw);
+  const companyLogoWhite = await toWhite(companyLogo);
+
+  // Company brand color (r,g,b)
+  const brandHex = company?.primary_color || '#141414';
+  const brandR = parseInt(brandHex.slice(1, 3), 16) || 20;
+  const brandG = parseInt(brandHex.slice(3, 5), 16) || 20;
+  const brandB = parseInt(brandHex.slice(5, 7), 16) || 20;
 
   // Crew avatars — only Firebase Storage
   const crewWithPhotos = await Promise.all(
@@ -191,18 +217,23 @@ export async function generateCallSheet({ production, crew, locations, inventory
     (primaryLoc ? `&location=${encodeURIComponent([primaryLoc.address, primaryLoc.city, primaryLoc.state].filter(Boolean).join(', '))}` : '');
   const qrDataUrl = await QRCode.toDataURL(qrUrl, { width: 200, margin: 1 });
 
+  // Apply brand color to section headers
+  setBrand(brandR, brandG, brandB);
+
   /* ═══════════════════════════════════════════
      HEADER: Company logo | Prod image + title | Call times
   ═══════════════════════════════════════════ */
   let y = 0;
 
-  // Dark header strip
+  // Header strip — use brand color
   const headerH = 16;
-  doc.setFillColor(15, 15, 15);
+  doc.setFillColor(brandR, brandG, brandB);
   doc.rect(0, 0, pageW, headerH, 'F');
 
-  // Company logo — LEFT
-  if (companyLogo) {
+  // Company logo — LEFT (white version on dark header)
+  if (companyLogoWhite) {
+    doc.addImage(companyLogoWhite, 'PNG', 10, 2, 40, 12, undefined, 'FAST');
+  } else if (companyLogo) {
     doc.addImage(companyLogo, 'PNG', 10, 2, 40, 12, undefined, 'FAST');
   } else if (company?.name) {
     doc.setTextColor(255, 255, 255); bold(doc); doc.setFontSize(10);
@@ -365,14 +396,17 @@ export async function generateCallSheet({ production, crew, locations, inventory
       } else {
         drawInitialsAvatar(doc, cxs[0], y + 0.5, 9, `${c.name} ${c.last_name}`, '#7c3aed');
       }
+      const memberCall = c.call_time || production.call_time || '—';
       doc.setFontSize(7.5); normal(doc); doc.setTextColor(0, 0, 0);
       doc.text(`${c.name} ${c.last_name}`, cxs[1], y + 5);
       doc.text(c.role || '—', cxs[2], y + 5);
       doc.text(c.status || '—', cxs[3], y + 5);
       doc.text('—', cxs[4], y + 5);
-      doc.text(production.call_time || '—', cxs[5], y + 5);
-      doc.text(production.call_time ? addMins(production.call_time, -30) : '—', cxs[6], y + 5);
-      doc.text(production.call_time || '—', cxs[7], y + 5);
+      bold(doc); doc.setTextColor(20, 60, 160);
+      doc.text(memberCall, cxs[5], y + 5);
+      normal(doc); doc.setTextColor(0, 0, 0);
+      doc.text(memberCall !== '—' ? addMins(memberCall, -30) : '—', cxs[6], y + 5);
+      doc.text(memberCall, cxs[7], y + 5);
       doc.text(production.wrap_time || '—', cxs[8], y + 5);
       y += rowH;
     });
@@ -419,10 +453,10 @@ export async function generateCallSheet({ production, crew, locations, inventory
         doc.text(`${c.name} ${c.last_name}`, dx + 11, colY[col] + 5);
         doc.setFontSize(6.5); normal(doc); doc.setTextColor(80, 80, 80);
         doc.text(c.role || '', dx + 11, colY[col] + 8.5);
-        doc.setTextColor(0, 0, 0);
+        doc.setTextColor(20, 60, 160);
         bold(doc); doc.setFontSize(7.5);
-        doc.text(production.call_time || '—', dx + halfW - 2, colY[col] + 5, { align: 'right' });
-        normal(doc);
+        doc.text(c.call_time || production.call_time || '—', dx + halfW - 2, colY[col] + 5, { align: 'right' });
+        normal(doc); doc.setTextColor(0, 0, 0);
         colY[col] += rowH;
       }
       colY[col] += 2;
@@ -450,12 +484,14 @@ export async function generateCallSheet({ production, crew, locations, inventory
     doc.text(`${production.name}  |  ${shootDate}  |  Call: ${production.call_time || '--'}`, 13 + qrSize + 5, y + 24);
   }
 
-  // PRO-LOGIC logo bottom right of footer
-  if (proLogicLogo) {
-    doc.addImage(proLogicLogo, 'PNG', pageW - 50, y + (footerH - 12) / 2, 38, 12, undefined, 'FAST');
+  // PRO-LOGIC logo — WHITE — bottom right of footer
+  if (proLogicLogoWhite) {
+    doc.addImage(proLogicLogoWhite, 'PNG', pageW - 50, y + (footerH - 12) / 2, 38, 12, undefined, 'FAST');
+  } else if (proLogicLogoRaw) {
+    doc.addImage(proLogicLogoRaw, 'PNG', pageW - 50, y + (footerH - 12) / 2, 38, 12, undefined, 'FAST');
   } else {
-    doc.setTextColor(150, 150, 150); doc.setFontSize(8); bold(doc);
-    doc.text('PRO-LOGIC', pageW - 12, y + footerH / 2 + 2, { align: 'right' });
+    doc.setTextColor(220, 220, 220); doc.setFontSize(9); bold(doc);
+    doc.text('PRO-LOGIC', pageW - 12, y + footerH / 2 + 3, { align: 'right' });
   }
 
   doc.setTextColor(0, 0, 0); normal(doc);

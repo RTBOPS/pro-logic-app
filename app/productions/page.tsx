@@ -10,6 +10,17 @@ import Modal from '@/components/Modal';
 import Link from 'next/link';
 import { Plus, Pencil, Trash2, ChevronRight, Upload } from 'lucide-react';
 
+// Generate 24H time options every 15 min
+const TIME_OPTIONS = Array.from({ length: 24 * 4 }, (_, i) => {
+  const h = Math.floor(i / 4);
+  const m = (i % 4) * 15;
+  const hh = String(h).padStart(2, '0');
+  const mm = String(m).padStart(2, '0');
+  const ampm = h < 12 ? 'AM' : 'PM';
+  const h12 = h % 12 || 12;
+  return { value: `${h12}:${mm} ${ampm}`, label: `${hh}:${mm}  (${h12}:${mm} ${ampm})` };
+});
+
 const STATUSES = ['Planning', 'Pre-Production', 'Active', 'On Hold', 'Completed', 'Cancelled'];
 const PROD_TYPES = ['Commercial', 'Corporate Video', 'Music Video', 'Feature Film', 'Short Film', 'Documentary', 'Live Event', 'Social Content', 'Other'];
 const BILLING_STATUSES = ['Estimate', 'Quoted', 'Pending', 'Invoiced', 'Paid', 'Overdue'];
@@ -84,7 +95,8 @@ export default function ProductionsPage() {
   const [formTab, setFormTab] = useState<'basic' | 'dates' | 'logistics' | 'technical'>('basic');
   const [editId, setEditId] = useState<string | null>(null);
 
-  const openCreate = () => { setForm(empty); setFormTab('basic'); setModal('create'); };
+  // Always create a fresh copy to prevent stale date/time values
+  const openCreate = () => { setForm({ ...empty }); setFormTab('basic'); setModal('create'); };
   const openEdit = (p: any) => {
     const keys = Object.keys(empty) as (keyof typeof empty)[];
     const f: any = {};
@@ -294,23 +306,41 @@ export default function ProductionsPage() {
                   <PF label="Wrap Date" k="wrap_date" form={form} setForm={setForm} type="date" />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
-                  <PF label="Call Time" k="call_time" form={form} setForm={setForm} placeholder="06:00" />
-                  <PF label="Wrap Time" k="wrap_time" form={form} setForm={setForm} placeholder="18:00" />
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">General Call Time</label>
+                    <select className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none"
+                      value={form.call_time} onChange={e => setForm((f: any) => ({ ...f, call_time: e.target.value }))}>
+                      <option value="">— Select time —</option>
+                      {TIME_OPTIONS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Est. Wrap Time</label>
+                    <select className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none"
+                      value={form.wrap_time} onChange={e => setForm((f: any) => ({ ...f, wrap_time: e.target.value }))}>
+                      <option value="">— Select time —</option>
+                      {TIME_OPTIONS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                    </select>
+                  </div>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <PF label="Country" k="country" form={form} setForm={setForm} placeholder="USA" />
-                  <PF label="City" k="city" form={form} setForm={setForm} placeholder="Austin, TX" />
-                </div>
-                <PF label="Primary Location" k="primary_location" form={form} setForm={setForm} placeholder="Circuit of the Americas" />
-                <PF label="Additional Locations" k="additional_locations" form={form} setForm={setForm} placeholder="Downtown; Hill Country" />
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Location (from saved locations)</label>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Primary Location <span className="text-gray-500 font-normal">(from saved locations)</span></label>
                   <select className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none"
-                    value={form.location_id} onChange={e => setForm({ ...form, location_id: e.target.value })}>
-                    <option value="">— None —</option>
-                    {locations.map((l: any) => <option key={l.id} value={l.id}>{l.name}</option>)}
+                    value={form.location_id} onChange={e => {
+                      const loc = locations.find((l: any) => l.id === e.target.value);
+                      setForm((f: any) => ({
+                        ...f,
+                        location_id: e.target.value,
+                        primary_location: loc?.name || f.primary_location,
+                        city: loc?.city || f.city,
+                        country: loc?.country || f.country,
+                      }));
+                    }}>
+                    <option value="">— Choose location or add in Locations menu —</option>
+                    {locations.map((l: any) => <option key={l.id} value={l.id}>{l.name}{l.city ? ` — ${l.city}` : ''}</option>)}
                   </select>
                 </div>
+                <PF label="Additional Locations / Notes" k="additional_locations" form={form} setForm={setForm} placeholder="Downtown; Hill Country" />
               </>
             )}
 

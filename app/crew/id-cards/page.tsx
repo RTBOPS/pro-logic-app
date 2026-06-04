@@ -2,10 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import { useData } from '@/hooks/useData';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, getDocs, collection } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Printer, IdCard, CreditCard } from 'lucide-react';
 import { deptLabel, DEPARTMENTS } from '@/lib/departments';
+import { useCompany } from '@/hooks/useCompany';
 import QRCode from 'qrcode';
 
 const ACCESS_COLORS: Record<string, { label: string; hex: string }> = {
@@ -24,73 +25,80 @@ const ACCESS_COLORS: Record<string, { label: string; hex: string }> = {
   other:         { label: 'CREW',        hex: '#6b7280' },
 };
 
-function IDCard({ c, company, orientation }: { c: any; company: any; orientation: 'horizontal' | 'vertical' }) {
+function IDCard({ c, company, orientation, productionName }: { c: any; company: any; orientation: 'horizontal' | 'vertical'; productionName?: string }) {
   const [qrUrl, setQrUrl] = useState('');
   const dept = c.department || 'other';
   const access = ACCESS_COLORS[dept] || ACCESS_COLORS.other;
   const code = c.person_code || c.id?.slice(-6).toUpperCase() || 'STAFF';
+  // Use company primary color if available, otherwise department color
+  const headerColor = company?.primary_color || access.hex;
 
   useEffect(() => {
-    const data = JSON.stringify({ id: code, name: `${c.name} ${c.last_name}`, role: c.role, dept: deptLabel(dept), email: c.email, phone: c.phone });
-    QRCode.toDataURL(data, { width: 80, margin: 1 }).then(setQrUrl).catch(() => {});
+    const data = JSON.stringify({ id: code, name: `${c.name} ${c.last_name}`, role: c.role, dept: deptLabel(dept), production: productionName || '', email: c.email });
+    QRCode.toDataURL(data, { width: 100, margin: 1 }).then(setQrUrl).catch(() => {});
   }, [c.id]);
+
+  const imgErr = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    (e.target as HTMLImageElement).style.display = 'none';
+  };
 
   if (orientation === 'vertical') {
     return (
       <div className="id-card bg-white rounded-2xl overflow-hidden shadow-lg border border-gray-200 flex flex-col"
-        style={{ width: '54mm', minHeight: '85.6mm', breakInside: 'avoid', pageBreakInside: 'avoid' }}>
-        {/* Header */}
-        <div className="px-3 py-2 flex items-center justify-between" style={{ backgroundColor: access.hex }}>
+        style={{ width: '54mm', minHeight: '90mm', breakInside: 'avoid', pageBreakInside: 'avoid' }}>
+        {/* Header with company logo LARGE */}
+        <div className="px-3 py-2.5 flex items-center justify-between" style={{ backgroundColor: headerColor }}>
           {company?.logo_url
-            ? <img src={company.logo_url} className="h-5 object-contain" style={{ filter: 'brightness(0) invert(1)' }} alt="" />
-            : <span className="text-white text-xs font-bold">{company?.name || 'STUDIO'}</span>}
-          <img src="/logo.png" className="h-4 object-contain" style={{ filter: 'brightness(0) invert(1)' }} alt="" />
+            ? <img src={company.logo_url} className="h-7 object-contain" style={{ filter: 'brightness(0) invert(1)', maxWidth: '70px' }} alt="" />
+            : <span className="text-white text-sm font-bold tracking-wide">{company?.name || 'STUDIO'}</span>}
+          <img src="/logo.png" className="h-5 object-contain" style={{ filter: 'brightness(0) invert(1)' }} alt="" />
         </div>
         {/* Large photo */}
-        <div className="flex justify-center pt-3 pb-2">
-          <img src={c.picture} className="w-20 h-20 rounded-xl object-cover border-4"
-            style={{ borderColor: access.hex }} alt={c.name}
-            onError={e => { (e.target as HTMLImageElement).src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80"><rect width="80" height="80" fill="%23e5e7eb"/><text x="40" y="44" text-anchor="middle" font-size="24" fill="%236b7280">?</text></svg>'; }} />
+        <div className="flex justify-center pt-3 pb-1">
+          <img src={c.picture} className="w-24 h-24 rounded-xl object-cover border-4"
+            style={{ borderColor: headerColor }} alt={c.name} onError={imgErr} />
         </div>
         {/* Name + role */}
-        <div className="px-3 text-center flex-1">
-          <div className="font-bold text-gray-900 text-sm leading-tight">{c.name}</div>
-          <div className="font-bold text-gray-900 text-sm">{c.last_name}</div>
-          <div className="text-xs text-gray-600 mt-0.5">{c.role || deptLabel(dept)}</div>
-          <div className="text-xs font-mono text-gray-500 mt-1 bg-gray-100 rounded px-2 py-0.5 inline-block">{code}</div>
+        <div className="px-3 text-center flex-1 pb-1">
+          <div className="font-black text-gray-900 text-base leading-tight mt-1">{c.name}</div>
+          <div className="font-black text-gray-900 text-base">{c.last_name}</div>
+          <div className="text-xs text-gray-600 mt-0.5 font-medium">{c.role || deptLabel(dept)}</div>
+          {productionName && <div className="text-xs text-gray-500 mt-0.5 italic">{productionName}</div>}
+          <div className="text-xs font-mono mt-1 bg-gray-100 rounded px-2 py-0.5 inline-block" style={{ color: headerColor }}>{code}</div>
         </div>
         {/* QR */}
-        {qrUrl && <div className="flex justify-center pb-2"><img src={qrUrl} className="w-14 h-14" alt="QR" /></div>}
+        {qrUrl && <div className="flex justify-center pb-1"><img src={qrUrl} className="w-16 h-16" alt="QR" /></div>}
         {/* Access strip */}
-        <div className="py-1.5 text-xs font-bold tracking-widest text-white text-center" style={{ backgroundColor: access.hex }}>
+        <div className="py-1.5 text-xs font-black tracking-widest text-white text-center" style={{ backgroundColor: headerColor }}>
           {access.label}
         </div>
       </div>
     );
   }
 
-  // Horizontal (credit card size)
+  // Horizontal
   return (
     <div className="id-card bg-white rounded-2xl overflow-hidden shadow-lg border border-gray-200 flex flex-col"
       style={{ width: '85.6mm', minHeight: '54mm', breakInside: 'avoid', pageBreakInside: 'avoid' }}>
-      <div className="px-3 py-2 flex items-center justify-between" style={{ backgroundColor: access.hex }}>
+      <div className="px-3 py-2.5 flex items-center justify-between" style={{ backgroundColor: headerColor }}>
         {company?.logo_url
-          ? <img src={company.logo_url} className="h-5 object-contain" style={{ filter: 'brightness(0) invert(1)' }} alt="" />
-          : <span className="text-white text-xs font-bold">{company?.name || 'STUDIO'}</span>}
-        <img src="/logo.png" className="h-4 object-contain" style={{ filter: 'brightness(0) invert(1)' }} alt="" />
+          ? <img src={company.logo_url} className="h-7 object-contain" style={{ filter: 'brightness(0) invert(1)', maxWidth: '80px' }} alt="" />
+          : <span className="text-white text-sm font-bold">{company?.name || 'STUDIO'}</span>}
+        <img src="/logo.png" className="h-5 object-contain" style={{ filter: 'brightness(0) invert(1)' }} alt="" />
       </div>
       <div className="flex gap-3 p-3 flex-1">
-        <img src={c.picture} className="w-16 h-16 rounded-xl object-cover shrink-0 border-3"
-          style={{ borderColor: access.hex, borderWidth: '3px', borderStyle: 'solid' }} alt={c.name}
-          onError={e => { (e.target as HTMLImageElement).src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><rect width="64" height="64" fill="%23e5e7eb"/><text x="32" y="36" text-anchor="middle" font-size="20" fill="%236b7280">?</text></svg>'; }} />
+        <img src={c.picture} className="w-20 h-20 rounded-xl object-cover shrink-0"
+          style={{ borderColor: headerColor, borderWidth: '3px', borderStyle: 'solid' }}
+          alt={c.name} onError={imgErr} />
         <div className="flex-1 min-w-0">
-          <div className="font-bold text-gray-900 text-sm leading-tight">{c.name} {c.last_name}</div>
-          <div className="text-xs text-gray-600 mt-0.5 truncate">{c.role || deptLabel(dept)}</div>
-          <div className="text-xs font-mono text-gray-500 mt-1 bg-gray-100 rounded px-1.5 py-0.5 inline-block">{code}</div>
+          <div className="font-black text-gray-900 text-base leading-tight">{c.name} {c.last_name}</div>
+          <div className="text-xs text-gray-600 mt-0.5 font-medium">{c.role || deptLabel(dept)}</div>
+          {productionName && <div className="text-xs text-gray-500 italic mt-0.5">{productionName}</div>}
+          <div className="text-xs font-mono mt-1 bg-gray-100 rounded px-1.5 py-0.5 inline-block" style={{ color: headerColor }}>{code}</div>
         </div>
-        {qrUrl && <img src={qrUrl} className="w-14 h-14 shrink-0 rounded" alt="QR" />}
+        {qrUrl && <img src={qrUrl} className="w-16 h-16 shrink-0 rounded" alt="QR" />}
       </div>
-      <div className="py-1.5 text-xs font-bold tracking-widest text-white text-center" style={{ backgroundColor: access.hex }}>
+      <div className="py-1.5 text-xs font-black tracking-widest text-white text-center" style={{ backgroundColor: headerColor }}>
         {access.label} ACCESS
       </div>
     </div>
@@ -98,25 +106,47 @@ function IDCard({ c, company, orientation }: { c: any; company: any; orientation
 }
 
 export default function IDCardsPage() {
-  const { data: crew } = useData('crew');
-  const [company, setCompany] = useState<any>(null);
+  const { data: allCrew } = useData('crew');
+  const { data: productions } = useData('productions');
+  const company = useCompany();
   const [filterDept, setFilterDept] = useState('');
+  const [selectedProd, setSelectedProd] = useState('');
   const [orientation, setOrientation] = useState<'horizontal' | 'vertical'>('horizontal');
+  const [prodCrew, setProdCrew] = useState<string[]>([]); // crew IDs assigned to production
+  const [loadingProd, setLoadingProd] = useState(false);
 
+  // Load crew assigned to selected production
   useEffect(() => {
-    getDoc(doc(db, 'company', 'profile')).then(s => { if (s.exists()) setCompany(s.data()); });
-  }, []);
+    if (!selectedProd) { setProdCrew([]); return; }
+    setLoadingProd(true);
+    getDocs(collection(db, 'productions', selectedProd, 'crew')).then(snap => {
+      setProdCrew(snap.docs.map(d => (d.data() as any).crew_id));
+      setLoadingProd(false);
+    });
+  }, [selectedProd]);
 
-  const filtered = crew.filter((c: any) => !filterDept || (c.department || 'other') === filterDept);
+  // Filter crew: if production selected, only show assigned crew
+  const filtered = allCrew.filter((c: any) => {
+    const inProd = !selectedProd || prodCrew.includes(c.id);
+    const inDept = !filterDept || (c.department || 'other') === filterDept;
+    return inProd && inDept;
+  });
+
+  const selectedProduction = productions.find((p: any) => p.id === selectedProd);
 
   return (
     <div className="p-4 md:p-8">
       <div className="flex items-center justify-between mb-6 no-print flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><IdCard size={22} /> ID Cards</h1>
-          <p className="text-gray-600 text-sm mt-1">{filtered.length} cards · QR code per card with staff info</p>
+          <p className="text-gray-600 text-sm mt-1">{filtered.length} cards · QR code per card</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          <select className="border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-700 min-w-[180px]"
+            value={selectedProd} onChange={e => setSelectedProd(e.target.value)}>
+            <option value="">All crew</option>
+            {productions.map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
           <select className="border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-700"
             value={filterDept} onChange={e => setFilterDept(e.target.value)}>
             <option value="">All departments</option>
@@ -139,14 +169,21 @@ export default function IDCardsPage() {
         </div>
       </div>
 
+      {selectedProd && (
+        <div className="mb-4 bg-blue-50 border border-blue-200 rounded-xl px-4 py-2 text-sm text-blue-700 no-print">
+          Showing {filtered.length} crew member{filtered.length !== 1 ? 's' : ''} assigned to <strong>{selectedProduction?.name}</strong>
+          {loadingProd && ' · Loading…'}
+        </div>
+      )}
+
       {filtered.length === 0 ? (
         <div className="bg-white rounded-2xl border border-dashed border-gray-200 p-12 text-center text-gray-600">
-          No crew members found. Add crew first.
+          {selectedProd ? 'No crew assigned to this production yet. Add crew from the production detail page.' : 'No crew members found. Add crew first.'}
         </div>
       ) : (
-        <div className={`id-card-grid flex flex-wrap gap-4 ${orientation === 'vertical' ? 'items-start' : ''}`}>
+        <div className="id-card-grid flex flex-wrap gap-4">
           {filtered.map(c => (
-            <IDCard key={c.id} c={c} company={company} orientation={orientation} />
+            <IDCard key={c.id} c={c} company={company} orientation={orientation} productionName={selectedProduction?.name} />
           ))}
         </div>
       )}

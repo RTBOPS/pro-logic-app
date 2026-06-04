@@ -1,6 +1,12 @@
 'use client';
 
 import { useEffect, useState, useCallback, use } from 'react';
+
+const TIME_OPTIONS = Array.from({ length: 24 * 4 }, (_, i) => {
+  const h = Math.floor(i / 4); const m = (i % 4) * 15;
+  const ampm = h < 12 ? 'AM' : 'PM'; const h12 = h % 12 || 12;
+  return `${h12}:${String(m).padStart(2,'0')} ${ampm}`;
+});
 import { doc, getDoc, updateDoc, collection, getDocs, addDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useData } from '@/hooks/useData';
@@ -127,8 +133,14 @@ export default function ProductionDetail({ params }: { params: Promise<{ id: str
       role: member.role, department: member.department || 'other',
       picture: member.picture, email: member.email || '', phone: member.phone || '',
       confirmation_status: 'pending', confirm_token: token,
+      call_time: production?.call_time || '', // individual call time, defaults to production call time
     });
     await loadAssignments();
+  };
+
+  const updateCrewCallTime = async (assignId: string, call_time: string) => {
+    await updateDoc(doc(db, 'productions', id, 'crew', assignId), { call_time });
+    setAssignedCrew(prev => prev.map(c => c.id === assignId ? { ...c, call_time } : c));
   };
 
   const removeCrew = async (assignId: string) => {
@@ -391,6 +403,16 @@ export default function ProductionDetail({ params }: { params: Promise<{ id: str
                           <span className="text-gray-600">{c.role || deptLabel(c.department)}</span>
                         </div>
                       </div>
+                      {/* Individual call time */}
+                      <select
+                        className="text-xs border border-gray-200 rounded-lg px-1.5 py-1 text-gray-700 shrink-0"
+                        value={c.call_time || production?.call_time || ''}
+                        onChange={e => updateCrewCallTime(c.id, e.target.value)}
+                        title="Individual call time"
+                      >
+                        <option value="">— Call time —</option>
+                        {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
+                      </select>
                       <div className="flex items-center gap-1.5">
                         <ConfirmIcon status={c.confirmation_status || 'pending'} />
                         <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${statusStyle(c.confirmation_status || 'pending')}`}>
