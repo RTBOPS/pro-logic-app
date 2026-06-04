@@ -25,7 +25,7 @@ const empty = {
 interface TeamMember { email: string; role: string; }
 
 export default function CompanyPage() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const namespace = useNamespace();
   const [form, setForm] = useState(empty);
   const [saving, setSaving] = useState(false);
