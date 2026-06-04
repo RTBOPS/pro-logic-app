@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useData } from '@/hooks/useData';
 import { addDoc, updateDoc, deleteDoc, collection, doc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
-import { Plus, Trash2, Pencil, Printer, GripVertical, Eraser, Minus, ImageIcon } from 'lucide-react';
+import { Plus, Trash2, Pencil, Printer, GripVertical, Eraser, Minus, ImageIcon, Pipette } from 'lucide-react';
 import { useNamespace } from '@/hooks/useNamespace';
 import Modal from '@/components/Modal';
 
@@ -20,12 +20,18 @@ interface Panel {
 
 const SHOT_TYPES = ['WS', 'MWS', 'MS', 'MCU', 'CU', 'ECU', 'OTS', 'POV', 'DRONE', 'TILT', 'PAN'];
 
+type Tool = 'pen' | 'pencil' | 'marker' | 'eraser';
+
+const COLORS = ['#111111','#ffffff','#ef4444','#f97316','#eab308','#22c55e','#3b82f6','#8b5cf6','#ec4899','#6b7280','#92400e','#0891b2'];
+
 function DrawingCanvas({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const drawing = useRef(false);
   const lastPos = useRef<{ x: number; y: number } | null>(null);
-  const [tool, setTool] = useState<'pen' | 'eraser'>('pen');
+  const [tool, setTool] = useState<Tool>('pen');
   const [penSize, setPenSize] = useState(2);
+  const [color, setColor] = useState('#111111');
+  const [opacity, setOpacity] = useState(1);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -74,11 +80,35 @@ function DrawingCanvas({ value, onChange }: { value: string; onChange: (v: strin
     ctx.beginPath();
     ctx.moveTo(lastPos.current!.x, lastPos.current!.y);
     ctx.lineTo(pos.x, pos.y);
-    ctx.strokeStyle = tool === 'eraser' ? '#ffffff' : '#111111';
-    ctx.lineWidth = tool === 'eraser' ? penSize * 6 : penSize;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
+    if (tool === 'eraser') {
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.lineWidth = penSize * 8;
+      ctx.strokeStyle = 'rgba(0,0,0,1)';
+    } else if (tool === 'marker') {
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = opacity * 0.45;
+      ctx.lineWidth = penSize * 5;
+      ctx.strokeStyle = color;
+    } else if (tool === 'pencil') {
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = opacity * 0.65;
+      ctx.lineWidth = Math.max(1, penSize * 0.8);
+      ctx.strokeStyle = color;
+      // pencil texture: slight variation
+      ctx.setLineDash([1, Math.random() * 2]);
+    } else {
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = opacity;
+      ctx.lineWidth = penSize;
+      ctx.strokeStyle = color;
+      ctx.setLineDash([]);
+    }
     ctx.stroke();
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.setLineDash([]);
     lastPos.current = pos;
   };
 
@@ -118,27 +148,49 @@ function DrawingCanvas({ value, onChange }: { value: string; onChange: (v: strin
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex items-center gap-2 flex-wrap">
-        <button onClick={() => setTool('pen')}
-          className={`p-1.5 rounded ${tool === 'pen' ? 'bg-black text-white' : 'bg-gray-100'}`} title="Pen">
-          <Pencil size={14} />
-        </button>
-        <button onClick={() => setTool('eraser')}
-          className={`p-1.5 rounded ${tool === 'eraser' ? 'bg-black text-white' : 'bg-gray-100'}`} title="Eraser">
-          <Eraser size={14} />
-        </button>
-        <div className="flex items-center gap-1">
-          <button onClick={() => setPenSize(s => Math.max(1, s - 1))} className="p-1 bg-gray-100 rounded"><Minus size={10} /></button>
-          <span className="text-xs w-4 text-center">{penSize}</span>
-          <button onClick={() => setPenSize(s => Math.min(10, s + 1))} className="p-1 bg-gray-100 rounded"><Plus size={10} /></button>
+      {/* Tool row */}
+      <div className="flex items-center gap-1.5 flex-wrap">
+        {([['pen','Pen',<Pencil size={12}/>],['pencil','Pencil','✏️'],['marker','Marker','🖊️'],['eraser','Eraser',<Eraser size={12}/>]] as const).map(([t, label, icon]: any) => (
+          <button key={t} onClick={() => setTool(t as Tool)} title={label}
+            className={`px-2 py-1 rounded text-xs flex items-center gap-1 ${tool === t ? 'bg-black text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
+            {icon} {label}
+          </button>
+        ))}
+        <div className="flex items-center gap-1 ml-1">
+          <button onClick={() => setPenSize(s => Math.max(1, s - 1))} className="p-1 bg-gray-100 rounded hover:bg-gray-200"><Minus size={10} /></button>
+          <span className="text-xs w-5 text-center font-mono">{penSize}</span>
+          <button onClick={() => setPenSize(s => Math.min(20, s + 1))} className="p-1 bg-gray-100 rounded hover:bg-gray-200"><Plus size={10} /></button>
+        </div>
+        {/* Opacity */}
+        <div className="flex items-center gap-1 ml-1">
+          <span className="text-xs text-gray-500">Opacity</span>
+          <input type="range" min={10} max={100} value={Math.round(opacity * 100)}
+            onChange={e => setOpacity(Number(e.target.value) / 100)}
+            className="w-16 h-1 accent-black" />
+          <span className="text-xs text-gray-500 w-7">{Math.round(opacity * 100)}%</span>
         </div>
         <input ref={bgInputRef} type="file" accept="image/*" className="hidden" onChange={loadBackground} />
-        <button onClick={() => bgInputRef.current?.click()}
-          className="flex items-center gap-1 text-xs px-2 py-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded"
-          title="Load background image">
+        <button onClick={() => bgInputRef.current?.click()} title="Load background image"
+          className="flex items-center gap-1 text-xs px-2 py-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded">
           <ImageIcon size={12} /> BG
         </button>
         <button onClick={clearCanvas} className="ml-auto text-xs text-red-400 hover:text-red-600 px-2 py-1 rounded bg-red-50">Clear</button>
+      </div>
+      {/* Color palette */}
+      <div className="flex items-center gap-1 flex-wrap">
+        {COLORS.map(c => (
+          <button key={c} onClick={() => setColor(c)}
+            className={`w-5 h-5 rounded-full border-2 transition-transform ${color === c ? 'border-black scale-125' : 'border-transparent hover:scale-110'}`}
+            style={{ backgroundColor: c, boxShadow: c === '#ffffff' ? 'inset 0 0 0 1px #ccc' : undefined }}
+            title={c} />
+        ))}
+        <input type="color" value={color} onChange={e => setColor(e.target.value)}
+          className="w-5 h-5 rounded cursor-pointer border border-gray-200" title="Custom color" />
+        {/* Current color preview */}
+        <div className="ml-2 flex items-center gap-1">
+          <div className="w-5 h-5 rounded border border-gray-300" style={{ backgroundColor: color }} />
+          <span className="text-xs text-gray-500 font-mono">{color}</span>
+        </div>
       </div>
       <canvas
         ref={canvasRef}

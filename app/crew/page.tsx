@@ -155,13 +155,18 @@ export default function CrewPage() {
 
   const save = async () => {
     const uid = getUid();
-    if (!form.name || !form.last_name || !uid) return;
-    if (modal === 'create') {
-      await addDoc(collection(db, 'users', uid, 'crew'), form);
-    } else if (editId) {
-      await updateDoc(doc(db, 'users', uid, 'crew', editId), form);
+    if (!form.name) { alert('First name is required.'); return; }
+    if (!uid) { alert('Not logged in. Please refresh and try again.'); return; }
+    try {
+      if (modal === 'create') {
+        await addDoc(collection(db, 'users', uid, 'crew'), form);
+      } else if (editId) {
+        await updateDoc(doc(db, 'users', uid, 'crew', editId), form);
+      }
+      close();
+    } catch (e: any) {
+      alert('Save failed: ' + e.message);
     }
-    close();
   };
 
   const remove = async (id: string) => {
@@ -566,7 +571,7 @@ export default function CrewPage() {
           </div>
 
           <div className="flex gap-3 pt-4 border-t mt-4">
-            <button onClick={save} disabled={!form.name || !form.last_name}
+            <button onClick={save} disabled={!form.name}
               className="flex-1 bg-blue-600 text-white py-2 rounded-lg text-sm font-medium disabled:opacity-40 hover:bg-blue-700">
               {modal === 'create' ? 'Add member' : 'Save changes'}
             </button>

@@ -114,13 +114,18 @@ export default function ProductionsPage() {
 
   const save = async () => {
     const uid = getUid();
-    if (!form.name || !form.client || !uid) return;
-    if (modal === 'create') {
-      await addDoc(collection(db, 'users', uid, 'productions'), form);
-    } else if (editId) {
-      await updateDoc(doc(db, 'users', uid, 'productions', editId), form);
+    if (!form.name) { alert('Production name is required.'); return; }
+    if (!uid) { alert('Not logged in. Please refresh and try again.'); return; }
+    try {
+      if (modal === 'create') {
+        await addDoc(collection(db, 'users', uid, 'productions'), form);
+      } else if (editId) {
+        await updateDoc(doc(db, 'users', uid, 'productions', editId), form);
+      }
+      close();
+    } catch (e: any) {
+      alert('Save failed: ' + e.message);
     }
-    close();
   };
 
   const remove = async (id: string) => {
@@ -455,7 +460,7 @@ export default function ProductionsPage() {
           </div>
 
           <div className="flex gap-3 pt-4 border-t mt-4">
-            <button onClick={save} disabled={!form.name || !form.client}
+            <button onClick={save} disabled={!form.name}
               className="flex-1 bg-black text-white py-2 rounded-lg text-sm font-medium disabled:opacity-40 hover:bg-zinc-800">
               {modal === 'create' ? 'Create' : 'Save changes'}
             </button>
