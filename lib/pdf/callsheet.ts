@@ -3,21 +3,24 @@ import { PDFContext, save } from './base';
 import { DEPARTMENTS } from '../departments';
 import QRCode from 'qrcode';
 
-/* ── Image loader (Firebase Storage + own origin only) ── */
+/* ── Image loader (canvas-based, avoids CORS fetch issues) ── */
 async function toDataUrl(url: string): Promise<string | null> {
-  const safe = url.startsWith('/') ||
-    url.includes('firebasestorage.googleapis.com') ||
-    url.includes('storage.googleapis.com');
-  if (!safe) return null;
+  if (!url) return null;
   try {
-    const res = await fetch(url);
-    if (!res.ok) return null;
-    const blob = await res.blob();
-    return new Promise(resolve => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result as string);
-      reader.onerror = () => resolve(null);
-      reader.readAsDataURL(blob);
+    return await new Promise(resolve => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.naturalWidth || 100;
+          canvas.height = img.naturalHeight || 100;
+          canvas.getContext('2d')!.drawImage(img, 0, 0);
+          resolve(canvas.toDataURL('image/png'));
+        } catch { resolve(null); }
+      };
+      img.onerror = () => resolve(null);
+      img.src = url;
     });
   } catch { return null; }
 }
@@ -58,76 +61,14 @@ function drawInitialsAvatar(doc: jsPDF, x: number, y: number, size: number, name
   doc.setFont('helvetica', 'normal');
 }
 
-/* ── Draw weather icon using only valid jsPDF primitives ── */
-function drawWeatherIcon(doc: jsPDF, x: number, y: number, description: string, size: number = 10) {
-  const d = description.toLowerCase();
-  const cx = x + size / 2;
-  const cy = y + size / 2;
-  const r = size / 2;
-
-  doc.setLineWidth(0.4);
-
-  if (d.includes('thunder') || d.includes('storm')) {
-    // Dark cloud
-    doc.setFillColor(80, 90, 110); doc.ellipse(cx - 1, cy - 1, r * 0.8, r * 0.45, 'F');
-    doc.setFillColor(60, 70, 90); doc.ellipse(cx + 1.5, cy - 2.5, r * 0.55, r * 0.4, 'F');
-    // Lightning bolt using lines
-    doc.setDrawColor(255, 200, 0); doc.setLineWidth(1.2);
-    doc.line(cx - 0.5, cy, cx - 2, cy + 3.5);
-    doc.line(cx - 2, cy + 3.5, cx + 0.5, cy + 3.5);
-    doc.line(cx + 0.5, cy + 3.5, cx - 0.5, cy + size - 1);
-    doc.setLineWidth(0.4);
-  } else if (d.includes('snow') || d.includes('blizzard')) {
-    // Cloud + snow dots
-    doc.setFillColor(160, 180, 210); doc.ellipse(cx, cy - 1.5, r * 0.85, r * 0.5, 'F');
-    doc.setFillColor(180, 210, 240);
-    for (let i = 0; i < 3; i++) {
-      doc.circle(cx - 2.5 + i * 2.5, cy + 3.5, 0.8, 'F');
-      doc.circle(cx - 1.25 + i * 2.5, cy + 5.5, 0.8, 'F');
-    }
-  } else if (d.includes('heavy rain') || d.includes('heavy shower') || d.includes('drizzle') || d.includes('rain') || d.includes('shower')) {
-    // Cloud + rain lines
-    doc.setFillColor(120, 150, 190); doc.ellipse(cx, cy - 1, r * 0.85, r * 0.5, 'F');
-    doc.setDrawColor(60, 120, 200); doc.setLineWidth(0.8);
-    for (let i = 0; i < 4; i++) {
-      const rx = cx - 3.5 + i * 2.2;
-      doc.line(rx, cy + 2, rx - 0.8, cy + 5);
-    }
-    doc.setLineWidth(0.4);
-  } else if (d.includes('fog') || d.includes('mist') || d.includes('haze')) {
-    // Horizontal fog lines
-    doc.setDrawColor(150, 155, 165); doc.setLineWidth(1.2);
-    doc.line(x + 0.5, y + 2.5, x + size - 0.5, y + 2.5);
-    doc.line(x + 1.5, y + 5, x + size - 1.5, y + 5);
-    doc.line(x + 0.5, y + 7.5, x + size - 0.5, y + 7.5);
-    doc.setLineWidth(0.4);
-  } else if (d.includes('overcast') || (d.includes('cloud') && !d.includes('partly'))) {
-    // Double overlapping clouds
-    doc.setFillColor(160, 165, 175); doc.ellipse(cx - 1.5, cy + 0.5, r * 0.8, r * 0.5, 'F');
-    doc.setFillColor(185, 190, 200); doc.ellipse(cx + 1.5, cy - 1.5, r * 0.65, r * 0.45, 'F');
-  } else if (d.includes('partly') || d.includes('mainly clear')) {
-    // Sun + cloud
-    doc.setFillColor(255, 190, 0); doc.circle(cx - 2, cy - 2, r * 0.4, 'F');
-    doc.setDrawColor(255, 160, 0); doc.setLineWidth(0.7);
-    for (let i = 0; i < 5; i++) {
-      const angle = (i * 72 - 20) * Math.PI / 180;
-      doc.line(cx - 2 + Math.cos(angle) * r * 0.52, cy - 2 + Math.sin(angle) * r * 0.52,
-               cx - 2 + Math.cos(angle) * r * 0.82, cy - 2 + Math.sin(angle) * r * 0.82);
-    }
-    doc.setLineWidth(0.4);
-    doc.setFillColor(200, 205, 215); doc.ellipse(cx + 1.5, cy + 1.5, r * 0.72, r * 0.46, 'F');
-  } else {
-    // Clear / sunny: circle with 8 rays
-    doc.setFillColor(255, 195, 0); doc.circle(cx, cy, r * 0.42, 'F');
-    doc.setDrawColor(255, 165, 0); doc.setLineWidth(0.7);
-    for (let i = 0; i < 8; i++) {
-      const angle = (i * 45) * Math.PI / 180;
-      doc.line(cx + Math.cos(angle) * r * 0.55, cy + Math.sin(angle) * r * 0.55,
-               cx + Math.cos(angle) * r * 0.9, cy + Math.sin(angle) * r * 0.9);
-    }
-    doc.setLineWidth(0.4);
-  }
-  doc.setDrawColor(0, 0, 0); doc.setLineWidth(0.2);
+/* ── Draw weather icon using OpenWeatherMap icon URL ── */
+async function drawWeatherIcon(doc: jsPDF, x: number, y: number, iconCode: string, size: number = 10): Promise<void> {
+  if (!iconCode) return;
+  try {
+    const url = `https://openweathermap.org/img/wn/${iconCode}@2x.png`;
+    const dataUrl = await toDataUrl(url);
+    if (dataUrl) doc.addImage(dataUrl, 'PNG', x, y, size, size, undefined, 'FAST');
+  } catch { /* silently skip icon on failure */ }
 }
 
 /* ── PDF helpers ────────────────────────────────── */
@@ -164,7 +105,7 @@ function maybeNewPage(doc: jsPDF, y: number, margin = 258): number {
 }
 
 /* ── MAIN GENERATOR ─────────────────────────────── */
-export async function generateCallSheet({ production, crew, locations, inventory, preview, weather, company }: PDFContext) {
+export async function generateCallSheet({ production, crew, locations, inventory, preview, weather, forecast, company }: PDFContext) {
   const doc = new jsPDF({ unit: 'mm', format: 'letter' });
   const pageW = doc.internal.pageSize.getWidth();
   const pageH = doc.internal.pageSize.getHeight();
@@ -189,12 +130,14 @@ export async function generateCallSheet({ production, crew, locations, inventory
   const brandG = parseInt(brandHex.slice(3, 5), 16) || 20;
   const brandB = parseInt(brandHex.slice(5, 7), 16) || 20;
 
-  // Crew avatars — only Firebase Storage
+  // Crew avatars — load any uploaded photo (skip default placeholder)
+  const DEFAULT_PIC_PATTERN = 'freepik.com';
   const crewWithPhotos = await Promise.all(
-    crew.slice(0, 30).map(async (c: any) => ({
-      ...c,
-      photoData: c.picture?.includes('firebasestorage') ? await toDataUrl(c.picture) : null,
-    }))
+    crew.slice(0, 30).map(async (c: any) => {
+      const pic = c.picture;
+      const skip = !pic || pic.includes(DEFAULT_PIC_PATTERN);
+      return { ...c, photoData: skip ? null : await toDataUrl(pic) };
+    })
   );
 
   // Single assigned location only
@@ -309,7 +252,7 @@ export async function generateCallSheet({ production, crew, locations, inventory
   if (weather) {
     const wy = callY + 12;
     const iconSize = 11;
-    drawWeatherIcon(doc, cx + 3, wy - 2, weather.description, iconSize);
+    await drawWeatherIcon(doc, cx + 3, wy - 2, weather.icon || '', iconSize);
     doc.setFontSize(9); bold(doc); doc.setTextColor(20, 60, 170);
     doc.text(`${weather.temp_high}deg / ${weather.temp_low}deg F`, cx + iconSize + 5, wy + 4);
     doc.setFontSize(7); normal(doc); doc.setTextColor(60, 60, 60);
@@ -343,7 +286,62 @@ export async function generateCallSheet({ production, crew, locations, inventory
     ry2 += 7;
   });
 
-  y += blockH + 8;
+  y += blockH + 4;
+
+  /* ═══════════════════════════════════════════
+     WEATHER FORECAST STRIP (7 days)
+  ═══════════════════════════════════════════ */
+  if (forecast && forecast.length > 0) {
+    y = maybeNewPage(doc, y);
+    // Fetch all weather icons in parallel
+    const iconDataUrls = await Promise.all(
+      forecast.slice(0, 7).map(day => toDataUrl(`https://openweathermap.org/img/wn/${day.icon}@2x.png`))
+    );
+
+    const days = forecast.slice(0, 7);
+    const stripW = pageW - 20;
+    const cellW = stripW / days.length;
+    const stripH = 22;
+    const sx = 10;
+
+    doc.setFillColor(248, 250, 252);
+    doc.rect(sx, y, stripW, stripH, 'F');
+    doc.setDrawColor(220, 220, 220);
+    doc.rect(sx, y, stripW, stripH);
+    doc.setDrawColor(0, 0, 0);
+
+    days.forEach((day: any, i: number) => {
+      const cx2 = sx + i * cellW;
+      // Vertical separator
+      if (i > 0) { doc.setDrawColor(220, 220, 220); doc.line(cx2, y, cx2, y + stripH); doc.setDrawColor(0, 0, 0); }
+      // Date
+      const label = new Date(day.date + 'T12:00:00').toLocaleDateString('en', { weekday: 'short', month: 'short', day: 'numeric' });
+      doc.setFontSize(5.5); normal(doc); doc.setTextColor(100, 100, 100);
+      doc.text(label, cx2 + cellW / 2, y + 3.5, { align: 'center' });
+      // Icon
+      const iconUrl = iconDataUrls[i];
+      const iconSize = 7;
+      const iconX = cx2 + cellW / 2 - iconSize / 2;
+      if (iconUrl) {
+        try { doc.addImage(iconUrl, 'PNG', iconX, y + 4.5, iconSize, iconSize, undefined, 'FAST'); }
+        catch {}
+      }
+      // Temp
+      doc.setFontSize(6); bold(doc); doc.setTextColor(20, 20, 20);
+      doc.text(`${day.temp_high}°/${day.temp_low}°F`, cx2 + cellW / 2, y + 14, { align: 'center' });
+      // Precip
+      doc.setFontSize(5.5); normal(doc); doc.setTextColor(0, 100, 180);
+      doc.text(`${day.precipitation}%`, cx2 + cellW / 2, y + 17.5, { align: 'center' });
+      // Description
+      doc.setFontSize(5); doc.setTextColor(80, 80, 80);
+      const shortDesc = day.description.length > 12 ? day.description.slice(0, 12) + '…' : day.description;
+      doc.text(shortDesc, cx2 + cellW / 2, y + 20.5, { align: 'center' });
+      doc.setTextColor(0, 0, 0);
+    });
+    y += stripH + 6;
+  } else {
+    y += 4;
+  }
 
   /* ═══════════════════════════════════════════
      LOCATION (single — assigned to production)

@@ -3,13 +3,14 @@
 import { useState, useEffect } from 'react';
 import { useData } from '@/hooks/useData';
 import { collection, doc, setDoc, getDoc, onSnapshot } from 'firebase/firestore';
+import { useNamespace } from '@/hooks/useNamespace';
 import { db } from '@/lib/firebase';
 import { CheckCircle, Circle, Printer, RotateCcw } from 'lucide-react';
 
 const DEFAULT_CHECKLISTS = {
   camera: {
     label: 'Camera Package',
-    emoji: '📷',
+    icon: '/icons/camera.svg',
     items: [
       'Camera body A', 'Camera body B', 'Camera monitor', 'Follow focus',
       'Lens set (primes)', 'Zoom lens', 'ND filter set', 'Matte box',
@@ -19,7 +20,7 @@ const DEFAULT_CHECKLISTS = {
   },
   audio: {
     label: 'Audio Package',
-    emoji: '🎙️',
+    icon: '/icons/audio.svg',
     items: [
       'Sound recorder', 'Boom mic (shotgun)', 'Lavalier mics (x4)',
       'Wireless transmitters (x4)', 'Wireless receivers (x4)',
@@ -30,7 +31,7 @@ const DEFAULT_CHECKLISTS = {
   },
   lighting: {
     label: 'Lighting Package',
-    emoji: '💡',
+    icon: '/icons/lighting.svg',
     items: [
       'Key light', 'Fill light', 'Back / rim light',
       'Practicals (x4)', 'LED panel (x2)', 'HMI fresnel',
@@ -43,7 +44,7 @@ const DEFAULT_CHECKLISTS = {
   },
   grip: {
     label: 'Grip Package',
-    emoji: '🔧',
+    icon: '/icons/grip.svg',
     items: [
       'Tripod system', 'Fluid head', 'Dolly + track',
       'Gimbal stabilizer', 'Slider 100cm', 'Jib arm',
@@ -54,7 +55,7 @@ const DEFAULT_CHECKLISTS = {
   },
   production: {
     label: 'Production Essentials',
-    emoji: '📋',
+    icon: '/icons/production.svg',
     items: [
       'Call sheets (printed)', 'Script sides', 'Shot list',
       'Storyboard printout', 'NDA forms', 'Talent releases',
@@ -67,7 +68,7 @@ const DEFAULT_CHECKLISTS = {
   },
   video: {
     label: 'Video / Tech',
-    emoji: '🖥️',
+    icon: '/icons/video.svg',
     items: [
       'Director monitor (17")', 'HDMI / SDI cables (x6)',
       'Video village cart', 'External recorder',
@@ -79,7 +80,7 @@ const DEFAULT_CHECKLISTS = {
   },
   team: {
     label: 'Team Readiness',
-    emoji: '👥',
+    icon: '/icons/team.svg',
     items: [
       'All crew confirmed via email/SMS',
       'Call sheets distributed to all crew',
@@ -101,7 +102,7 @@ const DEFAULT_CHECKLISTS = {
   },
   location: {
     label: 'Location Scout',
-    emoji: '📍',
+    icon: '/icons/Location.svg',
     items: [
       'Location release signed',
       'Site survey completed',
@@ -123,7 +124,7 @@ const DEFAULT_CHECKLISTS = {
   },
   transportation: {
     label: 'Transportation',
-    emoji: '🚐',
+    icon: '/icons/transportation.svg',
     items: [
       'All vehicles inspected',
       'Fuel topped off on all vehicles',
@@ -147,22 +148,23 @@ const DEFAULT_CHECKLISTS = {
 type ChecklistId = keyof typeof DEFAULT_CHECKLISTS;
 
 export default function ChecklistsPage() {
+  const namespace = useNamespace();
   const { data: productions } = useData('productions');
   const [selectedProduction, setSelectedProduction] = useState('');
   const [checks, setChecks] = useState<Record<string, Record<string, boolean>>>({});
   const [activeList, setActiveList] = useState<ChecklistId>('camera');
 
   useEffect(() => {
-    if (!selectedProduction) return;
-    const ref = doc(db, 'productions', selectedProduction, 'checklists', 'main');
+    if (!selectedProduction || !namespace) return;
+    const ref = doc(db, 'users', namespace, 'productions', selectedProduction, 'checklists', 'main');
     return onSnapshot(ref, snap => {
       if (snap.exists()) setChecks(snap.data() as any);
       else setChecks({});
     });
-  }, [selectedProduction]);
+  }, [selectedProduction, namespace]);
 
   const toggle = async (listId: string, item: string) => {
-    if (!selectedProduction) return;
+    if (!selectedProduction || !namespace) return;
     const updated = {
       ...checks,
       [listId]: {
@@ -171,14 +173,14 @@ export default function ChecklistsPage() {
       },
     };
     setChecks(updated);
-    await setDoc(doc(db, 'productions', selectedProduction, 'checklists', 'main'), updated);
+    await setDoc(doc(db, 'users', namespace, 'productions', selectedProduction, 'checklists', 'main'), updated);
   };
 
   const resetList = async (listId: string) => {
-    if (!selectedProduction || !confirm('Reset this checklist?')) return;
+    if (!selectedProduction || !namespace || !confirm('Reset this checklist?')) return;
     const updated = { ...checks, [listId]: {} };
     setChecks(updated);
-    await setDoc(doc(db, 'productions', selectedProduction, 'checklists', 'main'), updated);
+    await setDoc(doc(db, 'users', namespace, 'productions', selectedProduction, 'checklists', 'main'), updated);
   };
 
   const current = DEFAULT_CHECKLISTS[activeList];
@@ -227,7 +229,7 @@ export default function ChecklistsPage() {
                   className={`w-full text-left px-3 py-3 rounded-xl transition-colors ${activeList === id ? 'bg-gray-900 text-white' : 'hover:bg-gray-100 text-gray-700'}`}
                 >
                   <div className="flex items-center gap-2">
-                    <span>{list.emoji}</span>
+                    <img src={list.icon} className="w-5 h-5 shrink-0" style={{ filter: activeList === id ? 'brightness(0) invert(1)' : undefined }} alt="" />
                     <span className="text-sm font-medium">{list.label}</span>
                   </div>
                   <div className="mt-1.5">
@@ -248,7 +250,7 @@ export default function ChecklistsPage() {
           <div className="flex-1 bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
             <div className="flex items-center justify-between px-6 py-4 border-b">
               <div className="flex items-center gap-3">
-                <span className="text-xl">{current.emoji}</span>
+                <img src={current.icon} className="w-7 h-7 shrink-0" alt="" />
                 <div>
                   <div className="font-semibold text-gray-900">{current.label}</div>
                   <div className="text-xs text-gray-600">{checkedCount} of {current.items.length} checked</div>

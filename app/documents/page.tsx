@@ -8,6 +8,7 @@ import {
   FileText, Users, MapPin, Film, Shield, UserCheck,
   ClipboardList, Printer, Eye, Download, X
 } from 'lucide-react';
+import { useNamespace } from '@/hooks/useNamespace';
 import { generateCallSheet } from '@/lib/pdf/callsheet';
 import { generateNDA } from '@/lib/pdf/nda';
 import { generateCrewDeal } from '@/lib/pdf/crew-deal';
@@ -27,6 +28,7 @@ const DOCS = [
 ];
 
 export default function DocumentsPage() {
+  const namespace = useNamespace();
   const { data: productions } = useData('productions');
   const { data: crew } = useData('crew');
   const { data: locations } = useData('locations');
@@ -37,22 +39,23 @@ export default function DocumentsPage() {
   const [company, setCompany] = useState<any>(null);
 
   useEffect(() => {
-    getDoc(doc(db, 'company', 'profile')).then(s => { if (s.exists()) setCompany(s.data()); });
-  }, []);
+    if (!namespace) return;
+    getDoc(doc(db, 'users', namespace, 'company', 'profile')).then(s => { if (s.exists()) setCompany(s.data()); });
+  }, [namespace]);
 
   const getContext = async (includeWeather = false) => {
     const production = productions.find((p: any) => p.id === selectedProduction);
     let weather = null;
+    let forecast = null;
     if (includeWeather && production) {
       try {
-        // Try multiple city sources
         const loc = locations.find((l: any) => l.id === production.location_id);
         const city = loc?.city || loc?.address || production.city || production.primary_location || production.name;
         if (city) {
           const res = await fetch(`/api/weather?city=${encodeURIComponent(city)}`);
           const data = await res.json();
           if (!data.error && data.forecast?.length) {
-            // Find forecast day matching shoot date, or use first day
+            forecast = data.forecast;
             const targetDate = production.start_date;
             weather = targetDate
               ? data.forecast.find((f: any) => f.date === targetDate) || data.forecast[0]
@@ -67,7 +70,7 @@ export default function DocumentsPage() {
       try {
         const { getDocs, collection } = await import('firebase/firestore');
         const { db } = await import('@/lib/firebase');
-        const snap = await getDocs(collection(db, 'productions', selectedProduction, 'crew'));
+        const snap = await getDocs(collection(db, 'users', namespace!, 'productions', selectedProduction, 'crew'));
         const assignments = snap.docs.reduce((acc: any, d) => {
           const data = d.data() as any;
           if (data.crew_id) acc[data.crew_id] = data;
@@ -80,7 +83,7 @@ export default function DocumentsPage() {
         }));
       } catch {}
     }
-    return { production, crew: crewWithTimes, locations, inventory, weather, company };
+    return { production, crew: crewWithTimes, locations, inventory, weather, forecast, company };
   };
 
   const handlePreview = async (docItem: typeof DOCS[0]) => {
