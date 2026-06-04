@@ -23,26 +23,32 @@ export function useAuth() {
   useEffect(() => {
     return onAuthStateChanged(auth, async firebaseUser => {
       setUser(firebaseUser);
-      if (firebaseUser) {
-        const ref = doc(db, 'users', firebaseUser.uid);
-        const snap = await getDoc(ref);
-        if (snap.exists()) {
-          setProfile(snap.data() as UserProfile);
+      try {
+        if (firebaseUser) {
+          const ref = doc(db, 'users', firebaseUser.uid);
+          const snap = await getDoc(ref);
+          if (snap.exists()) {
+            setProfile(snap.data() as UserProfile);
+          } else {
+            const newProfile: UserProfile = {
+              uid: firebaseUser.uid,
+              email: firebaseUser.email || '',
+              displayName: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'User',
+              plan: 'free',
+              createdAt: new Date().toISOString(),
+            };
+            await setDoc(ref, newProfile);
+            setProfile(newProfile);
+          }
         } else {
-          const newProfile: UserProfile = {
-            uid: firebaseUser.uid,
-            email: firebaseUser.email || '',
-            displayName: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'User',
-            plan: 'free',
-            createdAt: new Date().toISOString(),
-          };
-          await setDoc(ref, newProfile);
-          setProfile(newProfile);
+          setProfile(null);
         }
-      } else {
+      } catch (e) {
+        console.error('useAuth profile load failed:', e);
         setProfile(null);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     });
   }, []);
 
