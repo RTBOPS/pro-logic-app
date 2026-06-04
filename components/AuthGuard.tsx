@@ -14,14 +14,7 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
     }
   }, [user, loading, router]);
 
-  if (loading) {
-    return (
-      <div className="flex-1 flex items-center justify-center text-gray-600 text-sm">
-        Loading…
-      </div>
-    );
-  }
-
+  if (loading) return null;
   if (!user) return null;
 
   return <>{children}</>;
