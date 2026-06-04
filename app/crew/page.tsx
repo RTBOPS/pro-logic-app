@@ -62,6 +62,7 @@ const emptyForm = {
   // Availability
   availability_start: '', availability_end: '',
   transport_needed: false, lodging_needed: false,
+  blocked_dates: [] as { start: string; end: string; reason: string }[],
   // Notes
   notes: '',
 };
@@ -128,6 +129,7 @@ export default function CrewPage() {
       agent_manager_name: c.agent_manager_name || '', agent_manager_email: c.agent_manager_email || '',
       agent_manager_phone: c.agent_manager_phone || '',
       availability_start: c.availability_start || '', availability_end: c.availability_end || '',
+      blocked_dates: c.blocked_dates || [],
       transport_needed: c.transport_needed || false, lodging_needed: c.lodging_needed || false,
       notes: c.notes || '',
     });
@@ -295,7 +297,12 @@ export default function CrewPage() {
                     <div className="flex items-center gap-3">
                       <img src={c.picture || DEFAULT_PICTURE} className="w-8 h-8 rounded-full object-cover" alt="" />
                       <div>
-                        <div className="font-medium text-gray-900">{c.name} {c.last_name}</div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-medium text-gray-900">{c.name} {c.last_name}</span>
+                          {(c.blocked_dates || []).some((b: any) => b.start && new Date(b.end || b.start) >= new Date()) && (
+                            <span className="text-xs bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full font-medium" title="Has blocked dates">Blocked</span>
+                          )}
+                        </div>
                         {c.dob && <div className="text-xs text-gray-600">DOB: {c.dob}</div>}
                       </div>
                     </div>
@@ -517,6 +524,38 @@ export default function CrewPage() {
                 <div className="flex gap-6 py-2">
                   {chk('Transport needed', 'transport_needed')}
                   {chk('Lodging needed', 'lodging_needed')}
+                </div>
+                {/* Blocked / unavailable dates */}
+                <div className="border-t pt-3 mt-1">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold text-gray-700 uppercase tracking-wide">Blocked Dates</span>
+                    <button
+                      type="button"
+                      onClick={() => setForm(f => ({ ...f, blocked_dates: [...(f.blocked_dates || []), { start: '', end: '', reason: '' }] }))}
+                      className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                    >+ Add block</button>
+                  </div>
+                  {(form.blocked_dates || []).length === 0 && (
+                    <p className="text-xs text-gray-400 italic">No blocked dates. Click "+ Add block" to mark dates as unavailable.</p>
+                  )}
+                  <div className="space-y-2">
+                    {(form.blocked_dates || []).map((blk: any, i: number) => (
+                      <div key={i} className="flex gap-2 items-center bg-red-50 border border-red-100 rounded-lg px-2 py-1.5">
+                        <input type="date" className="border border-gray-200 rounded px-2 py-1 text-xs focus:outline-none"
+                          value={blk.start}
+                          onChange={e => setForm(f => { const bd = [...(f.blocked_dates || [])]; bd[i] = { ...bd[i], start: e.target.value }; return { ...f, blocked_dates: bd }; })} />
+                        <span className="text-xs text-gray-400">→</span>
+                        <input type="date" className="border border-gray-200 rounded px-2 py-1 text-xs focus:outline-none"
+                          value={blk.end}
+                          onChange={e => setForm(f => { const bd = [...(f.blocked_dates || [])]; bd[i] = { ...bd[i], end: e.target.value }; return { ...f, blocked_dates: bd }; })} />
+                        <input type="text" placeholder="Reason (optional)" className="flex-1 border border-gray-200 rounded px-2 py-1 text-xs focus:outline-none"
+                          value={blk.reason}
+                          onChange={e => setForm(f => { const bd = [...(f.blocked_dates || [])]; bd[i] = { ...bd[i], reason: e.target.value }; return { ...f, blocked_dates: bd }; })} />
+                        <button type="button" onClick={() => setForm(f => ({ ...f, blocked_dates: (f.blocked_dates || []).filter((_: any, j: number) => j !== i) }))}
+                          className="text-red-400 hover:text-red-600 text-xs font-bold px-1">✕</button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </>
             )}
