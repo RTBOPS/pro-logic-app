@@ -12,6 +12,7 @@ import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useAuth } from '@/hooks/useAuth';
 import { useCompany } from '@/hooks/useCompany';
+import { useWorkspaces } from '@/hooks/useNamespace';
 
 const nav = [
   { section: 'Overview' },
@@ -49,6 +50,7 @@ export default function Sidebar() {
   const router = useRouter();
   const { profile } = useAuth();
   const company = useCompany();
+  const { namespace, ownUid, workspaces, switchWorkspace } = useWorkspaces();
 
   const handleLogout = async () => {
     await signOut(auth);
@@ -60,12 +62,32 @@ export default function Sidebar() {
       style={{ backgroundColor: company?.primary_color || '#18181b' }}>
       <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between gap-2">
         {/* Pro-Logic logo — always left */}
-        <img src="/logo.png" alt="Pro-Logic" style={{ filter: 'brightness(0) invert(1)', height: '28px', objectFit: 'contain', maxWidth: '90px' }} />
+        <img src="/logo-white.svg" alt="Pro-Logic" style={{ height: '28px', objectFit: 'contain', maxWidth: '90px' }} />
         {/* Company logo — right side */}
         {company?.logo_url && (
           <img src={company.logo_url} alt={company.name} style={{ height: '28px', objectFit: 'contain', maxWidth: '80px', borderRadius: '4px' }} />
         )}
       </div>
+
+      {/* Workspace switcher — only shown when user has access to multiple workspaces */}
+      {workspaces.length > 0 && (
+        <div className="px-3 py-2 border-b border-white/10">
+          <div className="text-xs text-white/40 uppercase tracking-widest mb-1 px-1">Workspace</div>
+          <select
+            value={namespace || ownUid || ''}
+            onChange={e => switchWorkspace(e.target.value)}
+            className="w-full text-xs rounded-lg px-2 py-1.5 border border-white/20 focus:outline-none"
+            style={{ backgroundColor: 'rgba(255,255,255,0.08)', color: 'white' }}
+          >
+            <option value={ownUid || ''}>My Company</option>
+            {workspaces.map(w => (
+              <option key={w.ownerUid} value={w.ownerUid}>
+                {w.companyName || 'Shared Workspace'}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       <nav className="flex-1 py-2">
         {nav.map((item, i) => {

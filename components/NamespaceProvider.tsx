@@ -4,42 +4,50 @@ import { useState, useEffect } from 'react';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
-import { NamespaceContext } from '@/hooks/useNamespace';
+import { NamespaceContext, Workspace } from '@/hooks/useNamespace';
 
 interface PendingInvite {
   ownerUid: string;
   email: string;
-  companyName?: string;
+  companyName: string;
 }
 
 export function NamespaceProvider({ children }: { children: React.ReactNode }) {
+  const [ownUid, setOwnUid] = useState<string | null>(null);
   const [namespace, setNamespace] = useState<string | null>(null);
+  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [pendingInvite, setPendingInvite] = useState<PendingInvite | null>(null);
 
   useEffect(() => {
     return onAuthStateChanged(auth, async user => {
-      if (!user) { setNamespace(null); setPendingInvite(null); return; }
+      if (!user) {
+        setOwnUid(null); setNamespace(null); setWorkspaces([]); setPendingInvite(null);
+        return;
+      }
 
-      // Always default to own namespace first
+      // Always start in own workspace
+      setOwnUid(user.uid);
       setNamespace(user.uid);
-      setPendingInvite(null);
 
       try {
-        const encoded = (user.email || '').replace(/[.@]/g, '_');
-        const snap = await getDoc(doc(db, 'invites', encoded));
-        if (!snap.exists()) return;
+        // Load profile to get accepted workspaces
+        const profileSnap = await getDoc(doc(db, 'users', user.uid));
+        if (profileSnap.exists()) {
+          setWorkspaces(profileSnap.data().workspaces || []);
+        }
 
-        const data = snap.data();
-        if (data.accepted === true) {
-          // Previously accepted — auto-switch to owner workspace
-          setNamespace(data.ownerUid);
-        } else {
-          // Pending invite — show banner, user decides
-          setPendingInvite({
-            ownerUid: data.ownerUid,
-            email: user.email || '',
-            companyName: data.companyName || '',
-          });
+        // Check for pending invite
+        const encoded = (user.email || '').replace(/[.@]/g, '_');
+        const inviteSnap = await getDoc(doc(db, 'invites', encoded));
+        if (inviteSnap.exists()) {
+          const data = inviteSnap.data();
+          if (!data.accepted) {
+            setPendingInvite({
+              ownerUid: data.ownerUid,
+              email: user.email || '',
+              companyName: data.companyName || 'another company',
+            });
+          }
         }
       } catch {
         // Keep own namespace on any error
@@ -47,39 +55,43 @@ export function NamespaceProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  const switchWorkspace = (uid: string) => setNamespace(uid);
+
   const acceptInvite = async () => {
-    if (!pendingInvite) return;
+    if (!pendingInvite || !ownUid) return;
     try {
+      // Mark invite accepted
       const encoded = pendingInvite.email.replace(/[.@]/g, '_');
       await setDoc(doc(db, 'invites', encoded), { accepted: true }, { merge: true });
-      setNamespace(pendingInvite.ownerUid);
+
+      // Add workspace to user's profile
+      const newWs: Workspace = {
+        ownerUid: pendingInvite.ownerUid,
+        companyName: pendingInvite.companyName,
+        role: 'Editor',
+      };
+      const updated = [...workspaces.filter(w => w.ownerUid !== pendingInvite.ownerUid), newWs];
+      await setDoc(doc(db, 'users', ownUid), { workspaces: updated }, { merge: true });
+      setWorkspaces(updated);
       setPendingInvite(null);
     } catch (e) {
       console.error('Failed to accept invite', e);
     }
   };
 
-  const dismissInvite = () => setPendingInvite(null);
-
   return (
-    <NamespaceContext.Provider value={namespace}>
+    <NamespaceContext.Provider value={{ namespace, ownUid, workspaces, switchWorkspace }}>
       {pendingInvite && (
-        <div className="fixed top-0 left-0 right-0 z-[200] flex items-center justify-center gap-3 px-4 py-2.5 text-sm text-white shadow-lg"
-          style={{ backgroundColor: '#1d4ed8' }}>
+        <div className="fixed top-0 left-0 right-0 z-[200] flex items-center justify-center gap-3 px-4 py-2.5 text-sm text-white shadow-lg bg-blue-700">
           <span>
-            You have a pending invitation to join
-            {pendingInvite.companyName ? ` ${pendingInvite.companyName}'s` : ' a'} workspace.
+            You have been invited to access <strong>{pendingInvite.companyName}</strong>'s workspace.
           </span>
-          <button
-            onClick={acceptInvite}
-            className="shrink-0 bg-white text-blue-700 px-3 py-1 rounded-lg font-semibold text-xs hover:bg-blue-50 transition-colors"
-          >
-            Accept &amp; Switch
+          <button onClick={acceptInvite}
+            className="shrink-0 bg-white text-blue-700 px-3 py-1 rounded-lg font-semibold text-xs hover:bg-blue-50">
+            Accept
           </button>
-          <button
-            onClick={dismissInvite}
-            className="shrink-0 text-blue-200 hover:text-white text-xs transition-colors"
-          >
+          <button onClick={() => setPendingInvite(null)}
+            className="shrink-0 text-blue-200 hover:text-white text-xs">
             Dismiss
           </button>
         </div>

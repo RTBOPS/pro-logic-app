@@ -5,7 +5,7 @@ import { doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '@/lib/firebase';
 import { useAuth } from '@/hooks/useAuth';
-import { useNamespace } from '@/hooks/useNamespace';
+import { useWorkspaces } from '@/hooks/useNamespace';
 import { Upload, Building2, Save, UserPlus, Trash2, Users, Share2, Lock } from 'lucide-react';
 import PageHeader from '@/components/PageHeader';
 import { useData } from '@/hooks/useData';
@@ -26,9 +26,10 @@ interface TeamMember { email: string; role: string; }
 
 export default function CompanyPage() {
   const { user, profile, loading: authLoading } = useAuth();
-  const namespace = useNamespace();
-  // Wait for both auth + namespace to resolve before deciding ownership
+  const { namespace, ownUid } = useWorkspaces();
+  // isOwner = user is viewing their own company (namespace matches their own UID)
   const isLoading = authLoading || !namespace;
+
   const [form, setForm] = useState(empty);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -50,7 +51,7 @@ export default function CompanyPage() {
   const atLimit = crewCount >= crewLimit && crewLimit !== Infinity;
 
   // Only owners (namespace === own uid) can manage company settings
-  const isOwner = !isLoading && !!(user && namespace && namespace === user.uid);
+  const isOwner = !isLoading && !!(namespace && ownUid && namespace === ownUid);
 
   useEffect(() => {
     if (!namespace) return;
