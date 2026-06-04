@@ -12,6 +12,7 @@ import { useNamespace } from '@/hooks/useNamespace';
 import { generateCallSheet } from '@/lib/pdf/callsheet';
 import { generateNDA } from '@/lib/pdf/nda';
 import { generateCrewDeal } from '@/lib/pdf/crew-deal';
+import PageHeader from '@/components/PageHeader';
 import { generateLocationRelease } from '@/lib/pdf/location-release';
 import { generateShotList } from '@/lib/pdf/shot-list';
 import { generateStripboard } from '@/lib/pdf/stripboard';
@@ -120,10 +121,7 @@ export default function DocumentsPage() {
 
   return (
     <div className="p-4 md:p-8">
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">Documents</h1>
-        <p className="text-gray-500 text-sm mt-1">Generate professional production documents as PDF</p>
-      </div>
+      <PageHeader title="Documents" subtitle="Generate professional production documents as PDF" />
 
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-8">
         <label className="block text-sm font-medium text-gray-700 mb-2">Select production</label>

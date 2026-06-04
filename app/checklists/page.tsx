@@ -6,6 +6,7 @@ import { collection, doc, setDoc, getDoc, onSnapshot } from 'firebase/firestore'
 import { useNamespace } from '@/hooks/useNamespace';
 import { db } from '@/lib/firebase';
 import { CheckCircle, Circle, Printer, RotateCcw } from 'lucide-react';
+import PageHeader from '@/components/PageHeader';
 
 const DEFAULT_CHECKLISTS = {
   camera: {
@@ -190,25 +191,16 @@ export default function ChecklistsPage() {
 
   return (
     <div className="p-4 md:p-8">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Equipment Checklists</h1>
-          <p className="text-gray-500 text-sm mt-1">Pre-shoot verification</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <select
-            className="border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-700"
-            value={selectedProduction}
-            onChange={e => setSelectedProduction(e.target.value)}
-          >
-            <option value="">Select production…</option>
-            {productions.map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </select>
-          <button onClick={() => window.print()} className="flex items-center gap-2 border border-gray-200 text-gray-700 px-3 py-2 rounded-xl text-sm hover:bg-gray-50">
-            <Printer size={14} /> Print
-          </button>
-        </div>
-      </div>
+      <PageHeader title="Equipment Checklists" subtitle="Pre-shoot verification">
+        <select className="border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-700"
+          value={selectedProduction} onChange={e => setSelectedProduction(e.target.value)}>
+          <option value="">Select production…</option>
+          {productions.map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
+        </select>
+        <button onClick={() => window.print()} className="flex items-center gap-2 border border-gray-200 text-gray-700 px-3 py-2 rounded-xl text-sm hover:bg-gray-50">
+          <Printer size={14} /> Print
+        </button>
+      </PageHeader>
 
       {!selectedProduction ? (
         <div className="bg-white rounded-2xl border border-dashed border-gray-200 p-12 text-center text-gray-600">

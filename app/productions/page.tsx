@@ -9,6 +9,8 @@ import { db, storage } from '@/lib/firebase';
 import Modal from '@/components/Modal';
 import Link from 'next/link';
 import { Plus, Pencil, Trash2, ChevronRight, Upload } from 'lucide-react';
+import { useNamespace } from '@/hooks/useNamespace';
+import PageHeader from '@/components/PageHeader';
 
 // Generate 24H time options every 15 min
 const TIME_OPTIONS = Array.from({ length: 24 * 4 }, (_, i) => {
@@ -70,6 +72,7 @@ const empty = {
 
 export default function ProductionsPage() {
   const router = useRouter();
+  const namespace = useNamespace();
   const { data: productions, loading } = useData('productions');
   const { data: locations } = useData('locations');
   const { data: crew } = useData('crew');
@@ -109,34 +112,27 @@ export default function ProductionsPage() {
   const close = () => { setModal(null); setEditId(null); };
 
   const save = async () => {
-    if (!form.name || !form.client) return;
+    if (!form.name || !form.client || !namespace) return;
     if (modal === 'create') {
-      await addDoc(collection(db, 'productions'), form);
+      await addDoc(collection(db, 'users', namespace, 'productions'), form);
     } else if (editId) {
-      await updateDoc(doc(db, 'productions', editId), form);
+      await updateDoc(doc(db, 'users', namespace, 'productions', editId), form);
     }
     close();
   };
 
   const remove = async (id: string) => {
-    if (!confirm('Delete this production?')) return;
-    await deleteDoc(doc(db, 'productions', id));
+    if (!confirm('Delete this production?') || !namespace) return;
+    await deleteDoc(doc(db, 'users', namespace, 'productions', id));
   };
 
   return (
     <div className="p-4 md:p-8">
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Productions</h1>
-          <p className="text-gray-500 text-sm mt-1">{productions.length} total</p>
-        </div>
-        <button
-          onClick={openCreate}
-          className="flex items-center gap-2 bg-black text-white px-4 py-2 rounded-xl text-sm hover:bg-zinc-800 transition-colors"
-        >
+      <PageHeader title="Productions" subtitle={`${productions.length} total`}>
+        <button onClick={openCreate} className="flex items-center gap-2 bg-black text-white px-4 py-2 rounded-xl text-sm hover:bg-zinc-800 transition-colors">
           <Plus size={16} /> New Production
         </button>
-      </div>
+      </PageHeader>
 
       {loading ? (
         <div className="text-gray-600 text-sm">Loading…</div>

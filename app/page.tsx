@@ -3,6 +3,7 @@
 import { useData } from '@/hooks/useData';
 import { Film, Users, Package, MapPin } from 'lucide-react';
 import Link from 'next/link';
+import PageHeader from '@/components/PageHeader';
 
 const STATUS_COLOR: Record<string, string> = {
   new: 'bg-blue-100 text-blue-700',
@@ -28,10 +29,7 @@ export default function Dashboard() {
 
   return (
     <div className="p-4 md:p-8">
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-gray-500 text-sm mt-1">Overview of your studio operations</p>
-      </div>
+      <PageHeader title="Dashboard" subtitle="Overview of your studio operations" />
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-10">

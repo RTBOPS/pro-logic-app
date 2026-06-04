@@ -8,6 +8,8 @@ import { db, storage } from '@/lib/firebase';
 import Modal from '@/components/Modal';
 import { Plus, Pencil, Trash2, Search, Mail, Phone, Upload, Users, Merge, BookUser } from 'lucide-react';
 import { DEPARTMENTS, deptColor, deptLabel } from '@/lib/departments';
+import { useNamespace } from '@/hooks/useNamespace';
+import PageHeader from '@/components/PageHeader';
 
 const DEFAULT_PICTURE = 'https://img.freepik.com/free-photo/portrait-white-man-isolated_53876-40306.jpg';
 
@@ -65,6 +67,7 @@ const emptyForm = {
 };
 
 export default function CrewPage() {
+  const namespace = useNamespace();
   const { data: crew, loading } = useData('crew');
   const [modal, setModal] = useState<'create' | 'edit' | 'merge' | null>(null);
   const [form, setForm] = useState(emptyForm);
@@ -148,16 +151,16 @@ export default function CrewPage() {
   const save = async () => {
     if (!form.name || !form.last_name) return;
     if (modal === 'create') {
-      await addDoc(collection(db, 'crew'), form);
+      await addDoc(collection(db, 'users', namespace!, 'crew'), form);
     } else if (editId) {
-      await updateDoc(doc(db, 'crew', editId), form);
+      await updateDoc(doc(db, 'users', namespace!, 'crew', editId), form);
     }
     close();
   };
 
   const remove = async (id: string) => {
     if (!confirm('Remove this crew member?')) return;
-    await deleteDoc(doc(db, 'crew', id));
+    await deleteDoc(doc(db, 'users', namespace!, 'crew', id));
   };
 
   const doMerge = async () => {
@@ -169,8 +172,8 @@ export default function CrewPage() {
     const merged: any = { ...b, ...Object.fromEntries(Object.entries(a).filter(([, v]) => v !== undefined && v !== '' && v !== false)) };
     merged.notes = [a.notes, b.notes].filter(Boolean).join(' | ');
     merged.picture = a.picture !== DEFAULT_PICTURE ? a.picture : b.picture;
-    await updateDoc(doc(db, 'crew', mergeA), merged);
-    await deleteDoc(doc(db, 'crew', mergeB));
+    await updateDoc(doc(db, 'users', namespace!, 'crew', mergeA), merged);
+    await deleteDoc(doc(db, 'users', namespace!, 'crew', mergeB));
     setMergeA(''); setMergeB(''); setModal(null);
   };
 
@@ -207,27 +210,14 @@ export default function CrewPage() {
 
   return (
     <div className="p-4 md:p-8">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Crew & Cast</h1>
-          <p className="text-gray-500 text-sm mt-1">{crew.length} contacts</p>
-        </div>
-        <div className="flex gap-2">
-          <button
-            onClick={() => setModal('merge')}
-            className="flex items-center gap-2 border border-gray-200 text-gray-600 px-3 py-2 rounded-xl text-sm hover:bg-gray-50"
-          >
-            <Merge size={15} /> Merge
-          </button>
-          <button
-            onClick={openCreate}
-            className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-xl text-sm hover:bg-blue-700"
-          >
-            <Plus size={16} /> Add Member
-          </button>
-        </div>
-      </div>
+      <PageHeader title="Crew & Cast" subtitle={`${crew.length} contacts`}>
+        <button onClick={() => setModal('merge')} className="flex items-center gap-2 border border-gray-200 text-gray-600 px-3 py-2 rounded-xl text-sm hover:bg-gray-50">
+          <Merge size={15} /> Merge
+        </button>
+        <button onClick={openCreate} className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-xl text-sm hover:bg-blue-700">
+          <Plus size={16} /> Add Member
+        </button>
+      </PageHeader>
 
       {/* Filters */}
       <div className="flex gap-3 mb-6 flex-wrap">

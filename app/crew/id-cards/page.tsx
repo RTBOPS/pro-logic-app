@@ -5,6 +5,8 @@ import { useData } from '@/hooks/useData';
 import { doc, getDoc, getDocs, collection } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Printer, IdCard, CreditCard } from 'lucide-react';
+import PageHeader from '@/components/PageHeader';
+import { useNamespace } from '@/hooks/useNamespace';
 import { deptLabel, DEPARTMENTS } from '@/lib/departments';
 import { useCompany } from '@/hooks/useCompany';
 import QRCode from 'qrcode';
@@ -106,6 +108,7 @@ function IDCard({ c, company, orientation, productionName }: { c: any; company: 
 }
 
 export default function IDCardsPage() {
+  const namespace = useNamespace();
   const { data: allCrew } = useData('crew');
   const { data: productions } = useData('productions');
   const company = useCompany();
@@ -117,13 +120,13 @@ export default function IDCardsPage() {
 
   // Load crew assigned to selected production
   useEffect(() => {
-    if (!selectedProd) { setProdCrew([]); return; }
+    if (!selectedProd || !namespace) { setProdCrew([]); return; }
     setLoadingProd(true);
-    getDocs(collection(db, 'productions', selectedProd, 'crew')).then(snap => {
+    getDocs(collection(db, 'users', namespace, 'productions', selectedProd, 'crew')).then(snap => {
       setProdCrew(snap.docs.map(d => (d.data() as any).crew_id));
       setLoadingProd(false);
     });
-  }, [selectedProd]);
+  }, [selectedProd, namespace]);
 
   // Filter crew: if production selected, only show assigned crew
   const filtered = allCrew.filter((c: any) => {
@@ -136,11 +139,8 @@ export default function IDCardsPage() {
 
   return (
     <div className="p-4 md:p-8">
-      <div className="flex items-center justify-between mb-6 no-print flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><IdCard size={22} /> ID Cards</h1>
-          <p className="text-gray-600 text-sm mt-1">{filtered.length} cards · QR code per card</p>
-        </div>
+      <div className="no-print">
+      <PageHeader title="ID Cards" subtitle={`${filtered.length} cards · QR code per card`}>
         <div className="flex items-center gap-2 flex-wrap">
           <select className="border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-700 min-w-[180px]"
             value={selectedProd} onChange={e => setSelectedProd(e.target.value)}>
@@ -167,6 +167,7 @@ export default function IDCardsPage() {
             <Printer size={14} /> Print All
           </button>
         </div>
+      </PageHeader>
       </div>
 
       {selectedProd && (
