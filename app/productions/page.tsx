@@ -1,13 +1,14 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useData } from '@/hooks/useData';
 import { useRouter } from 'next/navigation';
 import { addDoc, updateDoc, deleteDoc, collection, doc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db, storage } from '@/lib/firebase';
 import Modal from '@/components/Modal';
 import Link from 'next/link';
-import { Plus, Pencil, Trash2, ChevronRight } from 'lucide-react';
+import { Plus, Pencil, Trash2, ChevronRight, Upload } from 'lucide-react';
 
 const STATUSES = ['Planning', 'Pre-Production', 'Active', 'On Hold', 'Completed', 'Cancelled'];
 const PROD_TYPES = ['Commercial', 'Corporate Video', 'Music Video', 'Feature Film', 'Short Film', 'Documentary', 'Live Event', 'Social Content', 'Other'];
@@ -53,6 +54,7 @@ const empty = {
   data_storage_plan: '', deliverables: '',
   aspect_ratio: '16:9', resolution: '4K UHD', frame_rate: '23.976 fps',
   audio_format: '48 kHz WAV',
+  image_url: '',
 };
 
 export default function ProductionsPage() {
@@ -63,6 +65,21 @@ export default function ProductionsPage() {
   const { data: inventory } = useData('inventory');
   const { data: transportation } = useData('transportation');
   const [modal, setModal] = useState<'create' | 'edit' | null>(null);
+  const [imgUploading, setImgUploading] = useState(false);
+  const imgRef = useRef<HTMLInputElement>(null);
+
+  const handleProductionImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImgUploading(true);
+    try {
+      const path = `productions/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+      const snap = await uploadBytes(storageRef(storage, path), file);
+      const url = await getDownloadURL(snap.ref);
+      setForm((f: any) => ({ ...f, image_url: url }));
+    } catch (err: any) { alert('Upload failed: ' + err.message); }
+    finally { setImgUploading(false); if (imgRef.current) imgRef.current.value = ''; }
+  };
   const [form, setForm] = useState(empty);
   const [formTab, setFormTab] = useState<'basic' | 'dates' | 'logistics' | 'technical'>('basic');
   const [editId, setEditId] = useState<string | null>(null);
@@ -228,6 +245,20 @@ export default function ProductionsPage() {
                   <textarea className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none resize-none"
                     rows={2} value={form.project_description}
                     onChange={e => setForm({ ...form, project_description: e.target.value })} />
+                </div>
+                {/* Production image for call sheet */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Production Image <span className="text-gray-500 font-normal">(used in call sheet center)</span></label>
+                  <input ref={imgRef} type="file" accept="image/*" className="hidden" onChange={handleProductionImage} />
+                  <div className="flex items-center gap-3">
+                    {(form as any).image_url && (
+                      <img src={(form as any).image_url} className="w-20 h-14 rounded-lg object-cover border border-gray-200" alt="" />
+                    )}
+                    <button type="button" onClick={() => imgRef.current?.click()} disabled={imgUploading}
+                      className="flex items-center gap-2 border border-dashed border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50">
+                      <Upload size={13} /> {imgUploading ? 'Uploading…' : (form as any).image_url ? 'Change photo' : 'Upload photo'}
+                    </button>
+                  </div>
                 </div>
                 <div className="border-t pt-2 mt-1">
                   <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">Key Crew</p>
