@@ -25,10 +25,8 @@ const empty = {
 interface TeamMember { email: string; role: string; }
 
 export default function CompanyPage() {
-  const { user, profile, loading: authLoading } = useAuth();
+  const { user, profile } = useAuth();
   const { namespace, ownUid } = useWorkspaces();
-  // isOwner = user is viewing their own company (namespace matches their own UID)
-  const isLoading = authLoading || !namespace;
 
   const [form, setForm] = useState(empty);
   const [saving, setSaving] = useState(false);
@@ -50,8 +48,8 @@ export default function CompanyPage() {
   const crewCount = crew?.length ?? 0;
   const atLimit = crewCount >= crewLimit && crewLimit !== Infinity;
 
-  // Only owners (namespace === own uid) can manage company settings
-  const isOwner = !isLoading && !!(namespace && ownUid && namespace === ownUid);
+  // isOwner: true when viewing own company namespace
+  const isOwner = !!(namespace && ownUid && namespace === ownUid);
 
   useEffect(() => {
     if (!namespace) return;
@@ -139,13 +137,10 @@ export default function CompanyPage() {
         )}
       </PageHeader>
 
-      {!isLoading && !isOwner && (
+      {namespace && ownUid && !isOwner && (
         <div className="mb-6 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-sm text-blue-700">
           You are viewing a shared workspace. Contact the account owner to change company settings.
         </div>
-      )}
-      {isLoading && (
-        <div className="mb-6 text-sm text-gray-400">Loading…</div>
       )}
 
       <div className="space-y-6">
