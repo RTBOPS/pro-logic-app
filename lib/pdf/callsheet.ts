@@ -3,12 +3,14 @@ import { PDFContext, save } from './base';
 import { DEPARTMENTS } from '../departments';
 import QRCode from 'qrcode';
 
-/* ── Image loader via server proxy (bypasses Firebase Storage CORS) ── */
+/* ── Image loader ── */
 async function toDataUrl(url: string): Promise<string | null> {
   if (!url) return null;
   try {
-    // Local paths load directly; external URLs go through proxy
-    const fetchUrl = url.startsWith('/') ? url : `/api/proxy-image?url=${encodeURIComponent(url)}`;
+    // All URLs (local and external) go through the proxy so the server
+    // fetches them without browser CORS restrictions.
+    const fetchUrl = url.startsWith('data:') ? null : url.startsWith('/') ? url : `/api/proxy-image?url=${encodeURIComponent(url)}`;
+    if (!fetchUrl) return url; // already a data URL
     const res = await fetch(fetchUrl);
     if (!res.ok) return null;
     const blob = await res.blob();
@@ -138,12 +140,12 @@ export async function generateCallSheet({ production, crew, locations, inventory
     : new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
 
   /* ── PRE-FETCH IMAGES ── */
-  const [proLogicLogoRaw, companyLogo, productionImage] = await Promise.all([
-    toDataUrl('/logo.png'),
+  // Try white SVG logo first; fall back to inverting the black PNG
+  const proLogicLogoWhite = await toDataUrl('/logo-white.svg') || await toWhite(await toDataUrl('/logo.png'));
+  const [companyLogo, productionImage] = await Promise.all([
     company?.logo_url ? toDataUrl(company.logo_url) : Promise.resolve(null),
     production.image_url ? toDataUrl(production.image_url) : Promise.resolve(null),
   ]);
-  const proLogicLogoWhite = await toWhite(proLogicLogoRaw);
   const companyLogoWhite = await toWhite(companyLogo);
 
   // Brand color
@@ -153,14 +155,12 @@ export async function generateCallSheet({ production, crew, locations, inventory
   const brandB = parseInt(brandHex.slice(5, 7), 16) || 20;
   setBrand(brandR, brandG, brandB);
 
-  // Crew photos via proxy
-  const DEFAULT_PIC_PATTERN = 'freepik.com';
+  // Crew photos — load all non-null pictures via proxy
   const crewWithPhotos = await Promise.all(
-    crew.slice(0, 40).map(async (c: any) => {
-      const pic = c.picture;
-      const skip = !pic || pic.includes(DEFAULT_PIC_PATTERN);
-      return { ...c, photoData: skip ? null : await toDataUrl(pic) };
-    })
+    crew.slice(0, 40).map(async (c: any) => ({
+      ...c,
+      photoData: c.picture ? await toDataUrl(c.picture) : null,
+    }))
   );
 
   const primaryLoc = production.location_id
@@ -372,8 +372,9 @@ export async function generateCallSheet({ production, crew, locations, inventory
 
   y += 4;
 
-  /* Shared column positions for cast + crew rows */
-  const rowXs = [13, 26, 68, 106, 124, 141, 158, 172, 187, 200];
+  /* Shared column positions — all 9 cols fit within 10→206mm (196mm usable)
+     [avatar, Name, Role, Status, Pickup, Call, H/MU, OnSet, Wrap] */
+  const rowXs = [11, 23, 60, 95, 113, 130, 148, 163, 178];
 
   /* ═══════════════════════════════════════════
      CAST
@@ -435,14 +436,16 @@ export async function generateCallSheet({ production, crew, locations, inventory
     doc.text(`${production.name}  |  ${shootDate}  |  Call: ${production.call_time || '--'}`, 13 + qrSize + 5, y + 23);
   }
 
-  // Pro-Logic logo — white, small (24mm wide), right-aligned in footer
-  const logoW = 24; const logoH = 8;
-  const logoX = pageW - 10 - logoW;
+  // Pro-Logic logo — white, small, right-aligned in footer
+  const logoW = 26; const logoH = 9;
+  const logoX = pageW - 12 - logoW;
   const logoY = y + (footerH - logoH) / 2;
   if (proLogicLogoWhite) {
-    doc.addImage(proLogicLogoWhite, 'PNG', logoX, logoY, logoW, logoH, undefined, 'FAST');
-  } else if (proLogicLogoRaw) {
-    doc.addImage(proLogicLogoRaw, 'PNG', logoX, logoY, logoW, logoH, undefined, 'FAST');
+    const fmt = proLogicLogoWhite.includes('image/svg') ? 'SVG' : 'PNG';
+    try { doc.addImage(proLogicLogoWhite, fmt as any, logoX, logoY, logoW, logoH, undefined, 'FAST'); } catch {
+      doc.setTextColor(200, 200, 200); doc.setFontSize(7); bold(doc);
+      doc.text('PRO-LOGIC', pageW - 12, logoY + 5, { align: 'right' });
+    }
   } else {
     doc.setTextColor(200, 200, 200); doc.setFontSize(7); bold(doc);
     doc.text('PRO-LOGIC', pageW - 12, logoY + 5, { align: 'right' });

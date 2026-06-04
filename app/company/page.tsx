@@ -97,7 +97,7 @@ export default function CompanyPage() {
       setInviteEmail('');
       // Write invite record so this user sees the owner's namespace on login
       const encoded = email.replace(/[.@]/g, '_');
-      await setDoc(doc(db, 'invites', encoded), { ownerUid: namespace, role: inviteRole, email });
+      await setDoc(doc(db, 'invites', encoded), { ownerUid: namespace, role: inviteRole, email, companyName: form.name || '', accepted: false });
       // Save to company profile too
       await setDoc(doc(db, 'users', namespace, 'company', 'profile'), { ...form, team_members: newTeam }, { merge: true });
     } catch (err: any) {
@@ -305,24 +305,47 @@ export default function CompanyPage() {
                 Crew limit reached for your plan. <a href="/pricing" className="underline font-medium">Upgrade</a> to add more.
               </div>
             ) : (
-              <div className="flex gap-2">
-                <input type="email"
-                  className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-black"
-                  placeholder="team@email.com" value={inviteEmail}
-                  onChange={e => setInviteEmail(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && addTeamMember()} />
-                <select className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none"
-                  value={inviteRole} onChange={e => setInviteRole(e.target.value)}>
-                  <option>Editor</option>
-                  <option>Viewer</option>
-                </select>
-                <button onClick={addTeamMember} disabled={inviting || !inviteEmail.trim()}
-                  className="flex items-center gap-1.5 bg-black text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-zinc-800 disabled:opacity-40 transition-colors">
-                  <UserPlus size={14} /> {inviting ? 'Adding…' : 'Add'}
-                </button>
+              <div className="space-y-2">
+                {/* Pick from existing crew */}
+                {crew.filter((c: any) => c.email && !team.find(t => t.email === c.email)).length > 0 && (
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Pick from your crew</label>
+                    <select
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-black"
+                      value=""
+                      onChange={e => { if (e.target.value) setInviteEmail(e.target.value); }}
+                    >
+                      <option value="">— Select a crew member —</option>
+                      {crew
+                        .filter((c: any) => c.email && !team.find((t: any) => t.email === c.email))
+                        .map((c: any) => (
+                          <option key={c.id} value={c.email}>
+                            {c.name} {c.last_name} — {c.email}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+                )}
+                {/* Manual email entry */}
+                <div className="flex gap-2">
+                  <input type="email"
+                    className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-black"
+                    placeholder="or type email manually…" value={inviteEmail}
+                    onChange={e => setInviteEmail(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && addTeamMember()} />
+                  <select className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none"
+                    value={inviteRole} onChange={e => setInviteRole(e.target.value)}>
+                    <option>Editor</option>
+                    <option>Viewer</option>
+                  </select>
+                  <button onClick={addTeamMember} disabled={inviting || !inviteEmail.trim()}
+                    className="flex items-center gap-1.5 bg-black text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-zinc-800 disabled:opacity-40 transition-colors">
+                    <UserPlus size={14} /> {inviting ? 'Adding…' : 'Add'}
+                  </button>
+                </div>
               </div>
             )}
-            <p className="text-xs text-gray-400 mt-2">The user must already have a PRO-LOGIC account with that email address.</p>
+            <p className="text-xs text-gray-400 mt-2">The invited person must have a PRO-LOGIC account with that email to access your workspace.</p>
           </div>
         )}
       </div>
