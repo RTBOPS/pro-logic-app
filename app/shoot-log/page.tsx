@@ -41,7 +41,7 @@ export default function ShootLogPage() {
 
   useEffect(() => {
     if (!selectedProduction || !namespace) return;
-    const q = query(collection(db, 'users', namespace, 'productions', selectedProduction, 'takes'));
+    const q = query(collection(db, 'users', getUid()!, 'productions', selectedProduction, 'takes'));
     return onSnapshot(q, snap => {
       setTakes(snap.docs.map(d => ({ id: d.id, ...d.data() } as TakeEntry))
         .sort((a, b) => a.scene.localeCompare(b.scene) || a.shot.localeCompare(b.shot) || a.take - b.take));
@@ -49,8 +49,8 @@ export default function ShootLogPage() {
   }, [selectedProduction, namespace]);
 
   const addTake = async () => {
-    if (!selectedProduction || !form.scene || !namespace) return;
-    await addDoc(collection(db, 'users', namespace, 'productions', selectedProduction, 'takes'), {
+    if (!selectedProduction || !form.scene || !getUid()) return;
+    await addDoc(collection(db, 'users', getUid()!, 'productions', selectedProduction, 'takes'), {
       ...form,
       timestamp: new Date().toISOString(),
     });
@@ -59,13 +59,13 @@ export default function ShootLogPage() {
   };
 
   const toggleSelected = async (t: TakeEntry) => {
-    if (!namespace) return;
-    await updateDoc(doc(db, 'users', namespace, 'productions', selectedProduction, 'takes', t.id), { selected: !t.selected });
+    if (!getUid()) return;
+    await updateDoc(doc(db, 'users', getUid()!, 'productions', selectedProduction, 'takes', t.id), { selected: !t.selected });
   };
 
   const removeTake = async (id: string) => {
-    if (!namespace) return;
-    await deleteDoc(doc(db, 'users', namespace, 'productions', selectedProduction, 'takes', id));
+    if (!getUid()) return;
+    await deleteDoc(doc(db, 'users', getUid()!, 'productions', selectedProduction, 'takes', id));
   };
 
   const scenes = [...new Set(takes.map(t => t.scene))].sort();

@@ -70,14 +70,14 @@ export default function TransportationPage() {
 
   const save = async () => {
     if (!form.name) return;
-    if (modal === 'create') await addDoc(collection(db, 'users', namespace!, 'transportation'), form);
-    else if (editId) await updateDoc(doc(db, 'users', namespace!, 'transportation', editId), form);
+    if (modal === 'create') await addDoc(collection(db, 'users', getUid(), 'transportation'), form);
+    else if (editId) await updateDoc(doc(db, 'users', getUid(), 'transportation', editId), form);
     close();
   };
 
   const remove = async (id: string) => {
     if (!confirm('Remove this vehicle?')) return;
-    await deleteDoc(doc(db, 'users', namespace!, 'transportation', id));
+    await deleteDoc(doc(db, 'users', getUid(), 'transportation', id));
   };
 
   const fld = (label: string, k: keyof typeof empty, placeholder = '', type = 'text') => (

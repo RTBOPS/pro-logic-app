@@ -2,8 +2,9 @@
 
 import { useState } from 'react';
 import { useData } from '@/hooks/useData';
+import { useNamespace } from '@/hooks/useNamespace';
 import { addDoc, updateDoc, deleteDoc, collection, doc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
 import Modal from '@/components/Modal';
 import { Plus, Pencil, Trash2, UserCheck } from 'lucide-react';
 
@@ -21,6 +22,8 @@ const empty = {
 };
 
 export default function CharacterBreakdownPage() {
+  const namespace = useNamespace();
+  const getUid = () => namespace || auth.currentUser?.uid || null;
   const { data: characters, loading } = useData('characters');
   const { data: productions } = useData('productions');
   const { data: crew } = useData('crew');
@@ -39,15 +42,19 @@ export default function CharacterBreakdownPage() {
   };
 
   const save = async () => {
-    if (!form.character_name) return;
-    if (editId) await updateDoc(doc(db, 'characters', editId), form);
-    else await addDoc(collection(db, 'characters'), form);
-    setModal(false);
+    const uid = getUid();
+    if (!form.character_name || !uid) return;
+    try {
+      if (editId) await updateDoc(doc(db, 'users', uid, 'characters', editId), form);
+      else await addDoc(collection(db, 'users', uid, 'characters'), form);
+      setModal(false);
+    } catch (e: any) { alert('Save failed: ' + e.message); }
   };
 
   const remove = async (id: string) => {
-    if (!confirm('Remove character?')) return;
-    await deleteDoc(doc(db, 'characters', id));
+    const uid = getUid();
+    if (!confirm('Remove character?') || !uid) return;
+    await deleteDoc(doc(db, 'users', uid, 'characters', id));
   };
 
   const STATUS_COLOR: Record<string, string> = {

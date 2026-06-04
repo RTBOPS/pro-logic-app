@@ -146,10 +146,10 @@ export default function InventoryPage() {
   };
 
   const saveInspection = async () => {
-    await addDoc(collection(db, 'users', namespace!, 'equipment_inspections'), { ...inspection, created_at: new Date().toISOString() });
+    await addDoc(collection(db, 'users', getUid(), 'equipment_inspections'), { ...inspection, created_at: new Date().toISOString() });
     if (inspection.damage_claim) {
       const itemDoc = inventory.find((i: any) => i.id === editId || i.item_id === inspection.item_id);
-      if (itemDoc) await updateDoc(doc(db, 'users', namespace!, 'inventory', itemDoc.id), { status: 'In Repair', notes: `Damage claim: ${inspection.claim_notes}` });
+      if (itemDoc) await updateDoc(doc(db, 'users', getUid(), 'inventory', itemDoc.id), { status: 'In Repair', notes: `Damage claim: ${inspection.claim_notes}` });
     }
     close();
   };
@@ -192,16 +192,16 @@ export default function InventoryPage() {
     if (!form.name) return;
     const data = formToDoc(form);
     if (modal === 'create') {
-      await addDoc(collection(db, 'users', namespace!, 'inventory'), data);
+      await addDoc(collection(db, 'users', getUid(), 'inventory'), data);
     } else if (editId) {
-      await updateDoc(doc(db, 'users', namespace!, 'inventory', editId), data);
+      await updateDoc(doc(db, 'users', getUid(), 'inventory', editId), data);
     }
     close();
   };
 
   const remove = async (id: string) => {
     if (!confirm('Remove this item?')) return;
-    await deleteDoc(doc(db, 'users', namespace!, 'inventory', id));
+    await deleteDoc(doc(db, 'users', getUid(), 'inventory', id));
   };
 
   const dbResults = useMemo(() => {
@@ -233,7 +233,7 @@ export default function InventoryPage() {
     const toImport = catalog.filter(i => selectedItems.has(i.item_id));
     for (const item of toImport) {
       const { data_confidence, ...rest } = item as any;
-      await addDoc(collection(db, 'users', namespace!, 'inventory'), { ...rest, status: 'Available' });
+      await addDoc(collection(db, 'users', getUid(), 'inventory'), { ...rest, status: 'Available' });
     }
     close();
   };

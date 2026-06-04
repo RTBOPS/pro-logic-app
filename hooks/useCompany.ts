@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { doc, onSnapshot } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
+import { useNamespace } from '@/hooks/useNamespace';
 
 export interface CompanyProfile {
   name?: string;
@@ -18,25 +19,18 @@ export interface CompanyProfile {
   website?: string;
 }
 
-let _listeners = 0;
-let _data: CompanyProfile | null = null;
-const _cbs = new Set<(d: CompanyProfile | null) => void>();
-
 export function useCompany(): CompanyProfile | null {
-  const [company, setCompany] = useState<CompanyProfile | null>(_data);
+  const namespace = useNamespace();
+  const [company, setCompany] = useState<CompanyProfile | null>(null);
 
   useEffect(() => {
-    _cbs.add(setCompany);
-    if (_listeners === 0) {
-      _listeners++;
-      const unsub = onSnapshot(doc(db, 'company', 'profile'), snap => {
-        _data = snap.exists() ? (snap.data() as CompanyProfile) : null;
-        _cbs.forEach(cb => cb(_data));
-      });
-      return () => { unsub(); _listeners = 0; _cbs.delete(setCompany); };
-    }
-    return () => { _cbs.delete(setCompany); };
-  }, []);
+    const ns = namespace ?? auth.currentUser?.uid ?? null;
+    if (!ns) return;
+    const unsub = onSnapshot(doc(db, 'users', ns, 'company', 'profile'), snap => {
+      setCompany(snap.exists() ? (snap.data() as CompanyProfile) : null);
+    });
+    return unsub;
+  }, [namespace]);
 
   return company;
 }
