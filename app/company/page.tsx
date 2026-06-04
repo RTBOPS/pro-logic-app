@@ -25,8 +25,10 @@ const empty = {
 interface TeamMember { email: string; role: string; }
 
 export default function CompanyPage() {
-  const { user, profile } = useAuth();
+  const { user, profile, loading: authLoading } = useAuth();
   const namespace = useNamespace();
+  // Wait for both auth + namespace to resolve before deciding ownership
+  const isLoading = authLoading || !namespace;
   const [form, setForm] = useState(empty);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -48,7 +50,7 @@ export default function CompanyPage() {
   const atLimit = crewCount >= crewLimit && crewLimit !== Infinity;
 
   // Only owners (namespace === own uid) can manage company settings
-  const isOwner = user && namespace === user.uid;
+  const isOwner = !isLoading && !!(user && namespace && namespace === user.uid);
 
   useEffect(() => {
     if (!namespace) return;
@@ -136,10 +138,13 @@ export default function CompanyPage() {
         )}
       </PageHeader>
 
-      {!isOwner && (
+      {!isLoading && !isOwner && (
         <div className="mb-6 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-sm text-blue-700">
-          You are a team member. Contact the account owner to change company settings.
+          You are viewing a shared workspace. Contact the account owner to change company settings.
         </div>
+      )}
+      {isLoading && (
+        <div className="mb-6 text-sm text-gray-400">Loading…</div>
       )}
 
       <div className="space-y-6">
