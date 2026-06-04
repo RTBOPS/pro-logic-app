@@ -11,6 +11,7 @@ import {
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useAuth } from '@/hooks/useAuth';
+import { useCompany } from '@/hooks/useCompany';
 
 const nav = [
   { section: 'Overview' },
@@ -47,6 +48,7 @@ export default function Sidebar() {
   const path = usePathname();
   const router = useRouter();
   const { profile } = useAuth();
+  const company = useCompany();
 
   const handleLogout = async () => {
     await signOut(auth);
@@ -54,9 +56,15 @@ export default function Sidebar() {
   };
 
   return (
-    <aside className="w-64 md:w-52 h-screen bg-zinc-900 text-white flex flex-col shrink-0 overflow-y-auto">
-      <div className="px-4 py-3 border-b border-zinc-700 flex items-center gap-2.5">
-        <img src="/logo.png" alt="Pro-Logic" style={{ filter: 'brightness(0) invert(1)', height: '32px', objectFit: 'contain' }} />
+    <aside className="w-64 md:w-52 h-screen text-white flex flex-col shrink-0 overflow-y-auto"
+      style={{ backgroundColor: company?.primary_color || '#18181b' }}>
+      <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between gap-2">
+        {/* Pro-Logic logo — always left */}
+        <img src="/logo.png" alt="Pro-Logic" style={{ filter: 'brightness(0) invert(1)', height: '28px', objectFit: 'contain', maxWidth: '90px' }} />
+        {/* Company logo — right side */}
+        {company?.logo_url && (
+          <img src={company.logo_url} alt={company.name} style={{ height: '28px', objectFit: 'contain', maxWidth: '80px', borderRadius: '4px' }} />
+        )}
       </div>
 
       <nav className="flex-1 py-2">
@@ -73,7 +81,7 @@ export default function Sidebar() {
           return (
             <Link key={href} href={href}
               className={`flex items-center gap-2.5 px-4 py-2 text-sm transition-colors ${
-                active ? 'bg-zinc-700 text-white font-medium' : 'text-zinc-400 hover:text-white hover:bg-zinc-800'
+                active ? 'bg-zinc-700 text-white font-medium' : 'text-zinc-300 hover:text-white hover:bg-zinc-800'
               }`}>
               <Icon size={15} />
               {label}
@@ -84,8 +92,8 @@ export default function Sidebar() {
 
       <div className="border-t border-zinc-700 px-4 py-3 space-y-1.5">
         <Link href="/pricing" className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-zinc-800">
-          <CreditCard size={13} className="text-zinc-400" />
-          <span className="text-xs text-zinc-400">Plan</span>
+          <CreditCard size={13} className="text-zinc-300" />
+          <span className="text-xs text-zinc-300">Plan</span>
           {profile?.plan && (
             <span className={`ml-auto text-xs px-2 py-0.5 rounded-full font-medium capitalize ${PLAN_BADGE[profile.plan]}`}>
               {profile.plan}
@@ -94,13 +102,13 @@ export default function Sidebar() {
         </Link>
         {profile && (
           <div className="flex items-center gap-2 px-2 py-1">
-            <User size={13} className="text-zinc-400 shrink-0" />
-            <span className="text-xs text-zinc-400 truncate">{profile.displayName}</span>
+            <User size={13} className="text-zinc-300 shrink-0" />
+            <span className="text-xs text-zinc-300 truncate">{profile.displayName}</span>
           </div>
         )}
         <button onClick={handleLogout} className="flex items-center gap-2 px-2 py-1.5 w-full rounded-lg hover:bg-zinc-800 text-left">
-          <LogOut size={13} className="text-zinc-400" />
-          <span className="text-xs text-zinc-400">Sign out</span>
+          <LogOut size={13} className="text-zinc-300" />
+          <span className="text-xs text-zinc-300">Sign out</span>
         </button>
       </div>
     </aside>

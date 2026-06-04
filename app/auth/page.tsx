@@ -48,7 +48,7 @@ export default function AuthPage() {
         {/* Logo */}
         <div className="text-center mb-8">
           <div className="text-3xl font-bold text-white tracking-tight">PRO-LOGIC</div>
-          <div className="text-zinc-400 text-sm mt-1">Studio Management Platform</div>
+          <div className="text-zinc-300 text-sm mt-1">Studio Management Platform</div>
         </div>
 
         <div className="bg-white rounded-2xl shadow-2xl p-8">

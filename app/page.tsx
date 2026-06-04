@@ -59,9 +59,9 @@ export default function Dashboard() {
           </Link>
         </div>
         {lp ? (
-          <div className="p-6 text-gray-400 text-sm">Loading…</div>
+          <div className="p-6 text-gray-600 text-sm">Loading…</div>
         ) : recent.length === 0 ? (
-          <div className="p-6 text-gray-400 text-sm">No productions yet.</div>
+          <div className="p-6 text-gray-600 text-sm">No productions yet.</div>
         ) : (
           <>
           {/* Mobile: cards / Desktop: table */}
@@ -72,7 +72,7 @@ export default function Dashboard() {
                 <Link key={p.id} href={`/productions/${p.id}`} className="flex items-center justify-between px-4 py-3 hover:bg-gray-50 active:bg-gray-100">
                   <div>
                     <div className="font-medium text-gray-900 text-sm">{p.name}</div>
-                    <div className="text-xs text-gray-400">{p.client}{loc?.name ? ` · ${loc.name}` : ''}</div>
+                    <div className="text-xs text-gray-600">{p.client}{loc?.name ? ` · ${loc.name}` : ''}</div>
                   </div>
                   <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize shrink-0 ml-2 ${STATUS_COLOR[p.status] || 'bg-gray-100 text-gray-600'}`}>
                     {p.status}

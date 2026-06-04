@@ -125,9 +125,9 @@ export default function LocationsPage() {
         </button>
       </div>
 
-      {loading ? <div className="text-gray-400 text-sm">Loading…</div>
+      {loading ? <div className="text-gray-600 text-sm">Loading…</div>
         : locations.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-dashed border-gray-200 p-12 text-center text-gray-400">
+          <div className="bg-white rounded-2xl border border-dashed border-gray-200 p-12 text-center text-gray-600">
             No locations saved yet.
           </div>
         ) : (
@@ -156,8 +156,8 @@ export default function LocationsPage() {
                       )}
                     </div>
                     <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 ml-2">
-                      <button onClick={() => openEdit(l)} className="p-1.5 text-gray-400 hover:text-gray-700"><Pencil size={13} /></button>
-                      <button onClick={() => remove(l.id)} className="p-1.5 text-gray-400 hover:text-red-600"><Trash2 size={13} /></button>
+                      <button onClick={() => openEdit(l)} className="p-1.5 text-gray-600 hover:text-gray-700"><Pencil size={13} /></button>
+                      <button onClick={() => remove(l.id)} className="p-1.5 text-gray-600 hover:text-red-600"><Trash2 size={13} /></button>
                     </div>
                   </div>
                   {(l.contact_name || l.contact_phone || l.contact_email) && (
@@ -167,7 +167,7 @@ export default function LocationsPage() {
                       {l.contact_email && <div className="text-xs text-gray-500 flex items-center gap-1"><Mail size={10} /> {l.contact_email}</div>}
                     </div>
                   )}
-                  {l.notes && <div className="mt-2 text-xs text-gray-400 italic line-clamp-2">{l.notes}</div>}
+                  {l.notes && <div className="mt-2 text-xs text-gray-600 italic line-clamp-2">{l.notes}</div>}
                 </div>
               </div>
             ))}

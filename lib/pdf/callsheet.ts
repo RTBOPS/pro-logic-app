@@ -3,15 +3,10 @@ import { PDFContext, save } from './base';
 import { DEPARTMENTS } from '../departments';
 import QRCode from 'qrcode';
 
-/* ── Image loader (Firebase Storage only for CORS safety) ── */
+/* ── Image loader ───────────────────────────────── */
 async function toDataUrl(url: string): Promise<string | null> {
-  // Only load images from our own proxy or Firebase Storage (guaranteed CORS)
-  const safe = url.startsWith('/') ||
-    url.includes('firebasestorage.googleapis.com') ||
-    url.includes('storage.googleapis.com');
-  if (!safe) return null;
   try {
-    const res = await fetch(url);
+    const res = await fetch(url, { mode: 'cors' });
     if (!res.ok) return null;
     const blob = await res.blob();
     return new Promise(resolve => {
@@ -30,59 +25,18 @@ async function fetchMapDataUrl(address: string): Promise<string | null> {
   } catch { return null; }
 }
 
-/* ── Weather icon drawn with jsPDF (no emoji needed) ── */
-function drawWeatherIcon(doc: jsPDF, x: number, y: number, description: string, size = 8) {
+/* ── Weather icon helper ─────────────────────────── */
+function weatherIcon(description: string): string {
   const d = description.toLowerCase();
-  const cx = x + size / 2;
-  const cy = y + size / 2;
-  const r = size / 2;
-
-  if (d.includes('thunder')) {
-    // Dark cloud + lightning bolt
-    doc.setFillColor(80, 80, 100); doc.ellipse(cx, cy - 1, r * 0.8, r * 0.5, 'F');
-    doc.setFillColor(255, 200, 0);
-    doc.triangle(cx - 1, cy + 0.5, cx + 2, cy + 0.5, cx, cy + 3);
-    doc.triangle(cx - 2, cy + 3, cx + 1, cy + 3, cx - 1, cy + size - 1);
-  } else if (d.includes('snow')) {
-    // Snowflake
-    doc.setDrawColor(100, 160, 220); doc.setLineWidth(0.5);
-    for (let i = 0; i < 6; i++) {
-      const angle = (i * 60) * Math.PI / 180;
-      doc.line(cx, cy, cx + Math.cos(angle) * r, cy + Math.sin(angle) * r);
-    }
-  } else if (d.includes('rain') || d.includes('drizzle') || d.includes('shower')) {
-    // Cloud + rain drops
-    doc.setFillColor(120, 150, 180); doc.ellipse(cx, cy - 1, r * 0.8, r * 0.5, 'F');
-    doc.setDrawColor(60, 100, 180); doc.setLineWidth(0.5);
-    for (let i = 0; i < 3; i++) {
-      doc.line(cx - 2.5 + i * 2.5, cy + 1.5, cx - 3 + i * 2.5, cy + 3.5);
-    }
-  } else if (d.includes('fog') || d.includes('mist')) {
-    // Horizontal lines
-    doc.setDrawColor(160, 160, 160); doc.setLineWidth(0.8);
-    for (let i = 0; i < 3; i++) {
-      doc.line(x + 0.5, y + 2 + i * 2.5, x + size - 0.5, y + 2 + i * 2.5);
-    }
-  } else if (d.includes('overcast') || d.includes('cloudy')) {
-    // Double cloud
-    doc.setFillColor(160, 160, 170); doc.ellipse(cx - 1, cy, r * 0.85, r * 0.55, 'F');
-    doc.setFillColor(190, 190, 200); doc.ellipse(cx + 1, cy - 1.5, r * 0.7, r * 0.5, 'F');
-  } else if (d.includes('partly') || d.includes('mainly clear')) {
-    // Sun + partial cloud
-    doc.setFillColor(255, 180, 0); doc.circle(cx - 1.5, cy - 1.5, r * 0.45, 'F');
-    doc.setFillColor(180, 180, 190); doc.ellipse(cx + 1, cy + 1, r * 0.7, r * 0.45, 'F');
-  } else {
-    // Sunny: yellow circle with rays
-    doc.setFillColor(255, 200, 0); doc.circle(cx, cy, r * 0.45, 'F');
-    doc.setDrawColor(255, 170, 0); doc.setLineWidth(0.6);
-    for (let i = 0; i < 8; i++) {
-      const angle = (i * 45) * Math.PI / 180;
-      const inner = r * 0.55; const outer = r * 0.9;
-      doc.line(cx + Math.cos(angle) * inner, cy + Math.sin(angle) * inner,
-               cx + Math.cos(angle) * outer, cy + Math.sin(angle) * outer);
-    }
-  }
-  doc.setLineWidth(0.2);
+  if (d.includes('thunder')) return '⛈';
+  if (d.includes('snow') || d.includes('blizzard')) return '❄️';
+  if (d.includes('heavy rain') || d.includes('heavy shower')) return '🌧';
+  if (d.includes('rain') || d.includes('drizzle') || d.includes('shower')) return '🌦';
+  if (d.includes('fog') || d.includes('mist') || d.includes('haze')) return '🌫';
+  if (d.includes('overcast') || d.includes('cloudy')) return '☁️';
+  if (d.includes('partly') || d.includes('mainly clear')) return '⛅';
+  if (d.includes('wind')) return '💨';
+  return '☀️';
 }
 
 /* ── PDF helpers ────────────────────────────────── */
@@ -161,20 +115,17 @@ export async function generateCallSheet({ production, crew, locations, inventory
     : production.city || production.primary_location || '';
   const mapDataUrl = mapAddr ? await fetchMapDataUrl(mapAddr) : null;
 
-  // QR Code — Google Calendar deep link so phone adds event directly
-  const calStart = production.start_date
-    ? production.start_date.replace(/-/g, '') + 'T' + (production.call_time || '07:00').replace(/[: APMapm]/g, '').padEnd(6, '0')
-    : '';
-  const calEnd = production.end_date
-    ? production.end_date.replace(/-/g, '') + 'T' + (production.wrap_time || '18:00').replace(/[: APMapm]/g, '').padEnd(6, '0')
-    : calStart;
-  const calDetails = `Production: ${production.name} | Client: ${production.client} | Director: ${production.director || '--'} | Call: ${production.call_time || '--'}`;
-  const qrText = `https://calendar.google.com/calendar/render?action=TEMPLATE` +
-    `&text=${encodeURIComponent(production.name || 'Production')}` +
-    (calStart ? `&dates=${calStart}/${calEnd}` : '') +
-    `&details=${encodeURIComponent(calDetails)}` +
-    (mapAddr ? `&location=${encodeURIComponent(mapAddr)}` : '');
-  const qrDataUrl = await QRCode.toDataURL(qrText, { width: 200, margin: 1 });
+  // QR Code with production info
+  const qrText = JSON.stringify({
+    production: production.name,
+    client: production.client,
+    date: production.start_date,
+    callTime: production.call_time,
+    location: mapAddr,
+    director: production.director,
+    producer: production.producer,
+  });
+  const qrDataUrl = await QRCode.toDataURL(qrText, { width: 128, margin: 1 });
 
   /* ── PAGE 1: HEADER ── */
   let y = 0;
@@ -252,16 +203,17 @@ export async function generateCallSheet({ production, crew, locations, inventory
   doc.text(shootDate, cx + (colW - 2) / 2, y + 32, { align: 'center' });
   doc.setFontSize(6.5); doc.setTextColor(100, 100, 100);
   doc.text('Safety first. Follow all on-set safety protocols.', cx + (colW - 2) / 2, y + 40, { align: 'center' });
-  // Weather with drawn icon
+  // Weather with icons
   if (weather) {
-    const wy = y + blockH - 22;
-    drawWeatherIcon(doc, cx + 3, wy, weather.description, 10);
-    doc.setFontSize(9); bold(doc); doc.setTextColor(20, 60, 160);
-    doc.text(`${weather.temp_high}deg/${weather.temp_low}deg F`, cx + 16, wy + 5);
-    doc.setFontSize(7); normal(doc); doc.setTextColor(60, 60, 60);
-    doc.text(weather.description, cx + 16, wy + 10);
-    doc.setFontSize(6.5); doc.setTextColor(0, 100, 180);
-    doc.text(`Rain: ${weather.precipitation}%  Wind: ${weather.wind_speed || '--'} mph`, cx + 3, wy + 16);
+    const wIcon = weatherIcon(weather.description);
+    doc.setFontSize(11);
+    doc.text(wIcon, cx + 4, y + 50);
+    doc.setFontSize(8); bold(doc); doc.setTextColor(30, 70, 180);
+    doc.text(`${weather.temp_high}° / ${weather.temp_low}°F`, cx + 12, y + 50);
+    doc.setFontSize(6.5); normal(doc); doc.setTextColor(80, 80, 80);
+    doc.text(weather.description, cx + 12, y + 54.5);
+    doc.setFontSize(6); doc.setTextColor(0, 120, 200);
+    doc.text(`💧 ${weather.precipitation}% · 💨 ${weather.wind_speed || '—'} mph`, cx + 12, y + 59);
   }
   doc.setTextColor(0, 0, 0);
 
@@ -326,7 +278,7 @@ export async function generateCallSheet({ production, crew, locations, inventory
   });
 
   if (mapDataUrl) y = Math.max(y, section.length > 0 ? y : 0);
-  y += 10;
+  y += 4;
 
   /* ── CAST ── */
   const cast = crewWithPhotos.filter((c: any) => c.department === 'cast' || c.classification === 'Cast');
@@ -415,23 +367,15 @@ export async function generateCallSheet({ production, crew, locations, inventory
     y = Math.max(colY[0], colY[1]) + 4;
   }
 
-  /* ── FOOTER: QR + Calendar ── */
-  y = maybeNewPage(doc, y, 220);
-  const qrSize = 28;
-  const footerH = qrSize + 6;
-  doc.setFillColor(30, 30, 30); doc.rect(10, y, pageW - 20, footerH, 'F');
+  /* ── FOOTER: QR reminder ── */
+  y = maybeNewPage(doc, y);
+  doc.setFillColor(240, 240, 240); doc.rect(10, y, pageW - 20, 14, 'F');
   if (qrDataUrl) {
-    doc.addImage(qrDataUrl, 'PNG', 13, y + 3, qrSize, qrSize);
-    doc.setFontSize(8); bold(doc); doc.setTextColor(255, 255, 255);
-    doc.text('Add to Calendar', 13 + qrSize + 5, y + 10);
-    normal(doc); doc.setFontSize(7); doc.setTextColor(200, 200, 200);
-    doc.text('Scan with your phone camera to add this', 13 + qrSize + 5, y + 16);
-    doc.text('production shoot to your calendar app.', 13 + qrSize + 5, y + 21);
-    doc.setFontSize(7); doc.setTextColor(150, 200, 255);
-    doc.text(`${production.name}  |  Call: ${production.call_time || '—'}  |  ${shootDate}`, 13 + qrSize + 5, y + 28);
-    // Pro-Logic branding right side
-    doc.setTextColor(120, 120, 120); doc.setFontSize(6.5);
-    doc.text('Generated by PRO-LOGIC Studio', pageW - 12, y + footerH - 4, { align: 'right' });
+    doc.addImage(qrDataUrl, 'PNG', 13, y + 1, 12, 12);
+    doc.setFontSize(7); bold(doc);
+    doc.text('Scan QR to import production info to your device', 28, y + 6);
+    normal(doc); doc.setFontSize(6.5); doc.setTextColor(100, 100, 100);
+    doc.text(`Production: ${production.name}  ·  Call: ${production.call_time || '—'}  ·  ${shootDate}`, 28, y + 10);
     doc.setTextColor(0, 0, 0);
   }
 

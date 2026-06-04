@@ -97,7 +97,7 @@ export default function PricingPage() {
               <div className="font-bold text-gray-900 text-lg">{plan.name}</div>
               <div className="mt-1">
                 <span className="text-3xl font-bold text-gray-900">{plan.price}</span>
-                <span className="text-gray-400 text-sm">{plan.period}</span>
+                <span className="text-gray-600 text-sm">{plan.period}</span>
               </div>
             </div>
 

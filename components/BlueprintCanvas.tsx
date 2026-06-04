@@ -818,7 +818,7 @@ export default function BlueprintCanvas({
             <ImagePlus size={14} />
           </button>
           {bgImage && (
-            <button onClick={() => setBgImage(null)} className="text-xs text-gray-400 hover:text-red-500 px-1">✕ BG</button>
+            <button onClick={() => setBgImage(null)} className="text-xs text-gray-600 hover:text-red-500 px-1">✕ BG</button>
           )}
           <input ref={bgInputRef} type="file" accept="image/*" className="hidden" onChange={handleBgUpload} />
 

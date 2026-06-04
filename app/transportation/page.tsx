@@ -1,11 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useData } from '@/hooks/useData';
 import { addDoc, updateDoc, deleteDoc, collection, doc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db, storage } from '@/lib/firebase';
 import Modal from '@/components/Modal';
-import { Plus, Pencil, Trash2, Truck } from 'lucide-react';
+import { Plus, Pencil, Trash2, Truck, Upload, X } from 'lucide-react';
 
 const VEHICLE_TYPES = ['Production Van', 'Cube Truck', 'Grip Truck', 'Camera Car', 'Picture Car', 'Passenger Van', 'SUV', 'Sedan', 'Motorcycle', 'Golf Cart', 'Sprinter Van', 'Box Truck', 'Flatbed', 'Generator Truck', 'Other'];
 const VEHICLE_STATUSES = ['Available', 'In Use', 'Reserved', 'In Maintenance', 'Out of Service'];
@@ -18,6 +19,7 @@ const empty = {
   insurance_policy: '', insurance_expiry: '',
   registration_expiry: '', mileage: '',
   daily_rate_usd: '', notes: '',
+  images: [] as string[],
 };
 
 export default function TransportationPage() {
@@ -25,6 +27,24 @@ export default function TransportationPage() {
   const [modal, setModal] = useState<'create' | 'edit' | null>(null);
   const [form, setForm] = useState(empty);
   const [editId, setEditId] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const imgRef = useRef<HTMLInputElement>(null);
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files?.length) return;
+    setUploading(true);
+    try {
+      const urls: string[] = [];
+      for (const file of Array.from(files)) {
+        const path = `transportation/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+        const snap = await uploadBytes(storageRef(storage, path), file);
+        urls.push(await getDownloadURL(snap.ref));
+      }
+      setForm(f => ({ ...f, images: [...f.images, ...urls] }));
+    } catch (err: any) { alert('Upload failed: ' + err.message); }
+    finally { setUploading(false); if (imgRef.current) imgRef.current.value = ''; }
+  };
 
   const STATUS_COLOR: Record<string, string> = {
     Available: 'bg-green-100 text-green-700',
@@ -89,9 +109,9 @@ export default function TransportationPage() {
         </button>
       </div>
 
-      {loading ? <div className="text-gray-400 text-sm">Loading…</div>
+      {loading ? <div className="text-gray-600 text-sm">Loading…</div>
         : vehicles.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-dashed border-gray-200 p-12 text-center text-gray-400">
+          <div className="bg-white rounded-2xl border border-dashed border-gray-200 p-12 text-center text-gray-600">
             No vehicles yet. Add your production fleet.
           </div>
         ) : (
@@ -112,18 +132,21 @@ export default function TransportationPage() {
                 {vehicles.map((v: any) => (
                   <tr key={v.id} className="hover:bg-gray-50">
                     <td className="px-5 py-3">
-                      <div className="flex items-center gap-2">
-                        <Truck size={16} className="text-gray-400 shrink-0" />
+                      <div className="flex items-center gap-3">
+                        {v.images?.[0]
+                          ? <img src={v.images[0]} className="w-14 h-10 rounded-lg object-cover shrink-0 border border-gray-200" alt="" />
+                          : <div className="w-14 h-10 rounded-lg bg-gray-100 flex items-center justify-center shrink-0"><Truck size={18} className="text-gray-400" /></div>
+                        }
                         <div>
                           <div className="font-medium text-gray-900">{v.name}</div>
-                          <div className="text-xs text-gray-400">{[v.year, v.make, v.model, v.color].filter(Boolean).join(' ')}</div>
+                          <div className="text-xs text-gray-600">{[v.year, v.make, v.model, v.color].filter(Boolean).join(' ')}</div>
                         </div>
                       </div>
                     </td>
                     <td className="px-5 py-3 text-gray-600 text-xs">{v.type || '—'}</td>
                     <td className="px-5 py-3 text-xs text-gray-500">
                       {v.plate && <div className="font-mono">{v.plate}</div>}
-                      {v.vin && <div className="text-gray-400 text-xs">{v.vin.slice(-8)}</div>}
+                      {v.vin && <div className="text-gray-600 text-xs">{v.vin.slice(-8)}</div>}
                     </td>
                     <td className="px-5 py-3 text-xs text-gray-500">
                       {v.driver_name && <div>{v.driver_name}</div>}
@@ -139,8 +162,8 @@ export default function TransportationPage() {
                     </td>
                     <td className="px-5 py-3">
                       <div className="flex gap-1.5 justify-end">
-                        <button onClick={() => open(v)} className="text-gray-400 hover:text-gray-700"><Pencil size={14} /></button>
-                        <button onClick={() => remove(v.id)} className="text-gray-400 hover:text-red-600"><Trash2 size={14} /></button>
+                        <button onClick={() => open(v)} className="text-gray-600 hover:text-gray-700"><Pencil size={14} /></button>
+                        <button onClick={() => remove(v.id)} className="text-gray-600 hover:text-red-600"><Trash2 size={14} /></button>
                       </div>
                     </td>
                   </tr>
@@ -175,14 +198,14 @@ export default function TransportationPage() {
               {sel('Status', 'status', VEHICLE_STATUSES)}
             </div>
             <div className="border-t pt-3">
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Driver</p>
+              <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">Driver</p>
               <div className="grid grid-cols-2 gap-3">
                 {fld('Driver name', 'driver_name', 'Full name')}
                 {fld('Driver phone', 'driver_phone', '+1 555…', 'tel')}
               </div>
             </div>
             <div className="border-t pt-3">
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Insurance & Docs</p>
+              <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">Insurance & Docs</p>
               <div className="grid grid-cols-2 gap-3">
                 {fld('Insurance Policy #', 'insurance_policy', 'POL-12345')}
                 {fld('Insurance Expiry', 'insurance_expiry', '', 'date')}
@@ -197,6 +220,27 @@ export default function TransportationPage() {
               <label className="block text-xs font-medium text-gray-600 mb-1">Notes</label>
               <textarea className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none resize-none" rows={2}
                 value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-2">Vehicle Photos</label>
+              <input ref={imgRef} type="file" accept="image/*" multiple className="hidden" onChange={handleImageUpload} />
+              <button type="button" onClick={() => imgRef.current?.click()} disabled={uploading}
+                className="flex items-center gap-2 border border-dashed border-gray-300 rounded-lg px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 w-full justify-center disabled:opacity-50">
+                <Upload size={13} /> {uploading ? 'Uploading…' : 'Upload photos'}
+              </button>
+              {form.images.length > 0 && (
+                <div className="flex gap-2 mt-2 flex-wrap">
+                  {form.images.map((url, i) => (
+                    <div key={i} className="relative">
+                      <img src={url} className="w-20 h-16 rounded-lg object-cover" alt="" />
+                      <button onClick={() => setForm(f => ({ ...f, images: f.images.filter((_, j) => j !== i) }))}
+                        className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs">
+                        <X size={9} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
           <div className="flex gap-3 pt-4 border-t mt-4">

@@ -109,7 +109,7 @@ export default function DocumentsPage() {
           ))}
         </select>
         {!selectedProduction && (
-          <p className="text-xs text-gray-400 mt-2">All documents will be pre-filled with the selected production's data.</p>
+          <p className="text-xs text-gray-600 mt-2">All documents will be pre-filled with the selected production's data.</p>
         )}
       </div>
 
@@ -120,7 +120,7 @@ export default function DocumentsPage() {
               <docItem.icon size={20} />
             </div>
             <h3 className="font-semibold text-gray-900 mb-1">{docItem.title}</h3>
-            <p className="text-xs text-gray-400 mb-4 flex-1">{docItem.desc}</p>
+            <p className="text-xs text-gray-600 mb-4 flex-1">{docItem.desc}</p>
             <div className="flex gap-2">
               <button
                 onClick={() => handlePreview(docItem)}
@@ -158,7 +158,7 @@ export default function DocumentsPage() {
                   <Download size={13} />
                   {generating ? 'Downloading…' : 'Download PDF'}
                 </button>
-                <button onClick={() => setPreview(null)} className="p-1.5 text-gray-400 hover:text-gray-700">
+                <button onClick={() => setPreview(null)} className="p-1.5 text-gray-600 hover:text-gray-700">
                   <X size={18} />
                 </button>
               </div>

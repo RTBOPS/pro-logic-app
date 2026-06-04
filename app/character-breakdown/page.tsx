@@ -104,9 +104,9 @@ export default function CharacterBreakdownPage() {
         </div>
       </div>
 
-      {loading ? <div className="text-gray-400 text-sm">Loading…</div>
+      {loading ? <div className="text-gray-600 text-sm">Loading…</div>
         : filtered.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-dashed border-gray-200 p-12 text-center text-gray-400">
+          <div className="bg-white rounded-2xl border border-dashed border-gray-200 p-12 text-center text-gray-600">
             No characters yet. Add characters for your production.
           </div>
         ) : (
@@ -120,8 +120,8 @@ export default function CharacterBreakdownPage() {
                   </div>
                   <div className="flex items-center gap-1.5">
                     <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLOR[c.status] || 'bg-gray-100 text-gray-600'}`}>{c.status}</span>
-                    <button onClick={() => open(c)} className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-gray-700"><Pencil size={12}/></button>
-                    <button onClick={() => remove(c.id)} className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-red-600"><Trash2 size={12}/></button>
+                    <button onClick={() => open(c)} className="opacity-0 group-hover:opacity-100 p-1 text-gray-600 hover:text-gray-700"><Pencil size={12}/></button>
+                    <button onClick={() => remove(c.id)} className="opacity-0 group-hover:opacity-100 p-1 text-gray-600 hover:text-red-600"><Trash2 size={12}/></button>
                   </div>
                 </div>
                 <div className="flex gap-2 flex-wrap mb-2">
@@ -131,7 +131,7 @@ export default function CharacterBreakdownPage() {
                 </div>
                 {c.physical_description && <p className="text-xs text-gray-500 mb-1"><strong>Physical:</strong> {c.physical_description}</p>}
                 {c.personality && <p className="text-xs text-gray-500 mb-1"><strong>Personality:</strong> {c.personality}</p>}
-                {c.scenes && <p className="text-xs text-gray-400">Scenes: {c.scenes}</p>}
+                {c.scenes && <p className="text-xs text-gray-600">Scenes: {c.scenes}</p>}
               </div>
             ))}
           </div>

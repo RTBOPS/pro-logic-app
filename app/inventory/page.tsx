@@ -302,7 +302,7 @@ export default function InventoryPage() {
       {/* Filters */}
       <div className="flex gap-3 mb-6 flex-wrap">
         <div className="relative flex-1 min-w-[200px]">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600" />
           <input
             className="w-full border border-gray-200 rounded-xl pl-8 pr-3 py-2 text-sm focus:outline-none"
             placeholder="Search name, brand, model, serial…"
@@ -323,9 +323,9 @@ export default function InventoryPage() {
       </div>
 
       {loading ? (
-        <div className="text-gray-400 text-sm">Loading…</div>
+        <div className="text-gray-600 text-sm">Loading…</div>
       ) : filteredInventory.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-dashed border-gray-200 p-12 text-center text-gray-400">
+        <div className="bg-white rounded-2xl border border-dashed border-gray-200 p-12 text-center text-gray-600">
           {inventory.length === 0
             ? 'No equipment yet. Browse the catalog to import items or add manually.'
             : 'No items match your filter.'}
@@ -351,23 +351,23 @@ export default function InventoryPage() {
                   onClick={() => { setDetailItem(i); setModal('detail'); }}>
                   <td className="px-5 py-3">
                     <div className="font-medium text-gray-900">{i.name}</div>
-                    {i.serial_number && <div className="text-xs text-gray-400">S/N: {i.serial_number}</div>}
-                    {i.kit_name && <div className="text-xs text-gray-400">{i.kit_name}</div>}
+                    {i.serial_number && <div className="text-xs text-gray-600">S/N: {i.serial_number}</div>}
+                    {i.kit_name && <div className="text-xs text-gray-600">{i.kit_name}</div>}
                   </td>
                   <td className="px-5 py-3 text-gray-600">
                     <div>{i.brand || '—'}</div>
-                    <div className="text-xs text-gray-400">{i.model || ''}</div>
+                    <div className="text-xs text-gray-600">{i.model || ''}</div>
                   </td>
                   <td className="px-5 py-3 text-xs text-gray-500">
                     <div>{i.category || '—'}</div>
-                    <div className="text-gray-400">{i.subcategory || ''}</div>
+                    <div className="text-gray-600">{i.subcategory || ''}</div>
                   </td>
                   <td className={`px-5 py-3 text-xs font-medium ${CONDITION_COLOR[i.condition] || 'text-gray-500'}`}>
                     {i.condition || '—'}
                   </td>
                   <td className="px-5 py-3 text-xs text-gray-600">
                     {i.replacement_value_usd ? <div>${i.replacement_value_usd.toLocaleString()}</div> : <div className="text-gray-300">—</div>}
-                    {i.rental_day_rate_usd ? <div className="text-gray-400">${i.rental_day_rate_usd}/day</div> : null}
+                    {i.rental_day_rate_usd ? <div className="text-gray-600">${i.rental_day_rate_usd}/day</div> : null}
                   </td>
                   <td className="px-5 py-3">
                     <span className={`px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${STATUS_COLOR[i.status] || 'bg-gray-100 text-gray-600'}`}>
@@ -376,9 +376,9 @@ export default function InventoryPage() {
                   </td>
                   <td className="px-5 py-3" onClick={e => e.stopPropagation()}>
                     <div className="flex items-center gap-1.5 justify-end">
-                      <button onClick={() => openInspection(i)} title="Rental inspection" className="text-gray-400 hover:text-blue-600"><ClipboardCheck size={14} /></button>
-                      <button onClick={() => openEdit(i)} className="text-gray-400 hover:text-gray-700"><Pencil size={14} /></button>
-                      <button onClick={() => remove(i.id)} className="text-gray-400 hover:text-red-600"><Trash2 size={14} /></button>
+                      <button onClick={() => openInspection(i)} title="Rental inspection" className="text-gray-600 hover:text-blue-600"><ClipboardCheck size={14} /></button>
+                      <button onClick={() => openEdit(i)} className="text-gray-600 hover:text-gray-700"><Pencil size={14} /></button>
+                      <button onClick={() => remove(i.id)} className="text-gray-600 hover:text-red-600"><Trash2 size={14} /></button>
                     </div>
                   </td>
                 </tr>
@@ -395,7 +395,7 @@ export default function InventoryPage() {
             <div className="flex items-center justify-between px-6 py-4 border-b shrink-0">
               <div>
                 <h2 className="font-semibold text-lg">Production Equipment Catalog</h2>
-                <p className="text-xs text-gray-400 mt-0.5">{catalog.length} industry-standard items · select to add to your inventory</p>
+                <p className="text-xs text-gray-600 mt-0.5">{catalog.length} industry-standard items · select to add to your inventory</p>
               </div>
               <div className="flex items-center gap-2">
                 {selectedItems.size > 0 && (
@@ -404,13 +404,13 @@ export default function InventoryPage() {
                     Import {selectedItems.size} item{selectedItems.size !== 1 ? 's' : ''}
                   </button>
                 )}
-                <button onClick={close} className="text-gray-400 hover:text-gray-700 text-xl leading-none">×</button>
+                <button onClick={close} className="text-gray-600 hover:text-gray-700 text-xl leading-none">×</button>
               </div>
             </div>
 
             <div className="flex gap-3 px-6 py-3 border-b shrink-0">
               <div className="relative flex-1">
-                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600" />
                 <input autoFocus
                   className="w-full border border-gray-200 rounded-lg pl-8 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-black"
                   placeholder="Search cameras, lenses, audio, lighting…"
@@ -427,7 +427,7 @@ export default function InventoryPage() {
 
             <div className="overflow-y-auto flex-1">
               <table className="w-full text-sm">
-                <thead className="bg-gray-50 text-gray-400 text-xs uppercase sticky top-0">
+                <thead className="bg-gray-50 text-gray-600 text-xs uppercase sticky top-0">
                   <tr>
                     <th className="w-10 px-4 py-2">
                       <input type="checkbox" onChange={selectAll}
@@ -452,12 +452,12 @@ export default function InventoryPage() {
                         </td>
                         <td className="px-4 py-2.5">
                           <div className="font-medium text-gray-900">{item.name}</div>
-                          <div className="text-xs text-gray-400">{item.brand} · {item.model}</div>
-                          {item.description && <div className="text-xs text-gray-400 mt-0.5 line-clamp-1">{item.description}</div>}
+                          <div className="text-xs text-gray-600">{item.brand} · {item.model}</div>
+                          {item.description && <div className="text-xs text-gray-600 mt-0.5 line-clamp-1">{item.description}</div>}
                         </td>
                         <td className="px-4 py-2.5 hidden md:table-cell">
                           <div className="text-xs text-gray-600">{item.category}</div>
-                          <div className="text-xs text-gray-400">{item.subcategory}</div>
+                          <div className="text-xs text-gray-600">{item.subcategory}</div>
                         </td>
                         <td className="px-4 py-2.5 hidden lg:table-cell text-xs text-gray-500">
                           {item.voltage && <div className="flex items-center gap-1"><Zap size={11} />{item.voltage}</div>}
@@ -468,7 +468,7 @@ export default function InventoryPage() {
                             <div className="text-gray-700 font-medium">${item.replacement_value_usd.toLocaleString()}</div>
                           ) : null}
                           {item.rental_day_rate_usd ? (
-                            <div className="text-gray-400">${item.rental_day_rate_usd}/day</div>
+                            <div className="text-gray-600">${item.rental_day_rate_usd}/day</div>
                           ) : null}
                         </td>
                         <td className="px-2 py-2.5 text-right" onClick={e => e.stopPropagation()}>
@@ -510,7 +510,7 @@ export default function InventoryPage() {
                 </tbody>
               </table>
               {dbResults.length === 0 && (
-                <div className="text-center py-12 text-gray-400 text-sm">No items match your search.</div>
+                <div className="text-center py-12 text-gray-600 text-sm">No items match your search.</div>
               )}
             </div>
           </div>
@@ -569,7 +569,7 @@ export default function InventoryPage() {
           <div className="flex gap-0 border-b mb-4 -mx-1">
             {(['pre', 'post'] as const).map(p => (
               <button key={p} onClick={() => setInspectionPhase(p)}
-                className={`px-4 py-2 text-sm border-b-2 transition-colors ${inspectionPhase === p ? 'border-black text-black font-medium' : 'border-transparent text-gray-400'}`}>
+                className={`px-4 py-2 text-sm border-b-2 transition-colors ${inspectionPhase === p ? 'border-black text-black font-medium' : 'border-transparent text-gray-600'}`}>
                 {p === 'pre' ? 'Pre-Rental Inspection' : 'Post-Rental Inspection'}
               </button>
             ))}
@@ -722,7 +722,7 @@ export default function InventoryPage() {
           <div className="flex gap-0 border-b mb-4 -mx-1">
             {(['basic', 'specs', 'logistics'] as const).map(tab => (
               <button key={tab} onClick={() => setFormTab(tab)}
-                className={`px-4 py-2 text-sm capitalize transition-colors border-b-2 ${formTab === tab ? 'border-black text-black font-medium' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>
+                className={`px-4 py-2 text-sm capitalize transition-colors border-b-2 ${formTab === tab ? 'border-black text-black font-medium' : 'border-transparent text-gray-600 hover:text-gray-600'}`}>
                 {tab === 'basic' ? 'Basic Info' : tab === 'specs' ? 'Specs & Power' : 'Logistics'}
               </button>
             ))}
@@ -861,7 +861,7 @@ function InfoRow({ label, value }: { label: string; value?: string | number | nu
   if (!value) return null;
   return (
     <div>
-      <p className="text-xs text-gray-400">{label}</p>
+      <p className="text-xs text-gray-600">{label}</p>
       <p className="text-sm text-gray-800 font-medium">{value}</p>
     </div>
   );

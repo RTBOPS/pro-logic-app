@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, use } from 'react';
 import { doc, getDoc, updateDoc, collection, getDocs, addDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useData } from '@/hooks/useData';
@@ -42,24 +42,24 @@ function WeatherCard({ location }: { location: any }) {
 
   useEffect(() => { fetchWeather(); }, [fetchWeather]);
 
-  if (error) return <p className="text-xs text-gray-400 flex items-center gap-1"><CloudSun size={12} /> {error}</p>;
+  if (error) return <p className="text-xs text-gray-600 flex items-center gap-1"><CloudSun size={12} /> {error}</p>;
 
   return (
     <div>
       <div className="flex items-center gap-2 mb-2">
         <CloudSun size={14} className="text-blue-500" />
         <span className="text-xs font-medium text-gray-600">Forecast — {location.name}</span>
-        <button onClick={fetchWeather} className="ml-auto text-gray-400 hover:text-gray-600"><RefreshCw size={11} /></button>
+        <button onClick={fetchWeather} className="ml-auto text-gray-600 hover:text-gray-600"><RefreshCw size={11} /></button>
       </div>
-      {loading ? <p className="text-xs text-gray-400">Loading…</p> : (
+      {loading ? <p className="text-xs text-gray-600">Loading…</p> : (
         <div className="flex gap-2 overflow-x-auto pb-1">
           {forecast.map((day: any) => (
             <div key={day.date} className="shrink-0 bg-gray-50 rounded-xl border border-gray-100 p-2 text-center min-w-[76px]">
-              <div className="text-xs text-gray-400">{new Date(day.date + 'T12:00:00').toLocaleDateString('en', { weekday: 'short', month: 'short', day: 'numeric' })}</div>
+              <div className="text-xs text-gray-600">{new Date(day.date + 'T12:00:00').toLocaleDateString('en', { weekday: 'short', month: 'short', day: 'numeric' })}</div>
               <img src={`https://openweathermap.org/img/wn/${day.icon}.png`} className="w-8 h-8 mx-auto" alt="" />
               <div className="text-xs font-semibold text-gray-800">{day.temp_high}°F / {day.temp_low}°F</div>
               <div className="text-xs text-blue-500">{day.precipitation}% 💧</div>
-              <div className="text-xs text-gray-400 capitalize leading-tight">{day.description}</div>
+              <div className="text-xs text-gray-600 capitalize leading-tight">{day.description}</div>
             </div>
           ))}
         </div>
@@ -78,8 +78,8 @@ function ConfirmIcon({ status }: { status: string }) {
 /* ─── Main page ──────────────────────────────────────────────────── */
 type Tab = 'overview' | 'crew' | 'equipment';
 
-export default function ProductionDetail({ params }: { params: { id: string } }) {
-  const { id } = params;
+export default function ProductionDetail({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
   const [production, setProduction] = useState<any>(null);
   const [assignedCrew, setAssignedCrew] = useState<any[]>([]);
   const [assignedGear, setAssignedGear] = useState<any[]>([]);
@@ -188,7 +188,7 @@ export default function ProductionDetail({ params }: { params: { id: string } })
     setSending(null);
   };
 
-  if (loading) return <div className="p-8 text-gray-400 text-sm">Loading…</div>;
+  if (loading) return <div className="p-8 text-gray-600 text-sm">Loading…</div>;
   if (!production) return <div className="p-8 text-red-500">Production not found.</div>;
 
   const location = locations.find((l: any) => l.id === production.location_id);
@@ -230,7 +230,7 @@ export default function ProductionDetail({ params }: { params: { id: string } })
           <div>
             <h1 className="text-2xl font-bold text-gray-900">{production.name}</h1>
             <p className="text-gray-500 mt-0.5">{production.client}</p>
-            <div className="flex items-center gap-4 mt-2 text-sm text-gray-400">
+            <div className="flex items-center gap-4 mt-2 text-sm text-gray-600">
               {location && <span className="flex items-center gap-1"><MapPin size={13} />{location.name}</span>}
               {production.start_date && (
                 <span className="flex items-center gap-1">
@@ -254,19 +254,19 @@ export default function ProductionDetail({ params }: { params: { id: string } })
         <div className="flex gap-4 text-sm mb-4">
           <div className="bg-gray-50 rounded-xl px-4 py-2 text-center">
             <div className="font-bold text-gray-900">{assignedCrew.length}</div>
-            <div className="text-xs text-gray-400">Crew</div>
+            <div className="text-xs text-gray-600">Crew</div>
           </div>
           <div className="bg-green-50 rounded-xl px-4 py-2 text-center">
             <div className="font-bold text-green-700">{confirmedCount}</div>
-            <div className="text-xs text-gray-400">Confirmed</div>
+            <div className="text-xs text-gray-600">Confirmed</div>
           </div>
           <div className="bg-yellow-50 rounded-xl px-4 py-2 text-center">
             <div className="font-bold text-yellow-700">{pendingCount}</div>
-            <div className="text-xs text-gray-400">Pending</div>
+            <div className="text-xs text-gray-600">Pending</div>
           </div>
           <div className="bg-blue-50 rounded-xl px-4 py-2 text-center">
             <div className="font-bold text-blue-700">{assignedGear.length}</div>
-            <div className="text-xs text-gray-400">Equipment</div>
+            <div className="text-xs text-gray-600">Equipment</div>
           </div>
         </div>
 
@@ -300,7 +300,7 @@ export default function ProductionDetail({ params }: { params: { id: string } })
               <button onClick={() => setTab('crew')} className="text-xs text-blue-600 hover:underline">Manage →</button>
             </div>
             {assignedCrew.length === 0 ? (
-              <div className="p-6 text-sm text-gray-400 text-center">
+              <div className="p-6 text-sm text-gray-600 text-center">
                 No crew yet. <button onClick={() => setTab('crew')} className="text-blue-500 hover:underline">Add crew →</button>
               </div>
             ) : (
@@ -316,7 +316,7 @@ export default function ProductionDetail({ params }: { params: { id: string } })
                         {c.picture && <img src={c.picture} className="w-7 h-7 rounded-full object-cover" alt="" />}
                         <div className="flex-1 min-w-0">
                           <div className="text-sm font-medium text-gray-800 truncate">{c.name}</div>
-                          <div className="text-xs text-gray-400">{c.role}</div>
+                          <div className="text-xs text-gray-600">{c.role}</div>
                         </div>
                         <ConfirmIcon status={c.confirmation_status || 'pending'} />
                         <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusStyle(c.confirmation_status || 'pending')}`}>
@@ -335,7 +335,7 @@ export default function ProductionDetail({ params }: { params: { id: string } })
               <button onClick={() => setTab('equipment')} className="text-xs text-blue-600 hover:underline">Manage →</button>
             </div>
             {assignedGear.length === 0 ? (
-              <div className="p-6 text-sm text-gray-400 text-center">
+              <div className="p-6 text-sm text-gray-600 text-center">
                 No equipment yet. <button onClick={() => setTab('equipment')} className="text-blue-500 hover:underline">Add equipment →</button>
               </div>
             ) : (
@@ -345,9 +345,9 @@ export default function ProductionDetail({ params }: { params: { id: string } })
                     <Package size={13} className="text-gray-300 shrink-0" />
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-medium text-gray-800 truncate">{g.name}</div>
-                      <div className="text-xs text-gray-400">{g.brand} {g.model}</div>
+                      <div className="text-xs text-gray-600">{g.brand} {g.model}</div>
                     </div>
-                    {g.category && <span className="text-xs text-gray-400 bg-gray-50 px-2 py-0.5 rounded-full">{g.category}</span>}
+                    {g.category && <span className="text-xs text-gray-600 bg-gray-50 px-2 py-0.5 rounded-full">{g.category}</span>}
                   </li>
                 ))}
               </ul>
@@ -378,7 +378,7 @@ export default function ProductionDetail({ params }: { params: { id: string } })
                 Assigned ({assignedCrew.length})
               </div>
               {assignedCrew.length === 0 ? (
-                <div className="p-6 text-sm text-gray-400 text-center">No crew assigned yet</div>
+                <div className="p-6 text-sm text-gray-600 text-center">No crew assigned yet</div>
               ) : (
                 <div className="divide-y divide-gray-50 max-h-[500px] overflow-y-auto">
                   {assignedCrew.map(c => (
@@ -388,7 +388,7 @@ export default function ProductionDetail({ params }: { params: { id: string } })
                         <div className="text-sm font-medium text-gray-800 truncate">{c.name}</div>
                         <div className="text-xs flex items-center gap-1.5">
                           <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: deptColor(c.department || 'other') }} />
-                          <span className="text-gray-400">{c.role || deptLabel(c.department)}</span>
+                          <span className="text-gray-600">{c.role || deptLabel(c.department)}</span>
                         </div>
                       </div>
                       <div className="flex items-center gap-1.5">
@@ -399,16 +399,16 @@ export default function ProductionDetail({ params }: { params: { id: string } })
                       </div>
                       <div className="flex gap-1 ml-1">
                         {c.email && (
-                          <button onClick={() => sendConfirmation(c)} disabled={sending === c.id} title="Send confirmation email" className="p-1.5 text-gray-400 hover:text-blue-600 disabled:opacity-50">
+                          <button onClick={() => sendConfirmation(c)} disabled={sending === c.id} title="Send confirmation email" className="p-1.5 text-gray-600 hover:text-blue-600 disabled:opacity-50">
                             <Mail size={12} />
                           </button>
                         )}
                         {c.phone && (
-                          <button onClick={() => sendSMSToMember(c)} disabled={sending === c.id + '-sms'} title="Send SMS notification" className="p-1.5 text-gray-400 hover:text-green-600 disabled:opacity-50">
+                          <button onClick={() => sendSMSToMember(c)} disabled={sending === c.id + '-sms'} title="Send SMS notification" className="p-1.5 text-gray-600 hover:text-green-600 disabled:opacity-50">
                             💬
                           </button>
                         )}
-                        <button onClick={() => removeCrew(c.id)} className="p-1.5 text-gray-400 hover:text-red-500"><X size={12} /></button>
+                        <button onClick={() => removeCrew(c.id)} className="p-1.5 text-gray-600 hover:text-red-500"><X size={12} /></button>
                       </div>
                     </div>
                   ))}
@@ -423,7 +423,7 @@ export default function ProductionDetail({ params }: { params: { id: string } })
               </div>
               <div className="px-4 py-3 border-b flex gap-2">
                 <div className="relative flex-1">
-                  <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-600" />
                   <input className="w-full border border-gray-200 rounded-lg pl-7 pr-2 py-1.5 text-xs focus:outline-none" placeholder="Search…"
                     value={crewSearch} onChange={e => setCrewSearch(e.target.value)} />
                 </div>
@@ -434,7 +434,7 @@ export default function ProductionDetail({ params }: { params: { id: string } })
                 </select>
               </div>
               {unassignedCrew.length === 0 ? (
-                <div className="p-6 text-sm text-gray-400 text-center">{allCrew.length === 0 ? 'No crew in database yet.' : 'All crew already assigned.'}</div>
+                <div className="p-6 text-sm text-gray-600 text-center">{allCrew.length === 0 ? 'No crew in database yet.' : 'All crew already assigned.'}</div>
               ) : (
                 <div className="divide-y divide-gray-50 max-h-[460px] overflow-y-auto">
                   {unassignedCrew.map((c: any) => (
@@ -444,7 +444,7 @@ export default function ProductionDetail({ params }: { params: { id: string } })
                         <div className="text-sm font-medium text-gray-800 truncate">{c.name} {c.last_name}</div>
                         <div className="text-xs flex items-center gap-1.5">
                           <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: deptColor(c.department || 'other') }} />
-                          <span className="text-gray-400">{c.role || deptLabel(c.department || 'other')}</span>
+                          <span className="text-gray-600">{c.role || deptLabel(c.department || 'other')}</span>
                         </div>
                       </div>
                       <button onClick={() => addCrew(c.id)} className="flex items-center gap-1 text-xs bg-black text-white px-2.5 py-1 rounded-lg hover:bg-zinc-700">
@@ -473,7 +473,7 @@ export default function ProductionDetail({ params }: { params: { id: string } })
                 Assigned ({assignedGear.length})
               </div>
               {assignedGear.length === 0 ? (
-                <div className="p-6 text-sm text-gray-400 text-center">No equipment assigned yet</div>
+                <div className="p-6 text-sm text-gray-600 text-center">No equipment assigned yet</div>
               ) : (
                 <div className="divide-y divide-gray-50 max-h-[500px] overflow-y-auto">
                   {assignedGear.map(g => (
@@ -481,10 +481,10 @@ export default function ProductionDetail({ params }: { params: { id: string } })
                       <Package size={14} className="text-gray-300 shrink-0" />
                       <div className="flex-1 min-w-0">
                         <div className="text-sm font-medium text-gray-800 truncate">{g.name}</div>
-                        <div className="text-xs text-gray-400">{g.brand} {g.model}</div>
+                        <div className="text-xs text-gray-600">{g.brand} {g.model}</div>
                       </div>
-                      {g.category && <span className="text-xs text-gray-400 shrink-0">{g.category}</span>}
-                      <button onClick={() => removeEquipment(g.id)} className="p-1.5 text-gray-400 hover:text-red-500"><X size={12} /></button>
+                      {g.category && <span className="text-xs text-gray-600 shrink-0">{g.category}</span>}
+                      <button onClick={() => removeEquipment(g.id)} className="p-1.5 text-gray-600 hover:text-red-500"><X size={12} /></button>
                     </div>
                   ))}
                 </div>
@@ -496,13 +496,13 @@ export default function ProductionDetail({ params }: { params: { id: string } })
               <div className="px-5 py-3 bg-gray-50 border-b text-xs font-semibold text-gray-500 uppercase tracking-wide">Available to add</div>
               <div className="px-4 py-3 border-b">
                 <div className="relative">
-                  <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-600" />
                   <input className="w-full border border-gray-200 rounded-lg pl-7 pr-2 py-1.5 text-xs focus:outline-none"
                     placeholder="Search equipment…" value={gearSearch} onChange={e => setGearSearch(e.target.value)} />
                 </div>
               </div>
               {unassignedGear.length === 0 ? (
-                <div className="p-6 text-sm text-gray-400 text-center">{allInventory.length === 0 ? 'No inventory yet.' : 'All items assigned.'}</div>
+                <div className="p-6 text-sm text-gray-600 text-center">{allInventory.length === 0 ? 'No inventory yet.' : 'All items assigned.'}</div>
               ) : (
                 <div className="divide-y divide-gray-50 max-h-[460px] overflow-y-auto">
                   {unassignedGear.map((i: any) => (
@@ -510,7 +510,7 @@ export default function ProductionDetail({ params }: { params: { id: string } })
                       <Package size={13} className="text-gray-300 shrink-0" />
                       <div className="flex-1 min-w-0">
                         <div className="text-sm font-medium text-gray-800 truncate">{i.name}</div>
-                        <div className="text-xs text-gray-400">{i.brand} {i.model} · {i.category}</div>
+                        <div className="text-xs text-gray-600">{i.brand} {i.model} · {i.category}</div>
                       </div>
                       <button onClick={() => addEquipment(i.id)} className="flex items-center gap-1 text-xs bg-black text-white px-2.5 py-1 rounded-lg hover:bg-zinc-700 shrink-0">
                         <Plus size={11} /> Add

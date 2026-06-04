@@ -92,7 +92,7 @@ export default function ShootLogPage() {
       </div>
 
       {!selectedProduction ? (
-        <div className="bg-white rounded-2xl border border-dashed border-gray-200 p-12 text-center text-gray-400">
+        <div className="bg-white rounded-2xl border border-dashed border-gray-200 p-12 text-center text-gray-600">
           Select a production to start logging takes.
         </div>
       ) : (
@@ -199,7 +199,7 @@ export default function ShootLogPage() {
                   {filtered.map(t => (
                     <tr key={t.id} className={`hover:bg-gray-50 ${t.selected ? 'bg-green-50' : ''}`}>
                       <td className="px-3 py-2 text-center">
-                        <button onClick={() => toggleSelected(t)} className="text-gray-400">
+                        <button onClick={() => toggleSelected(t)} className="text-gray-600">
                           {t.selected
                             ? <CheckCircle size={14} className="text-green-500" />
                             : <Circle size={14} />}
@@ -215,7 +215,7 @@ export default function ShootLogPage() {
                       <td className="px-3 py-2 text-gray-500">{t.iso}</td>
                       <td className="px-3 py-2 text-gray-500">{t.shutter}</td>
                       <td className="px-3 py-2 text-gray-500">{t.sound_roll}</td>
-                      <td className="px-3 py-2 text-gray-400 max-w-[100px] truncate">{t.notes}</td>
+                      <td className="px-3 py-2 text-gray-600 max-w-[100px] truncate">{t.notes}</td>
                       <td className="px-3 py-2">
                         <button onClick={() => removeTake(t.id)} className="text-gray-300 hover:text-red-500"><Trash2 size={12} /></button>
                       </td>

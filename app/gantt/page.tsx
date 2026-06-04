@@ -160,7 +160,7 @@ export default function GanttPage() {
         </div>
 
         {rows.length === 0 ? (
-          <div className="p-12 text-center text-gray-400 text-sm">
+          <div className="p-12 text-center text-gray-600 text-sm">
             No rows yet. Click "+ From Productions" or "+ Add Row" to start.
           </div>
         ) : (
@@ -182,7 +182,7 @@ export default function GanttPage() {
                           title={d}
                         >
                           {isMonday && (
-                            <span className="text-xs text-gray-400 whitespace-nowrap px-1">
+                            <span className="text-xs text-gray-600 whitespace-nowrap px-1">
                               {day.toLocaleDateString('en', { month: 'short', day: 'numeric' })}
                             </span>
                           )}
@@ -202,7 +202,7 @@ export default function GanttPage() {
                       <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ backgroundColor: row.color }} />
                       <div className="min-w-0">
                         <div className="text-sm font-medium text-gray-800 truncate">{row.label}</div>
-                        <div className="text-xs text-gray-400 capitalize">{row.type}</div>
+                        <div className="text-xs text-gray-600 capitalize">{row.type}</div>
                       </div>
                       <button onClick={() => removeRow(row.id)} className="ml-auto opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-500 transition-opacity">
                         <Trash2 size={12} />

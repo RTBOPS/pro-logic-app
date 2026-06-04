@@ -24,7 +24,7 @@ export default function Modal({ title, onClose, children }: Props) {
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4">
         <div className="flex items-center justify-between px-6 py-4 border-b">
           <h2 className="font-semibold text-lg">{title}</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <button onClick={onClose} className="text-gray-600 hover:text-gray-600">
             <X size={20} />
           </button>
         </div>

@@ -232,7 +232,7 @@ export default function CrewPage() {
       {/* Filters */}
       <div className="flex gap-3 mb-6 flex-wrap">
         <div className="relative flex-1 min-w-[200px]">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600" />
           <input
             className="w-full border border-gray-200 rounded-xl pl-8 pr-3 py-2 text-sm focus:outline-none"
             placeholder="Search name, role, email…"
@@ -262,9 +262,9 @@ export default function CrewPage() {
       </div>
 
       {loading ? (
-        <div className="text-gray-400 text-sm">Loading…</div>
+        <div className="text-gray-600 text-sm">Loading…</div>
       ) : filtered.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-dashed border-gray-200 p-12 text-center text-gray-400">
+        <div className="bg-white rounded-2xl border border-dashed border-gray-200 p-12 text-center text-gray-600">
           {crew.length === 0 ? 'No crew members yet.' : 'No results for your search.'}
         </div>
       ) : viewMode === 'grid' ? (
@@ -275,7 +275,7 @@ export default function CrewPage() {
               <div className="flex items-center gap-2 mb-3">
                 <span className="w-3 h-3 rounded-full" style={{ backgroundColor: dept.color }} />
                 <h2 className="font-semibold text-gray-700">{dept.label}</h2>
-                <span className="text-xs text-gray-400">({dept.members.length})</span>
+                <span className="text-xs text-gray-600">({dept.members.length})</span>
               </div>
               <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                 {dept.members.map((c: any) => (
@@ -306,7 +306,7 @@ export default function CrewPage() {
                       <img src={c.picture || DEFAULT_PICTURE} className="w-8 h-8 rounded-full object-cover" alt="" />
                       <div>
                         <div className="font-medium text-gray-900">{c.name} {c.last_name}</div>
-                        {c.dob && <div className="text-xs text-gray-400">DOB: {c.dob}</div>}
+                        {c.dob && <div className="text-xs text-gray-600">DOB: {c.dob}</div>}
                       </div>
                     </div>
                   </td>
@@ -324,8 +324,8 @@ export default function CrewPage() {
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex gap-1.5 justify-end">
-                      <button onClick={() => openEdit(c)} className="text-gray-400 hover:text-gray-700"><Pencil size={13} /></button>
-                      <button onClick={() => remove(c.id)} className="text-gray-400 hover:text-red-600"><Trash2 size={13} /></button>
+                      <button onClick={() => openEdit(c)} className="text-gray-600 hover:text-gray-700"><Pencil size={13} /></button>
+                      <button onClick={() => remove(c.id)} className="text-gray-600 hover:text-red-600"><Trash2 size={13} /></button>
                     </div>
                   </td>
                 </tr>
@@ -347,7 +347,7 @@ export default function CrewPage() {
               { id: 'availability', label: 'Availability' },
             ] as const).map(t => (
               <button key={t.id} onClick={() => setFormTab(t.id)}
-                className={`px-3 py-2 text-xs transition-colors border-b-2 ${formTab === t.id ? 'border-black text-black font-medium' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>
+                className={`px-3 py-2 text-xs transition-colors border-b-2 ${formTab === t.id ? 'border-black text-black font-medium' : 'border-transparent text-gray-600 hover:text-gray-600'}`}>
                 {t.label}
               </button>
             ))}
@@ -578,14 +578,14 @@ function CrewCard({ member, onEdit, onRemove }: { member: any; onEdit: () => voi
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 group relative">
       <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-        <button onClick={onEdit} className="p-1.5 bg-white rounded-lg shadow-sm text-gray-400 hover:text-gray-700"><Pencil size={12} /></button>
-        <button onClick={onRemove} className="p-1.5 bg-white rounded-lg shadow-sm text-gray-400 hover:text-red-600"><Trash2 size={12} /></button>
+        <button onClick={onEdit} className="p-1.5 bg-white rounded-lg shadow-sm text-gray-600 hover:text-gray-700"><Pencil size={12} /></button>
+        <button onClick={onRemove} className="p-1.5 bg-white rounded-lg shadow-sm text-gray-600 hover:text-red-600"><Trash2 size={12} /></button>
       </div>
       <div className="flex items-center gap-3 mb-3">
         <img src={member.picture || DEFAULT_PICTURE} className="w-12 h-12 rounded-full object-cover shrink-0" alt="" />
         <div className="min-w-0">
           <div className="font-semibold text-gray-900 text-sm truncate">{member.name} {member.last_name}</div>
-          <div className="text-xs text-gray-400 truncate">{member.role || 'No role'}</div>
+          <div className="text-xs text-gray-600 truncate">{member.role || 'No role'}</div>
         </div>
       </div>
       <div className="flex items-center justify-between">

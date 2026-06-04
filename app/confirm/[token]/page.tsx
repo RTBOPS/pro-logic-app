@@ -1,12 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, use } from 'react';
 import { collection, query, where, getDocs, updateDoc, doc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { CheckCircle, XCircle, Clock } from 'lucide-react';
 
-export default function ConfirmPage({ params }: { params: { token: string } }) {
-  const { token } = params;
+export default function ConfirmPage({ params }: { params: Promise<{ token: string }> }) {
+  const { token } = use(params);
   const [status, setStatus] = useState<'loading' | 'found' | 'not_found' | 'done'>('loading');
   const [assignment, setAssignment] = useState<any>(null);
   const [docRef, setDocRef] = useState<any>(null);
@@ -82,7 +82,7 @@ export default function ConfirmPage({ params }: { params: { token: string } }) {
     <Shell>
       <div className="text-left w-full max-w-sm">
         <div className="bg-zinc-900 text-white rounded-xl p-4 mb-6">
-          <div className="text-xs text-zinc-400 mb-1">Production</div>
+          <div className="text-xs text-zinc-300 mb-1">Production</div>
           <div className="font-bold text-lg">{assignment?.production_name}</div>
           <div className="text-zinc-300 text-sm">{assignment?.production_client}</div>
         </div>
@@ -127,7 +127,7 @@ function Shell({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center px-4">
       <div className="bg-white rounded-2xl shadow-lg p-8 w-full max-w-sm text-center">
         <div className="text-lg font-bold text-zinc-900 mb-1">PRO-LOGIC</div>
-        <div className="text-xs text-zinc-400 mb-6">Studio Management</div>
+        <div className="text-xs text-zinc-300 mb-6">Studio Management</div>
         {children}
       </div>
     </div>

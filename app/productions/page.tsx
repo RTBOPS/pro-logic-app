@@ -110,9 +110,9 @@ export default function ProductionsPage() {
       </div>
 
       {loading ? (
-        <div className="text-gray-400 text-sm">Loading…</div>
+        <div className="text-gray-600 text-sm">Loading…</div>
       ) : productions.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-dashed border-gray-200 p-12 text-center text-gray-400">
+        <div className="bg-white rounded-2xl border border-dashed border-gray-200 p-12 text-center text-gray-600">
           No productions yet. Create one to get started.
         </div>
       ) : (
@@ -127,12 +127,12 @@ export default function ProductionsPage() {
                     <Link href={`/productions/${p.id}`} className="flex-1 min-w-0">
                       <div className="font-semibold text-gray-900 truncate">{p.name}</div>
                       <div className="text-xs text-gray-500 mt-0.5">{p.client}{loc?.name ? ` · ${loc.name}` : ''}</div>
-                      {p.start_date && <div className="text-xs text-gray-400 mt-1">{new Date(p.start_date+'T12:00:00').toLocaleDateString('en',{month:'short',day:'numeric',year:'numeric'})}</div>}
+                      {p.start_date && <div className="text-xs text-gray-600 mt-1">{new Date(p.start_date+'T12:00:00').toLocaleDateString('en',{month:'short',day:'numeric',year:'numeric'})}</div>}
                     </Link>
                     <div className="flex items-center gap-2 shrink-0">
                       <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLOR[p.status]||'bg-gray-100 text-gray-600'}`}>{p.status}</span>
-                      <button onClick={() => openEdit(p)} className="text-gray-400 hover:text-gray-700"><Pencil size={14}/></button>
-                      <button onClick={() => remove(p.id)} className="text-gray-400 hover:text-red-600"><Trash2 size={14}/></button>
+                      <button onClick={() => openEdit(p)} className="text-gray-600 hover:text-gray-700"><Pencil size={14}/></button>
+                      <button onClick={() => remove(p.id)} className="text-gray-600 hover:text-red-600"><Trash2 size={14}/></button>
                     </div>
                   </div>
                 </div>
@@ -171,8 +171,8 @@ export default function ProductionsPage() {
                     <td className="px-6 py-4 text-gray-500">{loc?.name||'—'}</td>
                     <td className="px-6 py-4" onClick={e => e.stopPropagation()}>
                       <div className="flex items-center gap-2 justify-end">
-                        <button onClick={() => openEdit(p)} className="text-gray-400 hover:text-gray-700 transition-colors"><Pencil size={15}/></button>
-                        <button onClick={() => remove(p.id)} className="text-gray-400 hover:text-red-600 transition-colors"><Trash2 size={15}/></button>
+                        <button onClick={() => openEdit(p)} className="text-gray-600 hover:text-gray-700 transition-colors"><Pencil size={15}/></button>
+                        <button onClick={() => remove(p.id)} className="text-gray-600 hover:text-red-600 transition-colors"><Trash2 size={15}/></button>
                       </div>
                     </td>
                   </tr>
@@ -194,7 +194,7 @@ export default function ProductionsPage() {
               { id: 'technical', label: 'Technical' },
             ] as const).map(t => (
               <button key={t.id} onClick={() => setFormTab(t.id)}
-                className={`px-3 py-2 text-xs transition-colors border-b-2 ${formTab === t.id ? 'border-black text-black font-medium' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>
+                className={`px-3 py-2 text-xs transition-colors border-b-2 ${formTab === t.id ? 'border-black text-black font-medium' : 'border-transparent text-gray-600 hover:text-gray-600'}`}>
                 {t.label}
               </button>
             ))}
@@ -230,7 +230,7 @@ export default function ProductionsPage() {
                     onChange={e => setForm({ ...form, project_description: e.target.value })} />
                 </div>
                 <div className="border-t pt-2 mt-1">
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Key Crew</p>
+                  <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">Key Crew</p>
                   <div className="grid grid-cols-2 gap-3">
                     {(['director', 'producer', 'line_producer', 'production_manager'] as const).map(k => {
                       const labels: Record<string, string> = { director: 'Director', producer: 'Producer', line_producer: 'Line Producer', production_manager: 'Production Manager' };
@@ -318,9 +318,9 @@ export default function ProductionsPage() {
                   <PCk label="Travel" k="travel_needed" form={form} setForm={setForm} />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Vehicles needed <span className="text-gray-400 font-normal">(from Transportation)</span></label>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Vehicles needed <span className="text-gray-600 font-normal">(from Transportation)</span></label>
                   {transportation.length === 0 ? (
-                    <p className="text-xs text-gray-400 border border-dashed border-gray-200 rounded-lg px-3 py-2">No vehicles yet — add them in <strong>Transportation</strong> first.</p>
+                    <p className="text-xs text-gray-600 border border-dashed border-gray-200 rounded-lg px-3 py-2">No vehicles yet — add them in <strong>Transportation</strong> first.</p>
                   ) : (
                     <div className="border border-gray-200 rounded-lg overflow-hidden divide-y divide-gray-100">
                       {transportation.map((v: any) => {
@@ -334,8 +334,8 @@ export default function ProductionsPage() {
                                 setForm((f: any) => ({ ...f, vehicles_needed: updated.join(';') }));
                               }} />
                             <span className="text-sm text-gray-800">{v.name}</span>
-                            {v.type && <span className="text-xs text-gray-400">{v.type}</span>}
-                            {v.plate && <span className="text-xs text-gray-400 ml-auto">{v.plate}</span>}
+                            {v.type && <span className="text-xs text-gray-600">{v.type}</span>}
+                            {v.plate && <span className="text-xs text-gray-600 ml-auto">{v.plate}</span>}
                           </label>
                         );
                       })}
@@ -343,9 +343,9 @@ export default function ProductionsPage() {
                   )}
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Equipment needed <span className="text-gray-400 font-normal">(from Inventory)</span></label>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Equipment needed <span className="text-gray-600 font-normal">(from Inventory)</span></label>
                   {inventory.length === 0 ? (
-                    <p className="text-xs text-gray-400 border border-dashed border-gray-200 rounded-lg px-3 py-2">No inventory yet — add items in <strong>Inventory</strong> first.</p>
+                    <p className="text-xs text-gray-600 border border-dashed border-gray-200 rounded-lg px-3 py-2">No inventory yet — add items in <strong>Inventory</strong> first.</p>
                   ) : (
                     <div className="border border-gray-200 rounded-lg overflow-hidden max-h-40 overflow-y-auto divide-y divide-gray-100">
                       {inventory.map((i: any) => {
@@ -359,7 +359,7 @@ export default function ProductionsPage() {
                                 setForm((f: any) => ({ ...f, equipment_needed: updated.join(';') }));
                               }} />
                             <span className="text-sm text-gray-800 truncate">{i.name}</span>
-                            {i.brand && <span className="text-xs text-gray-400 shrink-0">{i.brand}</span>}
+                            {i.brand && <span className="text-xs text-gray-600 shrink-0">{i.brand}</span>}
                           </label>
                         );
                       })}

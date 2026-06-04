@@ -4,12 +4,15 @@ import { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import Sidebar from './Sidebar';
 import AuthGuard from './AuthGuard';
+import CompanyTheme from './CompanyTheme';
+import { useCompany } from '@/hooks/useCompany';
 import { Menu, X } from 'lucide-react';
 
 const PUBLIC_PATHS = ['/auth', '/confirm'];
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const path = usePathname();
+  const company = useCompany();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const isPublic = PUBLIC_PATHS.some(p => path === p || path.startsWith(p + '/'));
 
@@ -20,13 +23,20 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthGuard>
+      <CompanyTheme />
       {/* Mobile header bar */}
-      <div className="md:hidden fixed top-0 left-0 right-0 z-40 bg-zinc-900 flex items-center justify-between px-4 h-14 shrink-0">
+      <div className="md:hidden fixed top-0 left-0 right-0 z-40 flex items-center justify-between px-4 h-14 shrink-0"
+        style={{ backgroundColor: company?.primary_color || '#18181b' }}>
         <button onClick={() => setSidebarOpen(true)} className="text-white p-1">
           <Menu size={22} />
         </button>
+        {/* Pro-Logic logo center-left */}
         <img src="/logo.png" alt="PRO-LOGIC" className="h-7 object-contain" style={{ filter: 'brightness(0) invert(1)' }} />
-        <div className="w-8" />
+        {/* Company logo right */}
+        {company?.logo_url
+          ? <img src={company.logo_url} alt={company.name} className="h-8 object-contain rounded" />
+          : <div className="w-8" />
+        }
       </div>
 
       {/* Mobile overlay */}
@@ -34,7 +44,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         <div className="md:hidden fixed inset-0 z-50 flex">
           <div className="absolute inset-0 bg-black/60" onClick={() => setSidebarOpen(false)} />
           <div className="relative z-10 w-64 h-full">
-            <button onClick={() => setSidebarOpen(false)} className="absolute top-3 right-3 text-zinc-400 hover:text-white z-20">
+            <button onClick={() => setSidebarOpen(false)} className="absolute top-3 right-3 text-zinc-300 hover:text-white z-20">
               <X size={20} />
             </button>
             <Sidebar />

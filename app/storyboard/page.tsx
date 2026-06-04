@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useData } from '@/hooks/useData';
 import { addDoc, updateDoc, deleteDoc, collection, doc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { Plus, Trash2, Pencil, Printer, GripVertical, Eraser, Minus } from 'lucide-react';
+import { Plus, Trash2, Pencil, Printer, GripVertical, Eraser, Minus, ImageIcon } from 'lucide-react';
 import Modal from '@/components/Modal';
 
 interface Panel {
@@ -95,28 +95,48 @@ function DrawingCanvas({ value, onChange }: { value: string; onChange: (v: strin
     onChange(canvas.toDataURL());
   };
 
+  const loadBackground = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const canvas = canvasRef.current!;
+      const ctx = canvas.getContext('2d')!;
+      const img = new Image();
+      img.onload = () => {
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        onChange(canvas.toDataURL());
+      };
+      img.src = ev.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
+  const bgInputRef = useRef<HTMLInputElement>(null);
+
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex items-center gap-2">
-        <button
-          onClick={() => setTool('pen')}
-          className={`p-1.5 rounded ${tool === 'pen' ? 'bg-black text-white' : 'bg-gray-100'}`}
-          title="Pen"
-        >
+      <div className="flex items-center gap-2 flex-wrap">
+        <button onClick={() => setTool('pen')}
+          className={`p-1.5 rounded ${tool === 'pen' ? 'bg-black text-white' : 'bg-gray-100'}`} title="Pen">
           <Pencil size={14} />
         </button>
-        <button
-          onClick={() => setTool('eraser')}
-          className={`p-1.5 rounded ${tool === 'eraser' ? 'bg-black text-white' : 'bg-gray-100'}`}
-          title="Eraser"
-        >
+        <button onClick={() => setTool('eraser')}
+          className={`p-1.5 rounded ${tool === 'eraser' ? 'bg-black text-white' : 'bg-gray-100'}`} title="Eraser">
           <Eraser size={14} />
         </button>
-        <div className="flex items-center gap-1 ml-2">
+        <div className="flex items-center gap-1">
           <button onClick={() => setPenSize(s => Math.max(1, s - 1))} className="p-1 bg-gray-100 rounded"><Minus size={10} /></button>
           <span className="text-xs w-4 text-center">{penSize}</span>
           <button onClick={() => setPenSize(s => Math.min(10, s + 1))} className="p-1 bg-gray-100 rounded"><Plus size={10} /></button>
         </div>
+        <input ref={bgInputRef} type="file" accept="image/*" className="hidden" onChange={loadBackground} />
+        <button onClick={() => bgInputRef.current?.click()}
+          className="flex items-center gap-1 text-xs px-2 py-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded"
+          title="Load background image">
+          <ImageIcon size={12} /> BG
+        </button>
         <button onClick={clearCanvas} className="ml-auto text-xs text-red-400 hover:text-red-600 px-2 py-1 rounded bg-red-50">Clear</button>
       </div>
       <canvas
@@ -136,6 +156,7 @@ function DrawingCanvas({ value, onChange }: { value: string; onChange: (v: strin
     </div>
   );
 }
+
 
 export default function StoryboardPage() {
   const { data: productions } = useData('productions');
@@ -224,13 +245,13 @@ export default function StoryboardPage() {
       </div>
 
       {!selectedProduction ? (
-        <div className="bg-white rounded-2xl border border-dashed border-gray-200 p-16 text-center text-gray-400">
+        <div className="bg-white rounded-2xl border border-dashed border-gray-200 p-16 text-center text-gray-600">
           Select a production to start your storyboard.
         </div>
       ) : loading ? (
-        <div className="text-gray-400 text-sm">Loading…</div>
+        <div className="text-gray-600 text-sm">Loading…</div>
       ) : panels.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-dashed border-gray-200 p-16 text-center text-gray-400">
+        <div className="bg-white rounded-2xl border border-dashed border-gray-200 p-16 text-center text-gray-600">
           No panels yet. Click "Add Panel" to start drawing.
         </div>
       ) : (
@@ -242,10 +263,10 @@ export default function StoryboardPage() {
                 <span className="text-xs font-semibold text-gray-500">Panel {idx + 1}</span>
                 <div className="flex items-center gap-1">
                   <span className="text-xs bg-black text-white px-2 py-0.5 rounded-full">{panel.shot}</span>
-                  <button onClick={() => openEdit(panel)} className="p-1 text-gray-400 hover:text-gray-700 opacity-0 group-hover:opacity-100">
+                  <button onClick={() => openEdit(panel)} className="p-1 text-gray-600 hover:text-gray-700 opacity-0 group-hover:opacity-100">
                     <Pencil size={12} />
                   </button>
-                  <button onClick={() => removePanel(panel.id)} className="p-1 text-gray-400 hover:text-red-600 opacity-0 group-hover:opacity-100">
+                  <button onClick={() => removePanel(panel.id)} className="p-1 text-gray-600 hover:text-red-600 opacity-0 group-hover:opacity-100">
                     <Trash2 size={12} />
                   </button>
                 </div>
@@ -289,7 +310,7 @@ export default function StoryboardPage() {
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl mx-4 flex flex-col overflow-hidden" style={{ maxHeight: '90vh' }}>
             <div className="flex items-center justify-between px-6 py-4 border-b">
               <h2 className="font-semibold">Edit Panel</h2>
-              <button onClick={() => setEditingPanel(null)} className="text-gray-400 hover:text-gray-600 text-xl">×</button>
+              <button onClick={() => setEditingPanel(null)} className="text-gray-600 hover:text-gray-600 text-xl">×</button>
             </div>
             <div className="overflow-y-auto flex-1 p-6 space-y-4">
               <DrawingCanvas value={editDrawing} onChange={setEditDrawing} />

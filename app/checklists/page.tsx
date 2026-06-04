@@ -77,6 +77,71 @@ const DEFAULT_CHECKLISTS = {
       'Hard drives (x3)', 'RAID backup drive',
     ],
   },
+  team: {
+    label: 'Team Readiness',
+    emoji: '👥',
+    items: [
+      'All crew confirmed via email/SMS',
+      'Call sheets distributed to all crew',
+      'ID badges printed and ready',
+      'NDAs signed by all crew',
+      'Deal memos signed',
+      'Emergency contacts collected',
+      'COVID / health protocols communicated',
+      'Union/SAG paperwork filed',
+      'Work permits verified (if applicable)',
+      'Dietary restrictions noted for catering',
+      'Travel arrangements confirmed',
+      'Lodging confirmed for out-of-town crew',
+      'Parking assignments distributed',
+      'Walkie talkies assigned',
+      'Department heads briefed',
+      'Safety briefing scheduled',
+    ],
+  },
+  location: {
+    label: 'Location Scout',
+    emoji: '📍',
+    items: [
+      'Location release signed',
+      'Site survey completed',
+      'Power sources identified',
+      'Generator fuel checked',
+      'Parking confirmed (cast & crew)',
+      'Load-in / load-out access confirmed',
+      'Nearest hospital noted',
+      'Emergency exits mapped',
+      'Restroom facilities confirmed',
+      'Catering / basecamp area set',
+      'WiFi / comms available',
+      'Sound/noise concerns assessed',
+      'Weather backup plan in place',
+      'Neighbor notifications sent',
+      'Local law enforcement notified (if required)',
+      'Fire extinguishers on site',
+    ],
+  },
+  transportation: {
+    label: 'Transportation',
+    emoji: '🚐',
+    items: [
+      'All vehicles inspected',
+      'Fuel topped off on all vehicles',
+      'Vehicle insurance verified',
+      'Drivers confirmed and briefed',
+      'Driver licenses verified',
+      'Load plans distributed',
+      'Grip truck loaded and locked',
+      'Camera van loaded and locked',
+      'Production van stocked',
+      'Picture cars cleaned and staged',
+      'Route to location confirmed',
+      'Parking permits for vehicles',
+      'Backup vehicle arranged',
+      'Equipment manifest in each vehicle',
+      'Emergency roadside kit in each vehicle',
+    ],
+  },
 };
 
 type ChecklistId = keyof typeof DEFAULT_CHECKLISTS;
@@ -144,7 +209,7 @@ export default function ChecklistsPage() {
       </div>
 
       {!selectedProduction ? (
-        <div className="bg-white rounded-2xl border border-dashed border-gray-200 p-12 text-center text-gray-400">
+        <div className="bg-white rounded-2xl border border-dashed border-gray-200 p-12 text-center text-gray-600">
           Select a production to start checking equipment.
         </div>
       ) : (
@@ -172,7 +237,7 @@ export default function ChecklistsPage() {
                         style={{ width: `${pct}%` }}
                       />
                     </div>
-                    <div className={`text-xs mt-0.5 ${activeList === id ? 'text-white/60' : 'text-gray-400'}`}>{done}/{list.items.length}</div>
+                    <div className={`text-xs mt-0.5 ${activeList === id ? 'text-white/60' : 'text-gray-600'}`}>{done}/{list.items.length}</div>
                   </div>
                 </button>
               );
@@ -186,7 +251,7 @@ export default function ChecklistsPage() {
                 <span className="text-xl">{current.emoji}</span>
                 <div>
                   <div className="font-semibold text-gray-900">{current.label}</div>
-                  <div className="text-xs text-gray-400">{checkedCount} of {current.items.length} checked</div>
+                  <div className="text-xs text-gray-600">{checkedCount} of {current.items.length} checked</div>
                 </div>
               </div>
               <div className="flex items-center gap-3">
@@ -202,7 +267,7 @@ export default function ChecklistsPage() {
                   </svg>
                   <span className="absolute inset-0 flex items-center justify-center text-xs font-bold text-gray-700">{progress}%</span>
                 </div>
-                <button onClick={() => resetList(activeList)} className="p-2 text-gray-400 hover:text-gray-700 rounded-lg hover:bg-gray-100" title="Reset list">
+                <button onClick={() => resetList(activeList)} className="p-2 text-gray-600 hover:text-gray-700 rounded-lg hover:bg-gray-100" title="Reset list">
                   <RotateCcw size={15} />
                 </button>
               </div>
@@ -220,7 +285,7 @@ export default function ChecklistsPage() {
                     {checked
                       ? <CheckCircle size={18} className="text-green-500 shrink-0" />
                       : <Circle size={18} className="text-gray-300 shrink-0" />}
-                    <span className={`text-sm ${checked ? 'line-through text-gray-400' : 'text-gray-800'}`}>{item}</span>
+                    <span className={`text-sm ${checked ? 'line-through text-gray-600' : 'text-gray-800'}`}>{item}</span>
                   </div>
                 );
               })}

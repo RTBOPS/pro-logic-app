@@ -112,9 +112,9 @@ export default function StripboardPage() {
         </div>
       </div>
 
-      {loading ? <div className="text-gray-400 text-sm">Loading…</div>
+      {loading ? <div className="text-gray-600 text-sm">Loading…</div>
         : filtered.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-dashed border-gray-200 p-12 text-center text-gray-400">
+          <div className="bg-white rounded-2xl border border-dashed border-gray-200 p-12 text-center text-gray-600">
             No scenes yet. Add your first scene to start building the stripboard.
           </div>
         ) : (
@@ -125,7 +125,7 @@ export default function StripboardPage() {
                   <div className="bg-zinc-800 text-white text-xs font-bold px-3 py-1 rounded-full">
                     {day === 'Unscheduled' ? 'Unscheduled' : `Shoot Day ${day}`}
                   </div>
-                  <span className="text-xs text-gray-400">{dayScenes.length} scenes · {dayScenes.reduce((s: number, x: any) => s + (parseFloat(x.pages) || 0), 0).toFixed(1)} pages</span>
+                  <span className="text-xs text-gray-600">{dayScenes.length} scenes · {dayScenes.reduce((s: number, x: any) => s + (parseFloat(x.pages) || 0), 0).toFixed(1)} pages</span>
                 </div>
                 <div className="space-y-1.5">
                   {dayScenes.map((s: any) => (
@@ -144,18 +144,18 @@ export default function StripboardPage() {
                           <span className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{s.day_night}</span>
                           {s.status === 'Filmed' && <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-medium">✓ Filmed</span>}
                         </div>
-                        {s.description && <p className="text-xs text-gray-400 mt-0.5 truncate">{s.description}</p>}
+                        {s.description && <p className="text-xs text-gray-600 mt-0.5 truncate">{s.description}</p>}
                         {s.cast_ids && <p className="text-xs text-blue-500 mt-0.5">Cast: {s.cast_ids}</p>}
                       </div>
                       {/* Pages + hours */}
                       <div className="shrink-0 px-3 flex flex-col items-end justify-center border-l border-gray-100 text-right">
                         {s.pages && <span className="text-xs font-semibold text-gray-700">{s.pages} pg</span>}
-                        {s.estimated_hours && <span className="text-xs text-gray-400">{s.estimated_hours}h</span>}
+                        {s.estimated_hours && <span className="text-xs text-gray-600">{s.estimated_hours}h</span>}
                       </div>
                       {/* Actions */}
                       <div className="shrink-0 flex items-center gap-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => open(s)} className="p-1.5 text-gray-400 hover:text-gray-700"><Pencil size={13} /></button>
-                        <button onClick={() => remove(s.id)} className="p-1.5 text-gray-400 hover:text-red-600"><Trash2 size={13} /></button>
+                        <button onClick={() => open(s)} className="p-1.5 text-gray-600 hover:text-gray-700"><Pencil size={13} /></button>
+                        <button onClick={() => remove(s.id)} className="p-1.5 text-gray-600 hover:text-red-600"><Trash2 size={13} /></button>
                       </div>
                     </div>
                   ))}

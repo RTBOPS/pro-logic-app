@@ -76,7 +76,7 @@ export default function BlueprintPage() {
       </div>
 
       {!selectedProduction ? (
-        <div className="flex-1 bg-white m-4 rounded-2xl border border-dashed border-gray-200 flex items-center justify-center text-gray-400 text-sm">
+        <div className="flex-1 bg-white m-4 rounded-2xl border border-dashed border-gray-200 flex items-center justify-center text-gray-600 text-sm">
           Select a production to start designing your set layout.
         </div>
       ) : (
@@ -91,7 +91,7 @@ export default function BlueprintPage() {
             {/* Production info */}
             <div className="bg-zinc-900 text-white rounded-xl p-4">
               <div className="font-bold">{production?.name}</div>
-              <div className="text-zinc-400 text-xs">{production?.client}</div>
+              <div className="text-zinc-300 text-xs">{production?.client}</div>
             </div>
 
             {/* Items on canvas */}
@@ -103,10 +103,10 @@ export default function BlueprintPage() {
               </div>
               <div className="overflow-y-auto max-h-64">
                 {items.length === 0 ? (
-                  <div className="px-3 py-4 text-xs text-gray-400 text-center">No items placed yet</div>
+                  <div className="px-3 py-4 text-xs text-gray-600 text-center">No items placed yet</div>
                 ) : (
                   <table className="w-full text-xs">
-                    <thead className="bg-gray-50 text-gray-400 uppercase">
+                    <thead className="bg-gray-50 text-gray-600 uppercase">
                       <tr>
                         <th className="text-left px-3 py-1.5">#</th>
                         <th className="text-left px-3 py-1.5">Item</th>
@@ -116,9 +116,9 @@ export default function BlueprintPage() {
                     <tbody className="divide-y divide-gray-50">
                       {items.map((item, idx) => (
                         <tr key={item.id}>
-                          <td className="px-3 py-1.5 text-gray-400">{idx + 1}</td>
+                          <td className="px-3 py-1.5 text-gray-600">{idx + 1}</td>
                           <td className="px-3 py-1.5 font-medium text-gray-800">{item.label}</td>
-                          <td className="px-3 py-1.5 text-gray-400">{item.category}</td>
+                          <td className="px-3 py-1.5 text-gray-600">{item.category}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -139,7 +139,7 @@ export default function BlueprintPage() {
                       <img src={c.picture} className="w-6 h-6 rounded-full object-cover" alt="" />
                       <div>
                         <div className="text-xs font-medium text-gray-800">{c.name} {c.last_name}</div>
-                        <div className="text-xs text-gray-400">{c.role}</div>
+                        <div className="text-xs text-gray-600">{c.role}</div>
                       </div>
                     </div>
                   ))}
