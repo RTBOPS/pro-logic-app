@@ -83,7 +83,7 @@ export default function CompanyPage() {
   };
 
   const save = async () => {
-    if (!namespace || !isOwner) return;
+    if (!namespace) return;
     setSaving(true);
     await setDoc(doc(db, 'users', namespace, 'company', 'profile'), { ...form, team_members: team });
     setSaving(false); setSaved(true);
@@ -91,7 +91,7 @@ export default function CompanyPage() {
   };
 
   const addTeamMember = async () => {
-    if (!inviteEmail.trim() || !namespace || !user || !isOwner) return;
+    if (!inviteEmail.trim() || !namespace || !user) return;
     const email = inviteEmail.trim().toLowerCase();
     if (team.find(m => m.email === email)) { alert('Already invited'); return; }
     setInviting(true);
@@ -112,7 +112,7 @@ export default function CompanyPage() {
   };
 
   const removeTeamMember = async (email: string) => {
-    if (!namespace || !isOwner) return;
+    if (!namespace) return;
     const newTeam = team.filter(m => m.email !== email);
     setTeam(newTeam);
     const encoded = email.replace(/[.@]/g, '_');
@@ -125,15 +125,15 @@ export default function CompanyPage() {
       <label className="block text-xs font-medium text-gray-600 mb-1">{label}</label>
       <input type={type} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-black"
         value={form[k]} onChange={e => setForm(f => ({ ...f, [k]: e.target.value }))} placeholder={placeholder}
-        disabled={!isOwner} />
+         />
     </div>
   );
 
   return (
     <div className="p-8 max-w-3xl">
       <PageHeader title="Company Information" subtitle="This info appears on all generated documents and ID cards">
-        {isOwner && (
-          <button onClick={save} disabled={saving}
+        {(
+          <button onClick={save} disabled={saving || !namespace}
             className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors ${saved ? 'bg-green-600 text-white' : 'bg-black text-white hover:bg-zinc-800'}`}>
             <Save size={14} /> {saving ? 'Saving…' : saved ? 'Saved!' : 'Save'}
           </button>
@@ -167,7 +167,7 @@ export default function CompanyPage() {
                     )}
                     <input ref={ref} type="file" accept="image/*" className="hidden"
                       onChange={e => handleUpload(e, field)} />
-                    {isOwner && (
+                    {(
                       <button onClick={() => ref.current?.click()} disabled={uploading !== null}
                         className="flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-800 border border-blue-200 rounded-lg px-3 py-1.5">
                         <Upload size={11} /> {uploading === (isLogo ? 'logo' : 'watermark') ? 'Uploading…' : 'Upload'}
@@ -175,7 +175,7 @@ export default function CompanyPage() {
                     )}
                     <input className="w-full border border-gray-200 rounded-lg px-2 py-1 text-xs focus:outline-none mt-1"
                       value={form[field]} onChange={e => setForm(f => ({ ...f, [field]: e.target.value }))}
-                      placeholder="Or paste URL" disabled={!isOwner} />
+                      placeholder="Or paste URL"  />
                   </div>
                 </div>
               );
@@ -200,18 +200,18 @@ export default function CompanyPage() {
                 <label className="block text-xs font-medium text-gray-600 mb-1">Primary Color</label>
                 <div className="flex gap-2">
                   <input type="color" className="h-9 w-12 rounded-lg border border-gray-200 cursor-pointer"
-                    value={form.primary_color} onChange={e => setForm(f => ({ ...f, primary_color: e.target.value }))} disabled={!isOwner} />
+                    value={form.primary_color} onChange={e => setForm(f => ({ ...f, primary_color: e.target.value }))}  />
                   <input className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none"
-                    value={form.primary_color} onChange={e => setForm(f => ({ ...f, primary_color: e.target.value }))} disabled={!isOwner} />
+                    value={form.primary_color} onChange={e => setForm(f => ({ ...f, primary_color: e.target.value }))}  />
                 </div>
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Secondary Color</label>
                 <div className="flex gap-2">
                   <input type="color" className="h-9 w-12 rounded-lg border border-gray-200 cursor-pointer"
-                    value={form.secondary_color} onChange={e => setForm(f => ({ ...f, secondary_color: e.target.value }))} disabled={!isOwner} />
+                    value={form.secondary_color} onChange={e => setForm(f => ({ ...f, secondary_color: e.target.value }))}  />
                   <input className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none"
-                    value={form.secondary_color} onChange={e => setForm(f => ({ ...f, secondary_color: e.target.value }))} disabled={!isOwner} />
+                    value={form.secondary_color} onChange={e => setForm(f => ({ ...f, secondary_color: e.target.value }))}  />
                 </div>
               </div>
             </div>
@@ -256,11 +256,11 @@ export default function CompanyPage() {
         <div>
           <label className="block text-xs font-medium text-gray-600 mb-1">Additional Notes</label>
           <textarea className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none resize-none" rows={3}
-            value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} disabled={!isOwner} />
+            value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}  />
         </div>
 
         {/* Team Access */}
-        {isOwner && (
+        {namespace && (
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
             <div className="flex items-center justify-between mb-1">
               <h2 className="font-semibold text-gray-800 flex items-center gap-2"><Users size={16} /> Team Access</h2>

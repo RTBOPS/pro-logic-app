@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useContext } from 'react';
+import { auth } from '@/lib/firebase';
 
 export interface Workspace {
   ownerUid: string;
@@ -9,9 +10,9 @@ export interface Workspace {
 }
 
 export interface NamespaceContextValue {
-  namespace: string | null;      // active workspace UID
-  ownUid: string | null;         // always the logged-in user's own UID
-  workspaces: Workspace[];       // additional workspaces they have access to
+  namespace: string | null;
+  ownUid: string | null;
+  workspaces: Workspace[];
   switchWorkspace: (uid: string) => void;
 }
 
@@ -22,12 +23,14 @@ export const NamespaceContext = createContext<NamespaceContextValue>({
   switchWorkspace: () => {},
 });
 
-// Backward-compatible hook — just returns the active namespace string
+// Returns the active namespace — always falls back to the current Firebase
+// user's UID so it is never null for a logged-in user.
 export function useNamespace(): string | null {
-  return useContext(NamespaceContext).namespace;
+  const ctx = useContext(NamespaceContext);
+  return ctx.namespace ?? auth.currentUser?.uid ?? null;
 }
 
-// Full hook for components that need workspace switching
+// Full context for workspace switching UI
 export function useWorkspaces(): NamespaceContextValue {
   return useContext(NamespaceContext);
 }
