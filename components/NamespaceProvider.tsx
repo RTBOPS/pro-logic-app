@@ -13,6 +13,12 @@ export function NamespaceProvider({ children }: { children: React.ReactNode }) {
   const [pendingInvite, setPendingInvite] = useState<{ ownerUid: string; email: string; companyName: string } | null>(null);
 
   useEffect(() => {
+    // Immediately apply already-restored session (no async wait needed)
+    if (auth.currentUser) {
+      setOwnUid(auth.currentUser.uid);
+      setNamespace(auth.currentUser.uid);
+    }
+
     return onAuthStateChanged(auth, async user => {
       if (!user) {
         setOwnUid(null); setNamespace(null); setWorkspaces([]); setPendingInvite(null);
