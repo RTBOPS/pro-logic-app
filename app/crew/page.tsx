@@ -9,6 +9,7 @@ import Modal from '@/components/Modal';
 import { Plus, Pencil, Trash2, Search, Mail, Phone, Upload, Users, Merge, BookUser } from 'lucide-react';
 import { DEPARTMENTS, deptColor, deptLabel } from '@/lib/departments';
 import { useNamespace } from '@/hooks/useNamespace';
+import { useAuth } from '@/hooks/useAuth';
 import PageHeader from '@/components/PageHeader';
 
 const DEFAULT_PICTURE = 'https://img.freepik.com/free-photo/portrait-white-man-isolated_53876-40306.jpg';
@@ -68,7 +69,9 @@ const emptyForm = {
 };
 
 export default function CrewPage() {
-  const namespace = useNamespace();
+  const { user } = useAuth();
+  const ns = useNamespace();
+  const namespace = ns || user?.uid || null;
   const { data: crew, loading } = useData('crew');
   const [modal, setModal] = useState<'create' | 'edit' | 'merge' | null>(null);
   const [form, setForm] = useState(emptyForm);

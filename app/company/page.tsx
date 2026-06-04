@@ -26,7 +26,10 @@ interface TeamMember { email: string; role: string; }
 
 export default function CompanyPage() {
   const { user, profile } = useAuth();
-  const { namespace, ownUid } = useWorkspaces();
+  const { namespace: wsNamespace, ownUid: wsOwnUid } = useWorkspaces();
+  // Fall back to user.uid if context hasn't resolved yet
+  const namespace = wsNamespace || user?.uid || null;
+  const ownUid = wsOwnUid || user?.uid || null;
 
   const [form, setForm] = useState(empty);
   const [saving, setSaving] = useState(false);
