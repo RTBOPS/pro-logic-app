@@ -4,12 +4,13 @@ import { useState, useMemo, useRef } from 'react';
 import { useData } from '@/hooks/useData';
 import { addDoc, updateDoc, deleteDoc, collection, doc } from 'firebase/firestore';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { db, storage } from '@/lib/firebase';
+import { auth, db, storage } from '@/lib/firebase';
 import Modal from '@/components/Modal';
 import {
   Plus, Pencil, Trash2, Search, Database, ExternalLink,
   ChevronDown, ChevronUp, Zap, Upload, ClipboardCheck, X,
 } from 'lucide-react';
+import { useNamespace } from '@/hooks/useNamespace';
 import { loadEquipmentCatalog, CATALOG_CATEGORIES, CATALOG_STATUSES, CATALOG_CONDITIONS, type CatalogItem } from '@/lib/equipment-catalog';
 
 const STATUS_COLOR: Record<string, string> = {
@@ -69,6 +70,8 @@ const emptyInspection = {
 type InspectionState = typeof emptyInspection;
 
 export default function InventoryPage() {
+  const namespace = useNamespace();
+  const getUid = () => namespace || auth.currentUser?.uid || null;
   const { data: inventory, loading } = useData('inventory');
   const [catalog, setCatalog] = useState<CatalogItem[]>([]);
   const [catalogLoading, setCatalogLoading] = useState(false);
@@ -143,10 +146,10 @@ export default function InventoryPage() {
   };
 
   const saveInspection = async () => {
-    await addDoc(collection(db, 'equipment_inspections'), { ...inspection, created_at: new Date().toISOString() });
+    await addDoc(collection(db, 'users', namespace!, 'equipment_inspections'), { ...inspection, created_at: new Date().toISOString() });
     if (inspection.damage_claim) {
       const itemDoc = inventory.find((i: any) => i.id === editId || i.item_id === inspection.item_id);
-      if (itemDoc) await updateDoc(doc(db, 'inventory', itemDoc.id), { status: 'In Repair', notes: `Damage claim: ${inspection.claim_notes}` });
+      if (itemDoc) await updateDoc(doc(db, 'users', namespace!, 'inventory', itemDoc.id), { status: 'In Repair', notes: `Damage claim: ${inspection.claim_notes}` });
     }
     close();
   };
@@ -189,16 +192,16 @@ export default function InventoryPage() {
     if (!form.name) return;
     const data = formToDoc(form);
     if (modal === 'create') {
-      await addDoc(collection(db, 'inventory'), data);
+      await addDoc(collection(db, 'users', namespace!, 'inventory'), data);
     } else if (editId) {
-      await updateDoc(doc(db, 'inventory', editId), data);
+      await updateDoc(doc(db, 'users', namespace!, 'inventory', editId), data);
     }
     close();
   };
 
   const remove = async (id: string) => {
     if (!confirm('Remove this item?')) return;
-    await deleteDoc(doc(db, 'inventory', id));
+    await deleteDoc(doc(db, 'users', namespace!, 'inventory', id));
   };
 
   const dbResults = useMemo(() => {
@@ -230,7 +233,7 @@ export default function InventoryPage() {
     const toImport = catalog.filter(i => selectedItems.has(i.item_id));
     for (const item of toImport) {
       const { data_confidence, ...rest } = item as any;
-      await addDoc(collection(db, 'inventory'), { ...rest, status: 'Available' });
+      await addDoc(collection(db, 'users', namespace!, 'inventory'), { ...rest, status: 'Available' });
     }
     close();
   };

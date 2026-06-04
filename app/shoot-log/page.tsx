@@ -3,8 +3,9 @@
 import { useState, useEffect } from 'react';
 import { useData } from '@/hooks/useData';
 import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
 import { Plus, Trash2, CheckCircle, Circle, Printer } from 'lucide-react';
+import { useNamespace } from '@/hooks/useNamespace';
 
 interface TakeEntry {
   id: string;
@@ -30,6 +31,8 @@ const empty: Omit<TakeEntry, 'id' | 'timestamp'> = {
 };
 
 export default function ShootLogPage() {
+  const namespace = useNamespace();
+  const getUid = () => namespace || auth.currentUser?.uid || null;
   const { data: productions } = useData('productions');
   const [selectedProduction, setSelectedProduction] = useState('');
   const [takes, setTakes] = useState<TakeEntry[]>([]);
@@ -37,31 +40,32 @@ export default function ShootLogPage() {
   const [sceneFilter, setSceneFilter] = useState('');
 
   useEffect(() => {
-    if (!selectedProduction) return;
-    const q = query(collection(db, 'productions', selectedProduction, 'takes'));
+    if (!selectedProduction || !namespace) return;
+    const q = query(collection(db, 'users', namespace, 'productions', selectedProduction, 'takes'));
     return onSnapshot(q, snap => {
       setTakes(snap.docs.map(d => ({ id: d.id, ...d.data() } as TakeEntry))
         .sort((a, b) => a.scene.localeCompare(b.scene) || a.shot.localeCompare(b.shot) || a.take - b.take));
     });
-  }, [selectedProduction]);
+  }, [selectedProduction, namespace]);
 
   const addTake = async () => {
-    if (!selectedProduction || !form.scene) return;
-    await addDoc(collection(db, 'productions', selectedProduction, 'takes'), {
+    if (!selectedProduction || !form.scene || !namespace) return;
+    await addDoc(collection(db, 'users', namespace, 'productions', selectedProduction, 'takes'), {
       ...form,
       timestamp: new Date().toISOString(),
     });
-    // Auto-increment take number for same scene+shot
     const sameTakes = takes.filter(t => t.scene === form.scene && t.shot === form.shot);
     setForm(f => ({ ...f, take: sameTakes.length + 2 }));
   };
 
   const toggleSelected = async (t: TakeEntry) => {
-    await updateDoc(doc(db, 'productions', selectedProduction, 'takes', t.id), { selected: !t.selected });
+    if (!namespace) return;
+    await updateDoc(doc(db, 'users', namespace, 'productions', selectedProduction, 'takes', t.id), { selected: !t.selected });
   };
 
   const removeTake = async (id: string) => {
-    await deleteDoc(doc(db, 'productions', selectedProduction, 'takes', id));
+    if (!namespace) return;
+    await deleteDoc(doc(db, 'users', namespace, 'productions', selectedProduction, 'takes', id));
   };
 
   const scenes = [...new Set(takes.map(t => t.scene))].sort();

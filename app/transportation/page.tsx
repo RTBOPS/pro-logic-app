@@ -4,9 +4,10 @@ import { useState, useRef } from 'react';
 import { useData } from '@/hooks/useData';
 import { addDoc, updateDoc, deleteDoc, collection, doc } from 'firebase/firestore';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { db, storage } from '@/lib/firebase';
+import { auth, db, storage } from '@/lib/firebase';
 import Modal from '@/components/Modal';
 import { Plus, Pencil, Trash2, Truck, Upload, X } from 'lucide-react';
+import { useNamespace } from '@/hooks/useNamespace';
 
 const VEHICLE_TYPES = ['Production Van', 'Cube Truck', 'Grip Truck', 'Camera Car', 'Picture Car', 'Passenger Van', 'SUV', 'Sedan', 'Motorcycle', 'Golf Cart', 'Sprinter Van', 'Box Truck', 'Flatbed', 'Generator Truck', 'Other'];
 const VEHICLE_STATUSES = ['Available', 'In Use', 'Reserved', 'In Maintenance', 'Out of Service'];
@@ -23,6 +24,8 @@ const empty = {
 };
 
 export default function TransportationPage() {
+  const namespace = useNamespace();
+  const getUid = () => namespace || auth.currentUser?.uid || null;
   const { data: vehicles, loading } = useData('transportation');
   const [modal, setModal] = useState<'create' | 'edit' | null>(null);
   const [form, setForm] = useState(empty);
@@ -67,14 +70,14 @@ export default function TransportationPage() {
 
   const save = async () => {
     if (!form.name) return;
-    if (modal === 'create') await addDoc(collection(db, 'transportation'), form);
-    else if (editId) await updateDoc(doc(db, 'transportation', editId), form);
+    if (modal === 'create') await addDoc(collection(db, 'users', namespace!, 'transportation'), form);
+    else if (editId) await updateDoc(doc(db, 'users', namespace!, 'transportation', editId), form);
     close();
   };
 
   const remove = async (id: string) => {
     if (!confirm('Remove this vehicle?')) return;
-    await deleteDoc(doc(db, 'transportation', id));
+    await deleteDoc(doc(db, 'users', namespace!, 'transportation', id));
   };
 
   const fld = (label: string, k: keyof typeof empty, placeholder = '', type = 'text') => (

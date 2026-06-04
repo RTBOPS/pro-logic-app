@@ -4,9 +4,10 @@ import { useState, useRef } from 'react';
 import { useData } from '@/hooks/useData';
 import { addDoc, updateDoc, deleteDoc, collection, doc } from 'firebase/firestore';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { db, storage } from '@/lib/firebase';
+import { auth, db, storage } from '@/lib/firebase';
 import Modal from '@/components/Modal';
 import { Plus, Pencil, Trash2, Phone, Mail, MapPin, Upload, BookUser, X } from 'lucide-react';
+import { useNamespace } from '@/hooks/useNamespace';
 
 const empty = {
   name: '', address: '', city: '', state: '', zip: '', country: 'USA', notes: '',
@@ -20,6 +21,8 @@ declare global {
 }
 
 export default function LocationsPage() {
+  const namespace = useNamespace();
+  const getUid = () => namespace || auth.currentUser?.uid || null;
   const { data: locations, loading } = useData('locations');
   const [modal, setModal] = useState<'create' | 'edit' | null>(null);
   const [form, setForm] = useState(empty);
@@ -92,14 +95,14 @@ export default function LocationsPage() {
 
   const save = async () => {
     if (!form.name) return;
-    if (modal === 'create') await addDoc(collection(db, 'locations'), form);
-    else if (editId) await updateDoc(doc(db, 'locations', editId), form);
+    if (modal === 'create') await addDoc(collection(db, 'users', namespace!, 'locations'), form);
+    else if (editId) await updateDoc(doc(db, 'users', namespace!, 'locations', editId), form);
     close();
   };
 
   const remove = async (id: string) => {
     if (!confirm('Delete this location?')) return;
-    await deleteDoc(doc(db, 'locations', id));
+    await deleteDoc(doc(db, 'users', namespace!, 'locations', id));
   };
 
   const fld = (label: string, key: keyof typeof empty, placeholder?: string, type = 'text') => (

@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useData } from '@/hooks/useData';
 import { collection, doc, setDoc, getDoc, onSnapshot } from 'firebase/firestore';
 import { useNamespace } from '@/hooks/useNamespace';
-import { db } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
 import { CheckCircle, Circle, Printer, RotateCcw } from 'lucide-react';
 import PageHeader from '@/components/PageHeader';
 
@@ -150,6 +150,7 @@ type ChecklistId = keyof typeof DEFAULT_CHECKLISTS;
 
 export default function ChecklistsPage() {
   const namespace = useNamespace();
+  const getUid = () => namespace || auth.currentUser?.uid || null;
   const { data: productions } = useData('productions');
   const [selectedProduction, setSelectedProduction] = useState('');
   const [checks, setChecks] = useState<Record<string, Record<string, boolean>>>({});

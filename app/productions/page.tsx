@@ -5,7 +5,7 @@ import { useData } from '@/hooks/useData';
 import { useRouter } from 'next/navigation';
 import { addDoc, updateDoc, deleteDoc, collection, doc } from 'firebase/firestore';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { db, storage } from '@/lib/firebase';
+import { auth, db, storage } from '@/lib/firebase';
 import Modal from '@/components/Modal';
 import Link from 'next/link';
 import { Plus, Pencil, Trash2, ChevronRight, Upload } from 'lucide-react';
@@ -73,6 +73,7 @@ const empty = {
 export default function ProductionsPage() {
   const router = useRouter();
   const namespace = useNamespace();
+  const getUid = () => namespace || auth.currentUser?.uid || null;
   const { data: productions, loading } = useData('productions');
   const { data: locations } = useData('locations');
   const { data: crew } = useData('crew');
@@ -112,18 +113,20 @@ export default function ProductionsPage() {
   const close = () => { setModal(null); setEditId(null); };
 
   const save = async () => {
-    if (!form.name || !form.client || !namespace) return;
+    const uid = getUid();
+    if (!form.name || !form.client || !uid) return;
     if (modal === 'create') {
-      await addDoc(collection(db, 'users', namespace, 'productions'), form);
+      await addDoc(collection(db, 'users', uid, 'productions'), form);
     } else if (editId) {
-      await updateDoc(doc(db, 'users', namespace, 'productions', editId), form);
+      await updateDoc(doc(db, 'users', uid, 'productions', editId), form);
     }
     close();
   };
 
   const remove = async (id: string) => {
-    if (!confirm('Delete this production?') || !namespace) return;
-    await deleteDoc(doc(db, 'users', namespace, 'productions', id));
+    const uid = getUid();
+    if (!confirm('Delete this production?') || !uid) return;
+    await deleteDoc(doc(db, 'users', uid, 'productions', id));
   };
 
   return (

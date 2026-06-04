@@ -3,8 +3,9 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useData } from '@/hooks/useData';
 import { addDoc, updateDoc, deleteDoc, collection, doc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
 import { Plus, Trash2, Pencil, Printer, GripVertical, Eraser, Minus, ImageIcon } from 'lucide-react';
+import { useNamespace } from '@/hooks/useNamespace';
 import Modal from '@/components/Modal';
 
 interface Panel {
@@ -159,6 +160,8 @@ function DrawingCanvas({ value, onChange }: { value: string; onChange: (v: strin
 
 
 export default function StoryboardPage() {
+  const namespace = useNamespace();
+  const getUid = () => namespace || auth.currentUser?.uid || null;
   const { data: productions } = useData('productions');
   const [selectedProduction, setSelectedProduction] = useState('');
   const [panels, setPanels] = useState<Panel[]>([]);
@@ -181,7 +184,7 @@ export default function StoryboardPage() {
       drawing: '', description: '', action: '', dialogue: '', shot: 'MS',
       order: panels.length,
     };
-    const ref = await addDoc(collection(db, collPath), newPanel);
+    const ref = await addDoc(collection(db, `users/${namespace}/${collPath}`), newPanel);
     setEditingPanel({ ...newPanel, id: ref.id });
     setEditDrawing('');
   };
@@ -194,7 +197,7 @@ export default function StoryboardPage() {
   const savePanel = async () => {
     if (!editingPanel || !collPath) return;
     setSaving(true);
-    await updateDoc(doc(db, collPath, editingPanel.id), {
+    await updateDoc(doc(db, `users/${namespace}/${collPath}`, editingPanel.id), {
       ...editingPanel,
       drawing: editDrawing,
     });
@@ -204,7 +207,7 @@ export default function StoryboardPage() {
 
   const removePanel = async (id: string) => {
     if (!collPath || !confirm('Delete this panel?')) return;
-    await deleteDoc(doc(db, collPath, id));
+    await deleteDoc(doc(db, `users/${namespace}/${collPath}`, id));
   };
 
   const printStoryboard = () => window.print();

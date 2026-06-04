@@ -4,7 +4,7 @@ import { useState, useMemo, useRef } from 'react';
 import { useData } from '@/hooks/useData';
 import { addDoc, updateDoc, deleteDoc, collection, doc } from 'firebase/firestore';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { db, storage } from '@/lib/firebase';
+import { auth, db, storage } from '@/lib/firebase';
 import Modal from '@/components/Modal';
 import { Plus, Pencil, Trash2, Search, Mail, Phone, Upload, Users, Merge, BookUser } from 'lucide-react';
 import { DEPARTMENTS, deptColor, deptLabel } from '@/lib/departments';
@@ -70,8 +70,8 @@ const emptyForm = {
 
 export default function CrewPage() {
   const { user } = useAuth();
-  const ns = useNamespace();
-  const namespace = ns || user?.uid || null;
+  const namespace = useNamespace();
+  const getUid = () => namespace || auth.currentUser?.uid || user?.uid || null;
   const { data: crew, loading } = useData('crew');
   const [modal, setModal] = useState<'create' | 'edit' | 'merge' | null>(null);
   const [form, setForm] = useState(emptyForm);
@@ -154,18 +154,19 @@ export default function CrewPage() {
   };
 
   const save = async () => {
-    if (!form.name || !form.last_name) return;
+    const uid = getUid();
+    if (!form.name || !form.last_name || !uid) return;
     if (modal === 'create') {
-      await addDoc(collection(db, 'users', namespace!, 'crew'), form);
+      await addDoc(collection(db, 'users', uid, 'crew'), form);
     } else if (editId) {
-      await updateDoc(doc(db, 'users', namespace!, 'crew', editId), form);
+      await updateDoc(doc(db, 'users', uid, 'crew', editId), form);
     }
     close();
   };
 
   const remove = async (id: string) => {
     if (!confirm('Remove this crew member?')) return;
-    await deleteDoc(doc(db, 'users', namespace!, 'crew', id));
+    await deleteDoc(doc(db, 'users', getUid()!, 'crew', id));
   };
 
   const doMerge = async () => {
@@ -177,8 +178,8 @@ export default function CrewPage() {
     const merged: any = { ...b, ...Object.fromEntries(Object.entries(a).filter(([, v]) => v !== undefined && v !== '' && v !== false)) };
     merged.notes = [a.notes, b.notes].filter(Boolean).join(' | ');
     merged.picture = a.picture !== DEFAULT_PICTURE ? a.picture : b.picture;
-    await updateDoc(doc(db, 'users', namespace!, 'crew', mergeA), merged);
-    await deleteDoc(doc(db, 'users', namespace!, 'crew', mergeB));
+    await updateDoc(doc(db, 'users', getUid()!, 'crew', mergeA), merged);
+    await deleteDoc(doc(db, 'users', getUid()!, 'crew', mergeB));
     setMergeA(''); setMergeB(''); setModal(null);
   };
 

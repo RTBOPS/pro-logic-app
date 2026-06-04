@@ -6,22 +6,11 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
 import { NamespaceContext, Workspace } from '@/hooks/useNamespace';
 
-interface PendingInvite {
-  ownerUid: string;
-  email: string;
-  companyName: string;
-}
-
 export function NamespaceProvider({ children }: { children: React.ReactNode }) {
-  // Initialise synchronously from the already-resolved Firebase auth state.
-  // auth.currentUser is non-null the moment the SDK has restored the session
-  // from local storage — no async round-trip needed.
-  const currentUid = auth.currentUser?.uid ?? null;
-
-  const [ownUid, setOwnUid] = useState<string | null>(currentUid);
-  const [namespace, setNamespace] = useState<string | null>(currentUid);
+  const [ownUid, setOwnUid] = useState<string | null>(null);
+  const [namespace, setNamespace] = useState<string | null>(null);
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
-  const [pendingInvite, setPendingInvite] = useState<PendingInvite | null>(null);
+  const [pendingInvite, setPendingInvite] = useState<{ ownerUid: string; email: string; companyName: string } | null>(null);
 
   useEffect(() => {
     return onAuthStateChanged(auth, async user => {
@@ -29,31 +18,18 @@ export function NamespaceProvider({ children }: { children: React.ReactNode }) {
         setOwnUid(null); setNamespace(null); setWorkspaces([]); setPendingInvite(null);
         return;
       }
-
       setOwnUid(user.uid);
-      setNamespace(uid => uid ?? user.uid); // only override if still null
-
+      setNamespace(user.uid);
       try {
         const profileSnap = await getDoc(doc(db, 'users', user.uid));
-        if (profileSnap.exists()) {
-          setWorkspaces(profileSnap.data().workspaces || []);
-        }
-
+        if (profileSnap.exists()) setWorkspaces(profileSnap.data().workspaces || []);
         const encoded = (user.email || '').replace(/[.@]/g, '_');
         const inviteSnap = await getDoc(doc(db, 'invites', encoded));
         if (inviteSnap.exists()) {
-          const data = inviteSnap.data();
-          if (!data.accepted) {
-            setPendingInvite({
-              ownerUid: data.ownerUid,
-              email: user.email || '',
-              companyName: data.companyName || 'another company',
-            });
-          }
+          const d = inviteSnap.data();
+          if (!d.accepted) setPendingInvite({ ownerUid: d.ownerUid, email: user.email || '', companyName: d.companyName || '' });
         }
-      } catch {
-        // keep own namespace on any Firestore error
-      }
+      } catch { /* keep own namespace */ }
     });
   }, []);
 
@@ -67,11 +43,8 @@ export function NamespaceProvider({ children }: { children: React.ReactNode }) {
       const newWs: Workspace = { ownerUid: pendingInvite.ownerUid, companyName: pendingInvite.companyName, role: 'Editor' };
       const updated = [...workspaces.filter(w => w.ownerUid !== pendingInvite.ownerUid), newWs];
       await setDoc(doc(db, 'users', ownUid), { workspaces: updated }, { merge: true });
-      setWorkspaces(updated);
-      setPendingInvite(null);
-    } catch (e) {
-      console.error('Failed to accept invite', e);
-    }
+      setWorkspaces(updated); setPendingInvite(null);
+    } catch (e) { console.error('acceptInvite failed', e); }
   };
 
   return (
@@ -79,8 +52,8 @@ export function NamespaceProvider({ children }: { children: React.ReactNode }) {
       {pendingInvite && (
         <div className="fixed top-0 left-0 right-0 z-[200] flex items-center justify-center gap-3 px-4 py-2.5 text-sm text-white shadow-lg bg-blue-700">
           <span>You have been invited to access <strong>{pendingInvite.companyName}</strong>'s workspace.</span>
-          <button onClick={acceptInvite} className="shrink-0 bg-white text-blue-700 px-3 py-1 rounded-lg font-semibold text-xs hover:bg-blue-50">Accept</button>
-          <button onClick={() => setPendingInvite(null)} className="shrink-0 text-blue-200 hover:text-white text-xs">Dismiss</button>
+          <button onClick={acceptInvite} className="bg-white text-blue-700 px-3 py-1 rounded-lg font-semibold text-xs">Accept</button>
+          <button onClick={() => setPendingInvite(null)} className="text-blue-200 hover:text-white text-xs">Dismiss</button>
         </div>
       )}
       {children}
