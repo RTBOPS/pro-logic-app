@@ -75,10 +75,10 @@ export default function LandingPage() {
       if (data.url) {
         window.location.href = data.url;
       } else {
-        alert('Could not start checkout. Please try again.');
+        alert(data.error || 'Could not start checkout. Please try again.');
       }
-    } catch {
-      alert('Could not start checkout. Please try again.');
+    } catch (e: any) {
+      alert(e?.message || 'Could not start checkout. Please try again.');
     } finally {
       setCheckingOut(null);
     }
