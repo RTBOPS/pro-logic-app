@@ -28,6 +28,8 @@ export interface BlueprintItem {
   // For text
   fontSize?: number;
   fontStyle?: string;
+  // For inventory items with photos
+  imageUrl?: string;
 }
 
 // ─── SVG icon data URLs ───────────────────────────────────────────────────────
@@ -280,6 +282,18 @@ function EquipmentShape({ item, isSelected, onSelect, onChange, imgEl }: {
 }) {
   const groupRef = useRef<any>(null);
   const trRef = useRef<any>(null);
+  const [dynamicImg, setDynamicImg] = useState<HTMLImageElement | undefined>(undefined);
+
+  useEffect(() => {
+    if (item.imageUrl && !imgEl) {
+      const img = new window.Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => setDynamicImg(img);
+      img.src = item.imageUrl;
+    }
+  }, [item.imageUrl]);
+
+  const resolvedImg = imgEl || dynamicImg;
 
   useEffect(() => {
     if (isSelected && trRef.current && groupRef.current) {
@@ -302,8 +316,8 @@ function EquipmentShape({ item, isSelected, onSelect, onChange, imgEl }: {
         onTap={onSelect}
         onDragEnd={e => onChange({ x: e.target.x(), y: e.target.y() })}
       >
-        {imgEl ? (
-          <KonvaImage image={imgEl} width={item.width} height={item.height} />
+        {resolvedImg ? (
+          <KonvaImage image={resolvedImg} width={item.width} height={item.height} cornerRadius={4} />
         ) : (
           <Rect
             width={item.width}
@@ -516,15 +530,19 @@ export default function BlueprintCanvas({
   items,
   onChange,
   productionId,
+  inventoryItems = [],
 }: {
   items: BlueprintItem[];
   onChange: (items: BlueprintItem[]) => void;
   productionId?: string;
+  inventoryItems?: any[];
 }) {
   const [selected, setSelected] = useState<string | null>(null);
   const [scale, setScale] = useState(1);
   const [showGrid, setShowGrid] = useState(true);
   const [activeCategory, setActiveCategory] = useState('Camera');
+  const [showInventory, setShowInventory] = useState(false);
+  const [invSearch, setInvSearch] = useState('');
   const [tool, setTool] = useState<DrawTool>('select');
   const [drawColor, setDrawColor] = useState('#374151');
   const [drawFontSize, setDrawFontSize] = useState(18);
@@ -567,6 +585,32 @@ export default function BlueprintCanvas({
     setSelected(newItem.id);
     setTool('select');
   };
+
+  const addFromInventory = (inv: any) => {
+    const newItem: BlueprintItem = {
+      id: crypto.randomUUID(),
+      kind: 'equipment',
+      type: `inv_${inv.id}`,
+      label: inv.name || 'Item',
+      x: 80 + Math.random() * 300,
+      y: 60 + Math.random() * 200,
+      width: 60,
+      height: 60,
+      rotation: 0,
+      color: '#374151',
+      category: inv.category || 'Inventory',
+      imageUrl: inv.image_url || inv.picture || '',
+    };
+    onChange([...items, newItem]);
+    setSelected(newItem.id);
+    setTool('select');
+  };
+
+  const filteredInventory = inventoryItems.filter(i => {
+    if (!invSearch) return true;
+    const q = invSearch.toLowerCase();
+    return i.name?.toLowerCase().includes(q) || i.category?.toLowerCase().includes(q) || i.brand?.toLowerCase().includes(q);
+  });
 
   const updateItem = (id: string, updates: Partial<BlueprintItem>) => {
     onChange(items.map(i => i.id === id ? { ...i, ...updates } : i));
@@ -732,32 +776,73 @@ export default function BlueprintCanvas({
     <div className="flex gap-4 h-full">
       {/* Left palette */}
       <div className="w-44 shrink-0 bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden flex flex-col">
-        <div className="px-3 py-2 border-b bg-gray-50">
-          <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Equipment</div>
+        {/* Tab toggle */}
+        <div className="flex border-b">
+          <button onClick={() => setShowInventory(false)}
+            className={`flex-1 py-2 text-xs font-medium transition-colors ${!showInventory ? 'bg-gray-900 text-white' : 'text-gray-500 hover:bg-gray-50'}`}>
+            Icons
+          </button>
+          <button onClick={() => setShowInventory(true)}
+            className={`flex-1 py-2 text-xs font-medium transition-colors ${showInventory ? 'bg-gray-900 text-white' : 'text-gray-500 hover:bg-gray-50'}`}>
+            Inventory
+          </button>
         </div>
-        <div className="flex flex-wrap gap-1 px-2 py-2 border-b">
-          {PALETTE_CATEGORIES.map(cat => (
-            <button key={cat} onClick={() => setActiveCategory(cat)}
-              className={`text-xs px-1.5 py-0.5 rounded-full transition-colors ${activeCategory === cat ? 'bg-gray-900 text-white' : 'text-gray-500 hover:bg-gray-100'}`}>
-              {cat}
-            </button>
-          ))}
-        </div>
-        <div className="overflow-y-auto flex-1 p-2 space-y-0.5">
-          {paletteCurrent.map(def => (
-            <button key={def.type} onClick={() => addEquipment(def)}
-              className="w-full flex items-center gap-2 text-left text-xs px-2 py-1.5 rounded-lg hover:bg-gray-50 transition-colors">
-              {/* SVG preview */}
-              {ICONS[def.type] ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={ICONS[def.type]} alt={def.label} className="w-6 h-6 shrink-0" />
-              ) : (
-                <span className="w-6 h-6 rounded bg-gray-200 flex items-center justify-center text-gray-500 text-xs">?</span>
-              )}
-              <span className="text-gray-700 truncate">{def.label}</span>
-            </button>
-          ))}
-        </div>
+
+        {!showInventory ? (
+          <>
+            <div className="flex flex-wrap gap-1 px-2 py-2 border-b">
+              {PALETTE_CATEGORIES.map(cat => (
+                <button key={cat} onClick={() => setActiveCategory(cat)}
+                  className={`text-xs px-1.5 py-0.5 rounded-full transition-colors ${activeCategory === cat ? 'bg-gray-900 text-white' : 'text-gray-500 hover:bg-gray-100'}`}>
+                  {cat}
+                </button>
+              ))}
+            </div>
+            <div className="overflow-y-auto flex-1 p-2 space-y-0.5">
+              {paletteCurrent.map(def => (
+                <button key={def.type} onClick={() => addEquipment(def)}
+                  className="w-full flex items-center gap-2 text-left text-xs px-2 py-1.5 rounded-lg hover:bg-gray-50 transition-colors">
+                  {ICONS[def.type] ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={ICONS[def.type]} alt={def.label} className="w-6 h-6 shrink-0" />
+                  ) : (
+                    <span className="w-6 h-6 rounded bg-gray-200 flex items-center justify-center text-gray-500 text-xs">?</span>
+                  )}
+                  <span className="text-gray-700 truncate">{def.label}</span>
+                </button>
+              ))}
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="px-2 py-1.5 border-b">
+              <input value={invSearch} onChange={e => setInvSearch(e.target.value)}
+                placeholder="Search inventory…"
+                className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-black" />
+            </div>
+            <div className="overflow-y-auto flex-1 p-2 space-y-0.5">
+              {filteredInventory.length === 0 ? (
+                <div className="text-xs text-gray-400 text-center py-4 px-2">
+                  {inventoryItems.length === 0 ? 'No inventory items' : 'No matches'}
+                </div>
+              ) : filteredInventory.map((inv: any) => (
+                <button key={inv.id} onClick={() => addFromInventory(inv)}
+                  className="w-full flex items-center gap-2 text-left text-xs px-2 py-1.5 rounded-lg hover:bg-gray-50 transition-colors">
+                  {inv.image_url || inv.picture ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={inv.image_url || inv.picture} alt={inv.name} className="w-6 h-6 shrink-0 rounded object-cover" />
+                  ) : (
+                    <span className="w-6 h-6 rounded bg-gray-200 flex items-center justify-center text-gray-400 text-xs shrink-0">📦</span>
+                  )}
+                  <div className="min-w-0">
+                    <div className="text-gray-700 truncate font-medium">{inv.name}</div>
+                    {inv.category && <div className="text-gray-400 truncate">{inv.category}</div>}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </>
+        )}
       </div>
 
       {/* Canvas area */}

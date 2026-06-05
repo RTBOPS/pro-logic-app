@@ -86,7 +86,7 @@ export default function BlueprintPage() {
         <div className="flex-1 flex flex-col md:flex-row gap-0 overflow-hidden min-h-0">
           {/* Canvas — full screen on mobile */}
           <div className="flex-1 overflow-hidden blueprint-canvas-wrap">
-            <BlueprintCanvas items={items} onChange={setItems} productionId={selectedProduction} />
+            <BlueprintCanvas items={items} onChange={setItems} productionId={selectedProduction} inventoryItems={inventory} />
           </div>
 
           {/* Right panel — hidden on mobile, shown on md+ */}
