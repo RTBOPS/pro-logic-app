@@ -15,7 +15,7 @@ import Link from 'next/link';
 import {
   ArrowLeft, Users, Package, X, Mail, CheckCircle,
   Clock, XCircle, CloudSun, RefreshCw, Calendar, MapPin,
-  Search, Filter, Plus
+  Search, Filter, Plus, Send, MessageSquare, FileText,
 } from 'lucide-react';
 import { DEPARTMENTS, deptColor, deptLabel, statusStyle } from '@/lib/departments';
 import { sendConfirmationEmail, sendSMS } from '@/lib/notifications';
@@ -201,6 +201,58 @@ export default function ProductionDetail({ params }: { params: Promise<{ id: str
   const sendAllPending = async () => {
     for (const m of assignedCrew.filter(c => c.confirmation_status === 'pending' && c.email))
       await sendConfirmation(m);
+  };
+
+  /* ── Send Call Sheet to ALL crew by email ── */
+  const sendCallSheetEmail = () => {
+    const crewWithEmail = assignedCrew.filter(c => c.email);
+    if (crewWithEmail.length === 0) { alert('No crew members have email addresses.'); return; }
+
+    const location = locations.find((l: any) => l.id === production?.location_id);
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.pro-logic.studio';
+    const callSheetUrl = `${appUrl}/documents`;
+
+    const bcc = crewWithEmail.map(c => c.email).join(',');
+    const subject = encodeURIComponent(`[CALL SHEET] ${production?.name} — ${production?.start_date || 'TBD'}`);
+    const body = encodeURIComponent([
+      `CALL SHEET — ${production?.name}`,
+      `Client: ${production?.client || '—'}`,
+      production?.start_date ? `Date: ${production.start_date}` : '',
+      location?.name ? `Location: ${location.name}` : '',
+      production?.call_time ? `General Call Time: ${production.call_time}` : '',
+      '',
+      'Individual call times:',
+      ...crewWithEmail.map(c => `  ${c.name} (${c.role || '—'}) — ${c.call_time || production?.call_time || 'TBD'}`),
+      '',
+      `Generate full PDF call sheet: ${callSheetUrl}`,
+      '',
+      '— PRO-LOGIC Studio',
+    ].filter(Boolean).join('\n'));
+
+    window.open(`mailto:?bcc=${bcc}&subject=${subject}&body=${body}`, '_blank');
+  };
+
+  /* ── Send SMS broadcast to ALL crew ── */
+  const sendCallSheetSMS = () => {
+    const crewWithPhone = assignedCrew.filter(c => c.phone);
+    if (crewWithPhone.length === 0) { alert('No crew members have phone numbers.'); return; }
+
+    const location = locations.find((l: any) => l.id === production?.location_id);
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.pro-logic.studio';
+
+    // Open one SMS per crew member (native sms: links can't broadcast)
+    // First one opens immediately; tell user to repeat for others
+    const message = encodeURIComponent([
+      `[PRO-LOGIC] CALL SHEET: ${production?.name}`,
+      production?.start_date ? `Date: ${production.start_date}` : '',
+      location?.name ? `Location: ${location.name}` : '',
+      `Your call: ${crewWithPhone[0]?.call_time || production?.call_time || 'TBD'}`,
+      `Full details: ${appUrl}/documents`,
+    ].filter(Boolean).join(' | '));
+
+    // Build a multi-recipient SMS string (works on some platforms)
+    const phones = crewWithPhone.map(c => c.phone.replace(/\D/g, '')).join(';');
+    window.open(`sms:${phones}?body=${message}`, '_blank');
   };
 
   const sendSMSToMember = async (member: any) => {
@@ -390,14 +442,30 @@ export default function ProductionDetail({ params }: { params: Promise<{ id: str
       {tab === 'crew' && (
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="px-6 py-4 border-b flex items-center justify-between flex-wrap gap-3">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 flex-wrap">
               <span className="font-semibold text-gray-800">Crew Assignment</span>
               {pendingCount > 0 && (
-                <button onClick={sendAllPending} className="text-xs bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 flex items-center gap-1">
-                  <Mail size={11} /> Send all confirmations ({pendingCount})
+                <button onClick={sendAllPending}
+                  className="text-xs bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 flex items-center gap-1">
+                  <Mail size={11} /> Confirm pending ({pendingCount})
                 </button>
               )}
             </div>
+            {assignedCrew.length > 0 && (
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs text-gray-400 hidden sm:block">Broadcast:</span>
+                <button onClick={sendCallSheetEmail}
+                  title="Email call sheet to all crew"
+                  className="flex items-center gap-1.5 text-xs bg-gray-900 text-white px-3 py-1.5 rounded-lg hover:bg-black">
+                  <FileText size={11} /> <Mail size={11} /> Call Sheet — Email All
+                </button>
+                <button onClick={sendCallSheetSMS}
+                  title="SMS call sheet to all crew"
+                  className="flex items-center gap-1.5 text-xs border border-gray-200 text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-50">
+                  <FileText size={11} /> <MessageSquare size={11} /> Call Sheet — SMS All
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Two-column: assigned | available */}
