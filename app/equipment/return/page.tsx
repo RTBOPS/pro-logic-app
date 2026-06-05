@@ -25,7 +25,13 @@ export default function ReturnPage() {
   const { data: inventory } = useData('inventory');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [printing, setPrinting] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
+
+  const handlePrint = () => {
+    setPrinting(true);
+    setTimeout(() => { window.print(); setPrinting(false); }, 150);
+  };
 
   const [info, setInfo] = useState({ agreementNo: '', dateReturned: '', timeReturned: '', projectName: '', returnedBy: '', inspectedBy: '' });
   const [equipment, setEquipment] = useState<ReturnRow[]>([emptyRow()]);
@@ -71,13 +77,13 @@ export default function ReturnPage() {
 
   return (
     <div className="p-4 md:p-8 max-w-5xl mx-auto">
-      {saving && (
+      {(saving || printing) && (
         <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-white/80 backdrop-blur-sm">
           <img src="/logo.png" alt="PRO-LOGIC" className="h-10 object-contain mb-4 opacity-80" />
           <div className="w-48 h-1.5 bg-gray-100 rounded-full overflow-hidden">
             <div className="h-full bg-gray-900 rounded-full animate-[slide_1.2s_ease-in-out_infinite]" />
           </div>
-          <p className="text-xs text-gray-400 mt-3 tracking-wide">Saving…</p>
+          <p className="text-xs text-gray-400 mt-3 tracking-wide">{printing ? 'Preparing print…' : 'Saving…'}</p>
           <style>{`@keyframes slide{0%{width:0%;margin-left:0}50%{width:60%;margin-left:20%}100%{width:0%;margin-left:100%}}`}</style>
         </div>
       )}
@@ -86,10 +92,12 @@ export default function ReturnPage() {
       <div className="no-print">
         <PageHeader title="Equipment Return Inspection" subtitle="VIDEO PRODUCTION EQUIPMENT RETURN INSPECTION REPORT">
           <div className="flex gap-2">
-            <button onClick={() => window.print()} className="flex items-center gap-2 border border-gray-200 text-gray-700 px-3 py-2 rounded-xl text-sm hover:bg-gray-50">
-              <Printer size={14} /> Print
+            <button onClick={handlePrint} disabled={printing || saving}
+              className="flex items-center gap-2 border border-gray-200 text-gray-700 px-3 py-2 rounded-xl text-sm hover:bg-gray-50 disabled:opacity-40">
+              {printing ? <Loader2 size={14} className="animate-spin" /> : <Printer size={14} />}
+              {printing ? 'Preparing…' : 'Print'}
             </button>
-            <button onClick={save} disabled={saving}
+            <button onClick={save} disabled={saving || printing}
               className="flex items-center gap-2 bg-black text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-zinc-800 disabled:opacity-40">
               {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
               {saved ? 'Saved!' : 'Save'}
