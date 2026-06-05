@@ -64,14 +64,14 @@ export default function StripboardPage() {
 
   const save = async () => {
     if (!form.scene_number) return;
-    if (editId) await updateDoc(doc(db, 'users', getUid(), 'stripboard', editId), form);
-    else await addDoc(collection(db, 'users', getUid(), 'stripboard'), form);
+    if (editId) await updateDoc(doc(db, 'users', getUid()!, 'stripboard', editId), form);
+    else await addDoc(collection(db, 'users', getUid()!, 'stripboard'), form);
     setModal(false);
   };
 
   const remove = async (id: string) => {
     if (!confirm('Remove scene?')) return;
-    await deleteDoc(doc(db, 'users', getUid(), 'stripboard', id));
+    await deleteDoc(doc(db, 'users', getUid()!, 'stripboard', id));
   };
 
   const fld = (label: string, k: keyof typeof empty, placeholder = '', type = 'text') => (

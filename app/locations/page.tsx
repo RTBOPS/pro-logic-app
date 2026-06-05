@@ -95,14 +95,14 @@ export default function LocationsPage() {
 
   const save = async () => {
     if (!form.name) return;
-    if (modal === 'create') await addDoc(collection(db, 'users', getUid(), 'locations'), form);
-    else if (editId) await updateDoc(doc(db, 'users', getUid(), 'locations', editId), form);
+    if (modal === 'create') await addDoc(collection(db, 'users', getUid()!, 'locations'), form);
+    else if (editId) await updateDoc(doc(db, 'users', getUid()!, 'locations', editId), form);
     close();
   };
 
   const remove = async (id: string) => {
     if (!confirm('Delete this location?')) return;
-    await deleteDoc(doc(db, 'users', getUid(), 'locations', id));
+    await deleteDoc(doc(db, 'users', getUid()!, 'locations', id));
   };
 
   const fld = (label: string, key: keyof typeof empty, placeholder?: string, type = 'text') => (

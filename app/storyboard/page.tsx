@@ -236,7 +236,7 @@ export default function StoryboardPage() {
       drawing: '', description: '', action: '', dialogue: '', shot: 'MS',
       order: panels.length,
     };
-    const ref = await addDoc(collection(db, `users/${getUid()}/${collPath}`), newPanel);
+    const ref = await addDoc(collection(db, `users/${getUid()!}/${collPath}`), newPanel);
     setEditingPanel({ ...newPanel, id: ref.id });
     setEditDrawing('');
   };
@@ -249,7 +249,7 @@ export default function StoryboardPage() {
   const savePanel = async () => {
     if (!editingPanel || !collPath) return;
     setSaving(true);
-    await updateDoc(doc(db, `users/${getUid()}/${collPath}`, editingPanel.id), {
+    await updateDoc(doc(db, `users/${getUid()!}/${collPath}`, editingPanel.id), {
       ...editingPanel,
       drawing: editDrawing,
     });
@@ -259,7 +259,7 @@ export default function StoryboardPage() {
 
   const removePanel = async (id: string) => {
     if (!collPath || !confirm('Delete this panel?')) return;
-    await deleteDoc(doc(db, `users/${getUid()}/${collPath}`, id));
+    await deleteDoc(doc(db, `users/${getUid()!}/${collPath}`, id));
   };
 
   const printStoryboard = () => window.print();
