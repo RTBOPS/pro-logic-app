@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useData } from '@/hooks/useData';
 import { addDoc, updateDoc, deleteDoc, collection, doc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
-import { Plus, Trash2, Pencil, Printer, GripVertical, Eraser, Minus, ImageIcon, Pipette } from 'lucide-react';
+import { Plus, Trash2, Pencil, Printer, GripVertical, Eraser, Minus, ImageIcon, Pipette, Loader2 } from 'lucide-react';
 import { useNamespace } from '@/hooks/useNamespace';
 import Modal from '@/components/Modal';
 
@@ -262,7 +262,8 @@ export default function StoryboardPage() {
     await deleteDoc(doc(db, `users/${getUid()!}/${collPath}`, id));
   };
 
-  const printStoryboard = () => window.print();
+  const [printing, setPrinting] = useState(false);
+  const printStoryboard = () => { setPrinting(true); setTimeout(() => { window.print(); setPrinting(false); }, 150); };
 
   return (
     <div className="p-4 md:p-8">
@@ -284,9 +285,11 @@ export default function StoryboardPage() {
             <>
               <button
                 onClick={printStoryboard}
-                className="flex items-center gap-2 border border-gray-200 text-gray-700 px-4 py-2 rounded-xl text-sm hover:bg-gray-50"
+                disabled={printing}
+                className="flex items-center gap-2 border border-gray-200 text-gray-700 px-4 py-2 rounded-xl text-sm hover:bg-gray-50 disabled:opacity-40"
               >
-                <Printer size={15} /> Print
+                {printing ? <Loader2 size={15} className="animate-spin" /> : <Printer size={15} />}
+                {printing ? 'Preparing…' : 'Print'}
               </button>
               <button
                 onClick={addPanel}

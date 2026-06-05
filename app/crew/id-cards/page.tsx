@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useData } from '@/hooks/useData';
 import { doc, getDoc, getDocs, collection } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
-import { Printer, IdCard, CreditCard } from 'lucide-react';
+import { Printer, IdCard, CreditCard, Loader2 } from 'lucide-react';
 import PageHeader from '@/components/PageHeader';
 import { useNamespace } from '@/hooks/useNamespace';
 import { deptLabel, DEPARTMENTS } from '@/lib/departments';
@@ -126,8 +126,14 @@ export default function IDCardsPage() {
   const [avery, setAvery] = useState('free');
   const [prodCrew, setProdCrew] = useState<string[]>([]);
   const [loadingProd, setLoadingProd] = useState(false);
+  const [printing, setPrinting] = useState(false);
   const getUid = () => namespace || auth.currentUser?.uid || null;
   const averyPreset = AVERY_PRESETS.find(p => p.id === avery) || AVERY_PRESETS[0];
+
+  const handlePrint = () => {
+    setPrinting(true);
+    setTimeout(() => { window.print(); setPrinting(false); }, 150);
+  };
 
   // Load crew assigned to selected production
   useEffect(() => {
@@ -182,13 +188,25 @@ export default function IDCardsPage() {
           >
             {AVERY_PRESETS.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
           </select>
-          <button onClick={() => window.print()}
-            className="flex items-center gap-2 bg-black text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-zinc-800">
-            <Printer size={14} /> Print All
+          <button onClick={handlePrint} disabled={printing}
+            className="flex items-center gap-2 bg-black text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-zinc-800 disabled:opacity-40">
+            {printing ? <Loader2 size={14} className="animate-spin" /> : <Printer size={14} />}
+            {printing ? 'Preparing…' : 'Print All'}
           </button>
         </div>
       </PageHeader>
       </div>
+
+      {printing && (
+        <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-white/80 backdrop-blur-sm no-print">
+          <img src="/logo.png" alt="PRO-LOGIC" className="h-10 object-contain mb-4 opacity-80" />
+          <div className="w-48 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+            <div className="h-full bg-gray-900 rounded-full animate-[slide_1.2s_ease-in-out_infinite]" />
+          </div>
+          <p className="text-xs text-gray-400 mt-3 tracking-wide">Preparing print…</p>
+          <style>{`@keyframes slide{0%{width:0%;margin-left:0}50%{width:60%;margin-left:20%}100%{width:0%;margin-left:100%}}`}</style>
+        </div>
+      )}
 
       {selectedProd && (
         <div className="mb-4 bg-blue-50 border border-blue-200 rounded-xl px-4 py-2 text-sm text-blue-700 no-print">

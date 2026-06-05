@@ -6,7 +6,7 @@ import { useData } from '@/hooks/useData';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { BlueprintItem } from '@/components/BlueprintCanvas';
-import { Save, Printer } from 'lucide-react';
+import { Save, Printer, Loader2 } from 'lucide-react';
 
 const BlueprintCanvas = dynamic(() => import('@/components/BlueprintCanvas'), { ssr: false });
 
@@ -20,6 +20,8 @@ export default function BlueprintPage() {
   const [items, setItems] = useState<BlueprintItem[]>([]);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [printing, setPrinting] = useState(false);
+  const handlePrint = () => { setPrinting(true); setTimeout(() => { window.print(); setPrinting(false); }, 150); };
 
   useEffect(() => {
     if (!selectedProduction) return;
@@ -66,9 +68,10 @@ export default function BlueprintPage() {
                 className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-colors ${saved ? 'bg-green-600 text-white' : 'bg-black text-white hover:bg-zinc-800'}`}>
                 <Save size={13} /> {saving ? '…' : saved ? '✓' : 'Save'}
               </button>
-              <button onClick={() => window.print()}
-                className="flex items-center gap-1.5 border border-gray-200 text-gray-700 px-3 py-2 rounded-xl text-sm hover:bg-gray-50">
-                <Printer size={13} /> Print
+              <button onClick={handlePrint} disabled={printing}
+                className="flex items-center gap-1.5 border border-gray-200 text-gray-700 px-3 py-2 rounded-xl text-sm hover:bg-gray-50 disabled:opacity-40">
+                {printing ? <Loader2 size={13} className="animate-spin" /> : <Printer size={13} />}
+                {printing ? 'Preparing…' : 'Print'}
               </button>
             </>
           )}

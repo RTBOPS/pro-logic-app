@@ -33,7 +33,7 @@ const empty: Omit<TakeEntry, 'id' | 'timestamp'> = {
 export default function ShootLogPage() {
   const namespace = useNamespace();
   const getUid = () => namespace || auth.currentUser?.uid || null;
-  const { data: productions } = useData('productions');
+  const { data: productions, loading: loadingProductions } = useData('productions');
   const [selectedProduction, setSelectedProduction] = useState('');
   const [takes, setTakes] = useState<TakeEntry[]>([]);
   const [form, setForm] = useState(empty);
@@ -88,13 +88,13 @@ export default function ShootLogPage() {
 
   return (
     <div className="p-4 md:p-8">
-      {(saving || printing) && (
+      {(saving || printing || loadingProductions) && (
         <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-white/80 backdrop-blur-sm">
           <img src="/logo.png" alt="PRO-LOGIC" className="h-10 object-contain mb-4 opacity-80" />
           <div className="w-48 h-1.5 bg-gray-100 rounded-full overflow-hidden">
             <div className="h-full bg-gray-900 rounded-full animate-[slide_1.2s_ease-in-out_infinite]" />
           </div>
-          <p className="text-xs text-gray-400 mt-3 tracking-wide">{printing ? 'Preparing print…' : 'Saving…'}</p>
+          <p className="text-xs text-gray-400 mt-3 tracking-wide">{printing ? 'Preparing print…' : loadingProductions ? 'Loading…' : 'Saving…'}</p>
           <style>{`@keyframes slide{0%{width:0%;margin-left:0}50%{width:60%;margin-left:20%}100%{width:0%;margin-left:100%}}`}</style>
         </div>
       )}

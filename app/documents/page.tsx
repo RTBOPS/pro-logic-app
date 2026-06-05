@@ -31,7 +31,7 @@ const DOCS = [
 export default function DocumentsPage() {
   const namespace = useNamespace();
   const getUid = () => namespace || auth.currentUser?.uid || null;
-  const { data: productions } = useData('productions');
+  const { data: productions, loading: loadingData } = useData('productions');
   const { data: crew } = useData('crew');
   const { data: locations } = useData('locations');
   const { data: inventory } = useData('inventory');
@@ -128,14 +128,14 @@ export default function DocumentsPage() {
 
   return (
     <div className="p-4 md:p-8">
-      {generating && (
+      {(generating || loadingData) && (
         <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-white/80 backdrop-blur-sm">
           <div className="flex flex-col items-center gap-4">
             <img src="/logo.png" alt="PRO-LOGIC" className="h-10 object-contain animate-pulse" />
             <div className="w-48 h-1.5 bg-gray-100 rounded-full overflow-hidden">
               <div className="h-full bg-gray-900 rounded-full animate-[slide_1.2s_ease-in-out_infinite]" />
             </div>
-            <p className="text-xs text-gray-400 mt-3 tracking-wide">Generating document…</p>
+            <p className="text-xs text-gray-400 mt-3 tracking-wide">{loadingData ? 'Loading…' : 'Generating document…'}</p>
           </div>
           <style>{`@keyframes slide{0%{width:0%;margin-left:0}50%{width:60%;margin-left:20%}100%{width:0%;margin-left:100%}}`}</style>
         </div>

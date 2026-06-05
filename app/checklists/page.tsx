@@ -5,7 +5,7 @@ import { useData } from '@/hooks/useData';
 import { collection, doc, setDoc, getDoc, onSnapshot } from 'firebase/firestore';
 import { useNamespace } from '@/hooks/useNamespace';
 import { auth, db } from '@/lib/firebase';
-import { CheckCircle, Circle, Printer, RotateCcw } from 'lucide-react';
+import { CheckCircle, Circle, Printer, RotateCcw, Loader2 } from 'lucide-react';
 import PageHeader from '@/components/PageHeader';
 
 const DEFAULT_CHECKLISTS = {
@@ -155,6 +155,9 @@ export default function ChecklistsPage() {
   const [selectedProduction, setSelectedProduction] = useState('');
   const [checks, setChecks] = useState<Record<string, Record<string, boolean>>>({});
   const [activeList, setActiveList] = useState<ChecklistId>('camera');
+  const [printing, setPrinting] = useState(false);
+
+  const handlePrint = () => { setPrinting(true); setTimeout(() => { window.print(); setPrinting(false); }, 150); };
 
   useEffect(() => {
     if (!selectedProduction || !getUid()) return;
@@ -198,8 +201,9 @@ export default function ChecklistsPage() {
           <option value="">Select production…</option>
           {productions.map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
         </select>
-        <button onClick={() => window.print()} className="flex items-center gap-2 border border-gray-200 text-gray-700 px-3 py-2 rounded-xl text-sm hover:bg-gray-50">
-          <Printer size={14} /> Print
+        <button onClick={handlePrint} disabled={printing} className="flex items-center gap-2 border border-gray-200 text-gray-700 px-3 py-2 rounded-xl text-sm hover:bg-gray-50 disabled:opacity-40">
+          {printing ? <Loader2 size={14} className="animate-spin" /> : <Printer size={14} />}
+          {printing ? 'Preparing…' : 'Print'}
         </button>
       </PageHeader>
 
