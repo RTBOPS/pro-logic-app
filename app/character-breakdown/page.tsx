@@ -153,16 +153,12 @@ export default function CharacterBreakdownPage() {
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Actor / Cast Member</label>
-              <select className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none"
-                value={form.actor_name} onChange={e => setForm(f => ({ ...f, actor_name: e.target.value }))}>
-                <option value="">— Not yet cast —</option>
-                {cast.map((c: any) => <option key={c.id} value={`${c.name} ${c.last_name}`}>{c.name} {c.last_name}</option>)}
-                <option value="__custom">Type name manually…</option>
-              </select>
-              {form.actor_name === '__custom' && (
-                <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none mt-1"
-                  placeholder="Actor name" onChange={e => setForm(f => ({ ...f, actor_name: e.target.value }))} />
-              )}
+              <input list="cast-list" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none"
+                placeholder="Type name or select from crew…"
+                value={form.actor_name} onChange={e => setForm(f => ({ ...f, actor_name: e.target.value }))} />
+              <datalist id="cast-list">
+                {crew.map((c: any) => <option key={c.id} value={`${c.name} ${c.last_name}`} />)}
+              </datalist>
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Production</label>

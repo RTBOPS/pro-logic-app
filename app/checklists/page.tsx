@@ -157,8 +157,8 @@ export default function ChecklistsPage() {
   const [activeList, setActiveList] = useState<ChecklistId>('camera');
 
   useEffect(() => {
-    if (!selectedProduction || !namespace) return;
-    const ref = doc(db, 'users', namespace, 'productions', selectedProduction, 'checklists', 'main');
+    if (!selectedProduction || !getUid()) return;
+    const ref = doc(db, 'users', getUid()!, 'productions', selectedProduction, 'checklists', 'main');
     return onSnapshot(ref, snap => {
       if (snap.exists()) setChecks(snap.data() as any);
       else setChecks({});
@@ -166,7 +166,7 @@ export default function ChecklistsPage() {
   }, [selectedProduction, namespace]);
 
   const toggle = async (listId: string, item: string) => {
-    if (!selectedProduction || !namespace) return;
+    if (!selectedProduction || !getUid()) return;
     const updated = {
       ...checks,
       [listId]: {
@@ -175,14 +175,14 @@ export default function ChecklistsPage() {
       },
     };
     setChecks(updated);
-    await setDoc(doc(db, 'users', namespace, 'productions', selectedProduction, 'checklists', 'main'), updated);
+    await setDoc(doc(db, 'users', getUid()!, 'productions', selectedProduction, 'checklists', 'main'), updated);
   };
 
   const resetList = async (listId: string) => {
-    if (!selectedProduction || !namespace || !confirm('Reset this checklist?')) return;
+    if (!selectedProduction || !getUid() || !confirm('Reset this checklist?')) return;
     const updated = { ...checks, [listId]: {} };
     setChecks(updated);
-    await setDoc(doc(db, 'users', namespace, 'productions', selectedProduction, 'checklists', 'main'), updated);
+    await setDoc(doc(db, 'users', getUid()!, 'productions', selectedProduction, 'checklists', 'main'), updated);
   };
 
   const current = DEFAULT_CHECKLISTS[activeList];

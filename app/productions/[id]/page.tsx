@@ -103,37 +103,37 @@ export default function ProductionDetail({ params }: { params: Promise<{ id: str
   const [gearSearch, setGearSearch] = useState('');
 
   const loadProduction = async () => {
-    if (!namespace) return;
-    const snap = await getDoc(doc(db, 'users', namespace, 'productions', id));
+    if (!getUid()) return;
+    const snap = await getDoc(doc(db, 'users', getUid()!, 'productions', id));
     if (snap.exists()) setProduction({ id: snap.id, ...snap.data() });
     setLoading(false);
   };
 
   const loadAssignments = async () => {
-    if (!namespace) return;
+    if (!getUid()) return;
     const [crewSnap, gearSnap] = await Promise.all([
-      getDocs(collection(db, 'users', namespace, 'productions', id, 'crew')),
-      getDocs(collection(db, 'users', namespace, 'productions', id, 'equipment')),
+      getDocs(collection(db, 'users', getUid()!, 'productions', id, 'crew')),
+      getDocs(collection(db, 'users', getUid()!, 'productions', id, 'equipment')),
     ]);
     setAssignedCrew(crewSnap.docs.map(d => ({ id: d.id, ...d.data() })));
     setAssignedGear(gearSnap.docs.map(d => ({ id: d.id, ...d.data() })));
   };
 
-  useEffect(() => { if (namespace) { loadProduction(); loadAssignments(); } }, [id, namespace]);
+  useEffect(() => { if (getUid()) { loadProduction(); loadAssignments(); } }, [id, namespace]);
 
   const updateStatus = async (status: string) => {
-    if (!namespace) return;
-    await updateDoc(doc(db, 'users', namespace, 'productions', id), { status });
+    if (!getUid()) return;
+    await updateDoc(doc(db, 'users', getUid()!, 'productions', id), { status });
     setProduction((p: any) => ({ ...p, status }));
   };
 
   /* ── Crew assignment ── */
   const addCrew = async (crewId: string) => {
-    if (assignedCrew.find(c => c.crew_id === crewId) || !namespace) return;
+    if (assignedCrew.find(c => c.crew_id === crewId) || !getUid()) return;
     const member = allCrew.find((c: any) => c.id === crewId);
     if (!member) return;
     const token = crypto.randomUUID();
-    await addDoc(collection(db, 'users', namespace, 'productions', id, 'crew'), {
+    await addDoc(collection(db, 'users', getUid()!, 'productions', id, 'crew'), {
       crew_id: crewId,
       name: `${member.name} ${member.last_name}`,
       role: member.role, department: member.department || 'other',
@@ -145,31 +145,31 @@ export default function ProductionDetail({ params }: { params: Promise<{ id: str
   };
 
   const updateCrewCallTime = async (assignId: string, call_time: string) => {
-    if (!namespace) return;
-    await updateDoc(doc(db, 'users', namespace, 'productions', id, 'crew', assignId), { call_time });
+    if (!getUid()) return;
+    await updateDoc(doc(db, 'users', getUid()!, 'productions', id, 'crew', assignId), { call_time });
     setAssignedCrew(prev => prev.map(c => c.id === assignId ? { ...c, call_time } : c));
   };
 
   const removeCrew = async (assignId: string) => {
-    if (!namespace) return;
-    await deleteDoc(doc(db, 'users', namespace, 'productions', id, 'crew', assignId));
+    if (!getUid()) return;
+    await deleteDoc(doc(db, 'users', getUid()!, 'productions', id, 'crew', assignId));
     await loadAssignments();
   };
 
   /* ── Equipment assignment ── */
   const addEquipment = async (itemId: string) => {
-    if (assignedGear.find(g => g.item_id === itemId) || !namespace) return;
+    if (assignedGear.find(g => g.item_id === itemId) || !getUid()) return;
     const item = allInventory.find((i: any) => i.id === itemId);
     if (!item) return;
-    await addDoc(collection(db, 'users', namespace, 'productions', id, 'equipment'), {
+    await addDoc(collection(db, 'users', getUid()!, 'productions', id, 'equipment'), {
       item_id: itemId, name: item.name, brand: item.brand, model: item.model, category: item.category,
     });
     await loadAssignments();
   };
 
   const removeEquipment = async (assignId: string) => {
-    if (!namespace) return;
-    await deleteDoc(doc(db, 'users', namespace, 'productions', id, 'equipment', assignId));
+    if (!getUid()) return;
+    await deleteDoc(doc(db, 'users', getUid()!, 'productions', id, 'equipment', assignId));
     await loadAssignments();
   };
 
@@ -185,7 +185,7 @@ export default function ProductionDetail({ params }: { params: Promise<{ id: str
       shootDates: production?.start_date ? `${production.start_date} → ${production.end_date || ''}` : undefined,
     });
     if (!ok) alert('Email failed — check SENDGRID_API_KEY in .env.local');
-    if (namespace) await updateDoc(doc(db, 'users', namespace, 'productions', id, 'crew', member.id), { email_sent_at: new Date().toISOString() });
+    if (namespace) await updateDoc(doc(db, 'users', getUid()!, 'productions', id, 'crew', member.id), { email_sent_at: new Date().toISOString() });
     await loadAssignments();
     setSending(null);
   };
