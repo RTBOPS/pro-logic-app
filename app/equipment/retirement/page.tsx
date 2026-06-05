@@ -1,0 +1,155 @@
+'use client';
+
+import { useState } from 'react';
+import { collection, addDoc } from 'firebase/firestore';
+import { auth, db } from '@/lib/firebase';
+import { useNamespace } from '@/hooks/useNamespace';
+import { Printer, Save, Loader2 } from 'lucide-react';
+import PageHeader from '@/components/PageHeader';
+
+const RETIREMENT_REASONS = ['End of Useful Life', 'Excessive Repair Cost', 'Obsolete Technology', 'Physical Damage', 'Lost / Stolen', 'Manufacturer Support Ended', 'Other'];
+const DISPOSITION_METHODS = ['Recycled', 'Sold', 'Donated', 'Scrapped', 'Parts Salvaged', 'Destroyed'];
+
+export default function RetirementPage() {
+  const namespace = useNamespace();
+  const getUid = () => namespace || auth.currentUser?.uid || null;
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  const [asset, setAsset] = useState({ assetId: '', equipmentDescription: '', manufacturer: '', model: '', serialNumber: '', purchaseDate: '', purchaseCost: '' });
+  const [reasons, setReasons] = useState<Record<string, boolean>>({});
+  const [evaluationSummary, setEvaluationSummary] = useState('');
+  const [disposition, setDisposition] = useState('');
+  const [operationsManager, setOperationsManager] = useState('');
+  const [technicalDirector, setTechnicalDirector] = useState('');
+
+  const setAsset1 = (k: string, v: string) => setAsset(f => ({ ...f, [k]: v }));
+
+  const save = async () => {
+    const uid = getUid();
+    if (!uid) return;
+    setSaving(true);
+    try {
+      await addDoc(collection(db, 'users', uid, 'equipment_retirement'), {
+        asset, reasons, evaluationSummary, disposition, operationsManager, technicalDirector, createdAt: new Date().toISOString(),
+      });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="p-4 md:p-8 max-w-4xl mx-auto">
+      {saving && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-white/60 backdrop-blur-sm pointer-events-none">
+          <div className="flex flex-col items-center gap-3">
+            <img src="/logo.png" alt="PRO-LOGIC" className="h-8 object-contain animate-pulse" />
+            <Loader2 size={20} className="animate-spin text-gray-700" />
+          </div>
+        </div>
+      )}
+      <div className="no-print">
+        <PageHeader title="Asset Retirement / Disposal" subtitle="ASSET RETIREMENT / DISPOSAL REPORT">
+          <div className="flex gap-2">
+            <button onClick={() => window.print()} className="flex items-center gap-2 border border-gray-200 text-gray-700 px-3 py-2 rounded-xl text-sm hover:bg-gray-50">
+              <Printer size={14} /> Print
+            </button>
+            <button onClick={save} disabled={saving} className="flex items-center gap-2 bg-black text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-zinc-800 disabled:opacity-40">
+              {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+              {saved ? 'Saved!' : 'Save'}
+            </button>
+          </div>
+        </PageHeader>
+      </div>
+
+      <div className="space-y-6 mt-4">
+        {/* Asset Details */}
+        <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+          <h2 className="font-bold text-gray-800 mb-4 text-sm uppercase tracking-wide">Asset Details</h2>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            {[
+              ['Asset ID', 'assetId', 'text'],
+              ['Equipment Description', 'equipmentDescription', 'text'],
+              ['Manufacturer', 'manufacturer', 'text'],
+              ['Model', 'model', 'text'],
+              ['Serial Number', 'serialNumber', 'text'],
+              ['Purchase Date', 'purchaseDate', 'date'],
+              ['Purchase Cost ($)', 'purchaseCost', 'number'],
+            ].map(([label, key, type]) => (
+              <div key={key as string}>
+                <label className="block text-xs font-medium text-gray-500 mb-1">{label}</label>
+                <input type={type as string} value={(asset as any)[key as string]} onChange={e => setAsset1(key as string, e.target.value)}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-black" />
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Retirement Reason */}
+          <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+            <h2 className="font-bold text-gray-800 mb-4 text-sm uppercase tracking-wide">Retirement Reason</h2>
+            <div className="space-y-2">
+              {RETIREMENT_REASONS.map(opt => (
+                <label key={opt} className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                  <input type="checkbox" checked={!!reasons[opt]} onChange={e => setReasons(s => ({ ...s, [opt]: e.target.checked }))}
+                    className="w-4 h-4 rounded border-gray-300" />
+                  {opt}
+                </label>
+              ))}
+            </div>
+          </section>
+
+          {/* Disposition */}
+          <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+            <h2 className="font-bold text-gray-800 mb-4 text-sm uppercase tracking-wide">Disposition Method</h2>
+            <div className="space-y-2">
+              {DISPOSITION_METHODS.map(opt => (
+                <label key={opt} className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                  <input type="radio" name="disposition" checked={disposition === opt} onChange={() => setDisposition(opt)}
+                    className="w-4 h-4" />
+                  {opt}
+                </label>
+              ))}
+            </div>
+          </section>
+        </div>
+
+        {/* Evaluation Summary */}
+        <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+          <h2 className="font-bold text-gray-800 mb-4 text-sm uppercase tracking-wide">Evaluation Summary</h2>
+          <textarea value={evaluationSummary} onChange={e => setEvaluationSummary(e.target.value)} rows={4}
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-black resize-none"
+            placeholder="Summary of condition and reasons for retirement…" />
+        </section>
+
+        {/* Approval */}
+        <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+          <h2 className="font-bold text-gray-800 mb-4 text-sm uppercase tracking-wide">Approval</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Operations Manager</label>
+              <input value={operationsManager} onChange={e => setOperationsManager(e.target.value)}
+                className="w-full border-b-2 border-gray-300 pb-1 text-sm focus:outline-none focus:border-black" placeholder="Name & title" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Technical Director</label>
+              <input value={technicalDirector} onChange={e => setTechnicalDirector(e.target.value)}
+                className="w-full border-b-2 border-gray-300 pb-1 text-sm focus:outline-none focus:border-black" placeholder="Name & title" />
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <style>{`
+        @media print {
+          .no-print { display: none !important; }
+          body > div > aside, body > div > div:first-child { display: none !important; }
+          body { background: white; }
+        }
+      `}</style>
+    </div>
+  );
+}

@@ -192,9 +192,9 @@ export async function generateCallSheet({ production, crew, locations, inventory
 
   // Company logo left
   if (companyLogoWhite) {
-    doc.addImage(companyLogoWhite, 'PNG', 8, 2, 40, 12, undefined, 'FAST');
+    doc.addImage(companyLogoWhite, 'PNG', 8, 3, 26, 10, undefined, 'FAST');
   } else if (companyLogo) {
-    doc.addImage(companyLogo, 'PNG', 8, 2, 40, 12, undefined, 'FAST');
+    doc.addImage(companyLogo, 'PNG', 8, 3, 26, 10, undefined, 'FAST');
   } else if (company?.name) {
     doc.setTextColor(255, 255, 255); bold(doc); doc.setFontSize(10);
     doc.text(company.name, 10, 10);

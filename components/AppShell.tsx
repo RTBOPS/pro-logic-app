@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import Sidebar from './Sidebar';
 import AuthGuard from './AuthGuard';
 import CompanyTheme from './CompanyTheme';
+import { NamespaceProvider } from './NamespaceProvider';
 import { useCompany } from '@/hooks/useCompany';
 import { Menu, X } from 'lucide-react';
 
@@ -22,6 +23,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   if (isPublic) return <>{children}</>;
 
   return (
+    <NamespaceProvider>
     <AuthGuard>
       <CompanyTheme />
       {/* Mobile header bar */}
@@ -62,5 +64,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         {children}
       </main>
     </AuthGuard>
+    </NamespaceProvider>
   );
 }

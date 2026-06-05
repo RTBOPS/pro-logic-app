@@ -6,7 +6,7 @@ import {
   Film, Users, Package, MapPin, LayoutDashboard,
   BookImage, FileText, CreditCard, LogOut, User,
   Layout, Clapperboard, CheckSquare, CalendarDays,
-  Truck, Building2, IdCard, UserCheck, Layers,
+  Truck, Building2, IdCard, UserCheck, Layers, ClipboardCheck,
 } from 'lucide-react';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
@@ -30,6 +30,7 @@ const nav = [
   { href: '/character-breakdown', label: 'Characters', icon: UserCheck },
   { section: 'Assets' },
   { href: '/inventory', label: 'Inventory', icon: Package },
+  { href: '/equipment', label: 'Equipment Forms', icon: ClipboardCheck },
   { href: '/transportation', label: 'Transportation', icon: Truck },
   { href: '/locations', label: 'Locations', icon: MapPin },
   { section: 'Tools' },

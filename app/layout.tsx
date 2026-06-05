@@ -8,11 +8,6 @@ const geist = Geist({ subsets: ['latin'], variable: '--font-geist-sans' });
 export const metadata: Metadata = {
   title: 'PRO-LOGIC Studio',
   description: 'Production management for Pro-Logic Studio',
-  icons: {
-    icon: '/favicon.png',
-    shortcut: '/favicon.png',
-    apple: '/favicon.png',
-  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

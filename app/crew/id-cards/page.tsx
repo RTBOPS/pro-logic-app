@@ -107,6 +107,14 @@ function IDCard({ c, company, orientation, productionName }: { c: any; company: 
   );
 }
 
+const AVERY_PRESETS = [
+  { id: 'free',   label: 'Free flow',      perRow: 0,  cardW: '',      gap: '5mm',  pageMargin: '5mm' },
+  { id: '5385',   label: 'Avery 5385 (3×4")',  perRow: 2,  cardW: '85.6mm', gap: '6mm',  pageMargin: '6mm' },
+  { id: '5392',   label: 'Avery 5392 (2×3½")', perRow: 2,  cardW: '88.9mm', gap: '6mm',  pageMargin: '6mm' },
+  { id: '74549',  label: 'Avery 74549 (2½×4")',perRow: 2,  cardW: '101.6mm',gap: '6mm',  pageMargin: '6mm' },
+  { id: '5360',   label: 'Avery 5360 (2×3¼")', perRow: 3,  cardW: '82.5mm', gap: '4mm',  pageMargin: '6mm' },
+];
+
 export default function IDCardsPage() {
   const namespace = useNamespace();
   const { data: allCrew } = useData('crew');
@@ -115,9 +123,11 @@ export default function IDCardsPage() {
   const [filterDept, setFilterDept] = useState('');
   const [selectedProd, setSelectedProd] = useState('');
   const [orientation, setOrientation] = useState<'horizontal' | 'vertical'>('horizontal');
-  const [prodCrew, setProdCrew] = useState<string[]>([]); // crew IDs assigned to production
+  const [avery, setAvery] = useState('free');
+  const [prodCrew, setProdCrew] = useState<string[]>([]);
   const [loadingProd, setLoadingProd] = useState(false);
   const getUid = () => namespace || auth.currentUser?.uid || null;
+  const averyPreset = AVERY_PRESETS.find(p => p.id === avery) || AVERY_PRESETS[0];
 
   // Load crew assigned to selected production
   useEffect(() => {
@@ -164,6 +174,14 @@ export default function IDCardsPage() {
               <IdCard size={13} /> Vertical
             </button>
           </div>
+          <select
+            value={avery}
+            onChange={e => setAvery(e.target.value)}
+            className="border border-gray-200 rounded-xl px-3 py-2 text-xs text-gray-700"
+            title="Avery paper preset"
+          >
+            {AVERY_PRESETS.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
+          </select>
           <button onClick={() => window.print()}
             className="flex items-center gap-2 bg-black text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-zinc-800">
             <Printer size={14} /> Print All
@@ -195,7 +213,14 @@ export default function IDCardsPage() {
         @media print {
           .no-print { display: none !important; }
           body > div > aside, body > div > div:first-child { display: none !important; }
-          .id-card-grid { display: flex; flex-wrap: wrap; gap: 5mm; padding: 5mm; }
+          .id-card-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: ${averyPreset.gap};
+            padding: ${averyPreset.pageMargin};
+            ${averyPreset.perRow > 0 ? `width: calc(${averyPreset.perRow} * ${averyPreset.cardW} + ${averyPreset.perRow - 1} * ${averyPreset.gap} + 2 * ${averyPreset.pageMargin});` : ''}
+          }
+          ${averyPreset.cardW ? `.id-card { width: ${averyPreset.cardW} !important; flex-shrink: 0; }` : ''}
           .id-card { box-shadow: none !important; border: 1px solid #ccc !important; }
           body { background: white; }
         }

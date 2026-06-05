@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { useData } from '@/hooks/useData';
-import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
-import { Plus, Trash2, CheckCircle, Circle, Printer } from 'lucide-react';
+import { Plus, Trash2, CheckCircle, Circle, Printer, Loader2 } from 'lucide-react';
 import { useNamespace } from '@/hooks/useNamespace';
 
 interface TakeEntry {
@@ -19,7 +19,7 @@ interface TakeEntry {
   shutter: string;
   fps: string;
   sound_roll: string;
-  selected: boolean; // circle / X system
+  selected: boolean;
   notes: string;
   timestamp: string;
 }
@@ -38,10 +38,11 @@ export default function ShootLogPage() {
   const [takes, setTakes] = useState<TakeEntry[]>([]);
   const [form, setForm] = useState(empty);
   const [sceneFilter, setSceneFilter] = useState('');
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!selectedProduction || !namespace) return;
-    const q = query(collection(db, 'users', getUid()!, 'productions', selectedProduction, 'takes'));
+    const q = collection(db, 'users', getUid()!, 'productions', selectedProduction, 'takes');
     return onSnapshot(q, snap => {
       setTakes(snap.docs.map(d => ({ id: d.id, ...d.data() } as TakeEntry))
         .sort((a, b) => a.scene.localeCompare(b.scene) || a.shot.localeCompare(b.shot) || a.take - b.take));
@@ -49,23 +50,31 @@ export default function ShootLogPage() {
   }, [selectedProduction, namespace]);
 
   const addTake = async () => {
-    if (!selectedProduction || !form.scene || !getUid()) return;
-    await addDoc(collection(db, 'users', getUid()!, 'productions', selectedProduction, 'takes'), {
-      ...form,
-      timestamp: new Date().toISOString(),
-    });
-    const sameTakes = takes.filter(t => t.scene === form.scene && t.shot === form.shot);
-    setForm(f => ({ ...f, take: sameTakes.length + 2 }));
+    const uid = getUid();
+    if (!selectedProduction || !form.scene || !uid) return;
+    setSaving(true);
+    try {
+      await addDoc(collection(db, 'users', uid, 'productions', selectedProduction, 'takes'), {
+        ...form,
+        timestamp: new Date().toISOString(),
+      });
+      const sameTakes = takes.filter(t => t.scene === form.scene && t.shot === form.shot);
+      setForm(f => ({ ...f, take: sameTakes.length + 2 }));
+    } finally {
+      setSaving(false);
+    }
   };
 
   const toggleSelected = async (t: TakeEntry) => {
-    if (!getUid()) return;
-    await updateDoc(doc(db, 'users', getUid()!, 'productions', selectedProduction, 'takes', t.id), { selected: !t.selected });
+    const uid = getUid();
+    if (!uid) return;
+    await updateDoc(doc(db, 'users', uid, 'productions', selectedProduction, 'takes', t.id), { selected: !t.selected });
   };
 
   const removeTake = async (id: string) => {
-    if (!getUid()) return;
-    await deleteDoc(doc(db, 'users', getUid()!, 'productions', selectedProduction, 'takes', id));
+    const uid = getUid();
+    if (!uid) return;
+    await deleteDoc(doc(db, 'users', uid, 'productions', selectedProduction, 'takes', id));
   };
 
   const scenes = [...new Set(takes.map(t => t.scene))].sort();
@@ -73,6 +82,15 @@ export default function ShootLogPage() {
 
   return (
     <div className="p-4 md:p-8">
+      {saving && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-white/60 backdrop-blur-sm pointer-events-none">
+          <div className="flex flex-col items-center gap-3">
+            <img src="/logo.png" alt="PRO-LOGIC" className="h-8 object-contain animate-pulse" />
+            <Loader2 size={20} className="animate-spin text-gray-700" />
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Shoot Log</h1>
@@ -106,16 +124,16 @@ export default function ShootLogPage() {
             <h2 className="font-semibold text-gray-800 mb-4 text-sm">Log New Take</h2>
             <div className="grid grid-cols-6 gap-3">
               {[
-                ['Scene', 'scene', '1', 'text', '1'],
-                ['Shot', 'shot', 'A', 'text', '1'],
-                ['Take #', 'take', '1', 'number', '1'],
-                ['Lens', 'lens', '50mm', 'text', '1'],
-                ['FPS', 'fps', '24', 'text', '1'],
-                ['Aperture', 'aperture', 'T2.8', 'text', '1'],
-                ['ISO', 'iso', '800', 'text', '1'],
-                ['Shutter', 'shutter', '1/50', 'text', '1'],
-                ['Sound Roll', 'sound_roll', 'SR-01', 'text', '1'],
-              ].map(([label, key, placeholder, type, colSpan]) => (
+                ['Scene', 'scene', '1', 'text'],
+                ['Shot', 'shot', 'A', 'text'],
+                ['Take #', 'take', '1', 'number'],
+                ['Lens', 'lens', '50mm', 'text'],
+                ['FPS', 'fps', '24', 'text'],
+                ['Aperture', 'aperture', 'T2.8', 'text'],
+                ['ISO', 'iso', '800', 'text'],
+                ['Shutter', 'shutter', '1/50', 'text'],
+                ['Sound Roll', 'sound_roll', 'SR-01', 'text'],
+              ].map(([label, key, placeholder, type]) => (
                 <div key={key as string}>
                   <label className="block text-xs font-medium text-gray-500 mb-1">{label}</label>
                   <input
@@ -148,10 +166,11 @@ export default function ShootLogPage() {
               <div className="flex items-end">
                 <button
                   onClick={addTake}
-                  disabled={!form.scene}
+                  disabled={!form.scene || saving}
                   className="w-full flex items-center justify-center gap-1.5 bg-black text-white py-1.5 rounded-lg text-sm font-medium disabled:opacity-40 hover:bg-zinc-800"
                 >
-                  <Plus size={14} /> Log
+                  {saving ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+                  {saving ? 'Saving…' : 'Log'}
                 </button>
               </div>
             </div>
