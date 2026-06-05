@@ -1,7 +1,9 @@
 import { jsPDF } from 'jspdf';
 import { PDFContext, header, sectionTitle, save } from './base';
 
-export async function generateCharacterBreakdown({ production, characters: chars = [], preview }: PDFContext) {
+export async function generateCharacterBreakdown(ctx: PDFContext) {
+  const { production, preview } = ctx;
+  const chars = ctx.characters ?? [];
   const doc = new jsPDF({ unit: 'mm', format: 'letter' });
   const pageW = doc.internal.pageSize.getWidth();
 
