@@ -17,20 +17,24 @@ export function createDoc(orientation: 'p' | 'l' = 'p'): jsPDF {
   return new jsPDF({ orientation, unit: 'mm', format: 'letter' });
 }
 
-export function header(doc: jsPDF, title: string, production: any) {
+export function header(doc: jsPDF, title: string, production: any, company?: any) {
   const pageW = doc.internal.pageSize.getWidth();
-  doc.setFillColor(20, 20, 20);
+  const brandHex = company?.primary_color || '#141414';
+  const r = parseInt(brandHex.slice(1,3),16)||20;
+  const g = parseInt(brandHex.slice(3,5),16)||20;
+  const b = parseInt(brandHex.slice(5,7),16)||20;
+  doc.setFillColor(r, g, b);
   doc.rect(0, 0, pageW, 18, 'F');
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(11);
   doc.setFont('helvetica', 'bold');
-  doc.text('PRO-LOGIC STUDIO', 10, 8);
+  doc.text(company?.name || 'PRO-LOGIC STUDIO', 10, 8);
   doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
   doc.text(title.toUpperCase(), 10, 14);
   doc.setFontSize(9);
   doc.text(production.name, pageW - 10, 8, { align: 'right' });
-  doc.text(`Client: ${production.client}`, pageW - 10, 14, { align: 'right' });
+  doc.text(`Client: ${production.client || ''}`, pageW - 10, 14, { align: 'right' });
   doc.setTextColor(0, 0, 0);
 }
 

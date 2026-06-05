@@ -1,53 +1,97 @@
 import { jsPDF } from 'jspdf';
-import { PDFContext, header, sectionTitle, tableRow, save } from './base';
+import { PDFContext, header, save } from './base';
 
-export async function generateShotList({ production, crew, locations, preview }: PDFContext) {
+export async function generateShotList({ production, crew, locations, stripboardScenes = [], preview }: PDFContext) {
   const doc = new jsPDF({ unit: 'mm', format: 'letter', orientation: 'l' });
   const pageW = doc.internal.pageSize.getWidth();
 
   header(doc, 'Shot List', production);
   let y = 26;
 
-  // Info bar
-  doc.setFontSize(8);
-  doc.setFont('helvetica', 'normal');
-  const loc = locations[0];
-  doc.text(`Location: ${loc?.name || 'TBD'}  |  DP: ${crew.find((c: any) => c.role?.toLowerCase().includes('dp') || c.role?.toLowerCase().includes('director of photography'))?.name || 'TBD'}  |  Director: ${crew.find((c: any) => c.role?.toLowerCase().includes('director'))?.name || 'TBD'}`, 10, y);
-  y += 8;
+  const dp = crew.find((c: any) => /dp|director of photography/i.test(c.role || ''));
+  const director = crew.find((c: any) => /^director$/i.test(c.role || ''));
+  const loc = locations.find((l: any) => l.id === production.location_id) || locations[0];
 
-  y = sectionTitle(doc, 'Shot List', y);
+  doc.setFontSize(8); doc.setFont('helvetica', 'normal');
+  doc.text(
+    `Location: ${loc?.name || 'TBD'}  |  DP: ${dp ? `${dp.name} ${dp.last_name}` : 'TBD'}  |  Director: ${director ? `${director.name} ${director.last_name}` : production.director || 'TBD'}  |  Date: ${production.start_date || '—'}`,
+    10, y
+  );
+  y += 10;
 
-  const cols = ['#', 'Scene', 'Shot', 'Size', 'Angle', 'Movement', 'Lens', 'Description', 'Audio', 'VFX', 'Est. Time', 'Notes'];
-  const widths = [8, 15, 15, 15, 15, 20, 15, 55, 18, 12, 18, pageW - 10 - 8 - 15 - 15 - 15 - 15 - 20 - 15 - 55 - 18 - 12 - 18];
+  const cols = ['#', 'Scene', 'Shot', 'Size', 'Angle', 'Movement', 'Lens', 'Description', 'Audio', 'Est.', 'Notes'];
+  const colW =   [8,   14,     14,     14,     14,      20,          14,     55,              16,      16,    pageW - 10 - 8 - 14*5 - 20 - 55 - 16 - 16];
 
-  y = tableRow(doc, cols, widths, y, 10, true);
+  // Header row
+  doc.setFillColor(30, 30, 30);
+  doc.rect(10, y - 5, colW.reduce((a, b) => a + b, 0), 7, 'F');
+  doc.setTextColor(255, 255, 255); doc.setFontSize(7.5); doc.setFont('helvetica', 'bold');
+  let hx = 12;
+  cols.forEach((c, i) => { doc.text(c, hx, y); hx += colW[i]; });
+  doc.setTextColor(0, 0, 0); y += 4;
 
-  // Sample rows (in production, these would come from a shots collection)
-  const sampleShots = [
-    ['1', '1', 'A', 'WS', 'EYE', 'STATIC', '24mm', 'Establishing shot of location', 'NAT', '—', '0:30', ''],
-    ['2', '1', 'B', 'MS', 'EYE', 'DOLLY IN', '50mm', 'Character enters frame', 'SYNC', '—', '0:45', 'Steady'],
-    ['3', '1', 'C', 'CU', 'LOW', 'STATIC', '85mm', 'Reaction shot', 'SYNC', '—', '0:20', ''],
-    ['4', '2', 'A', 'WS', 'HIGH', 'CRANE UP', '24mm', 'Scene overview', 'NAT', 'YES', '1:00', 'VFX sky'],
-    ['5', '2', 'B', 'OTS', 'EYE', 'STATIC', '50mm', 'Over the shoulder dialog', 'SYNC', '—', '1:30', 'Alt takes'],
-    ['6', '2', 'C', 'ECU', 'EYE', 'PUSH IN', '100mm', 'Extreme close-up detail', 'NAT', '—', '0:25', ''],
-    ['7', '3', 'A', 'MS', 'EYE', 'TRACK', '35mm', 'Walking shot', 'SYNC', '—', '0:50', 'Gimbal'],
-    ['8', '3', 'B', 'CU', 'EYE', 'STATIC', '85mm', 'Dialog close-up', 'SYNC', '—', '2:00', 'Coverage'],
-    ['9', '3', 'C', 'POV', 'EYE', 'HANDHELD', '35mm', 'Character POV', 'SYNC', '—', '0:40', ''],
-    ['10', '4', 'A', 'DRONE', 'HIGH', 'FLY-IN', 'DRONE', 'Aerial establishing', 'NAT', '—', '1:00', 'FAA permit'],
-    ['11', '4', 'B', 'WS', 'EYE', 'STATIC', '24mm', 'Wide coverage', 'NAT', '—', '0:30', ''],
-    ['12', '5', 'A', 'MS', 'EYE', 'STATIC', '50mm', 'Interview setup', 'LAVALIER', '—', '5:00', 'B-roll needed'],
-  ];
+  const scenes = [...stripboardScenes].sort((a, b) => {
+    const d = (Number(a.shoot_day) || 0) - (Number(b.shoot_day) || 0);
+    return d !== 0 ? d : String(a.scene_number).localeCompare(String(b.scene_number));
+  });
 
-  sampleShots.forEach((row, i) => {
-    y = tableRow(doc, row, widths, y, 10, false, i % 2 === 1);
+  if (scenes.length === 0) {
+    doc.setFontSize(9); doc.setFont('helvetica', 'normal');
+    doc.text('No scenes in stripboard yet. Add scenes to the Stripboard to populate this Shot List.', 14, y + 8);
+    return save(doc, `shot-list-${(production.name || 'production').replace(/\s+/g, '-').toLowerCase()}.pdf`, preview);
+  }
+
+  let rowNum = 1;
+  let currentDay = '';
+
+  scenes.forEach(scene => {
+    if (y > 185) { doc.addPage(); y = 20; }
+
+    // Day break header
+    if (scene.shoot_day && scene.shoot_day !== currentDay) {
+      currentDay = scene.shoot_day;
+      doc.setFillColor(50, 50, 50);
+      doc.rect(10, y, colW.reduce((a, b) => a + b, 0), 5, 'F');
+      doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5);
+      doc.text(`SHOOT DAY ${scene.shoot_day}`, 12, y + 3.5);
+      doc.setTextColor(0, 0, 0); y += 5;
+    }
+
+    const rowH = 6;
+    if (rowNum % 2 === 0) { doc.setFillColor(248, 248, 248); doc.rect(10, y, colW.reduce((a, b) => a + b, 0), rowH, 'F'); }
+    doc.setDrawColor(220, 220, 220); doc.rect(10, y, colW.reduce((a, b) => a + b, 0), rowH);
+    doc.setDrawColor(0);
+
+    const vals = [
+      String(rowNum),
+      scene.scene_number || '',
+      'A',
+      scene.int_ext?.includes('EXT') ? 'WS' : 'MS',
+      'EYE',
+      'STATIC',
+      '—',
+      scene.description || '',
+      'SYNC',
+      scene.estimated_hours ? `${scene.estimated_hours}h` : '—',
+      scene.notes || '',
+    ];
+
+    doc.setFontSize(7); doc.setFont('helvetica', 'normal');
+    let sx = 12;
+    vals.forEach((val, vi) => {
+      const truncated = doc.splitTextToSize(String(val), colW[vi] - 2)[0] || '';
+      doc.text(truncated, sx, y + 4);
+      sx += colW[vi];
+    });
+
+    rowNum++;
+    y += rowH;
     if (y > 185) { doc.addPage(); y = 20; }
   });
 
-  // Add blank rows for manual entry
-  for (let i = 0; i < 8; i++) {
-    y = tableRow(doc, Array(cols.length).fill(''), widths, y, 10, false, false);
-    if (y > 185) { doc.addPage(); y = 20; }
-  }
+  y += 8;
+  doc.setFontSize(8); doc.setFont('helvetica', 'bold');
+  doc.text(`Total Shots: ${rowNum - 1}  |  Scenes: ${scenes.length}  |  Production: ${production.name}`, 10, y);
 
-  return save(doc, `shot-list-${production.name.replace(/\s+/g, '-').toLowerCase()}.pdf`, preview);
+  return save(doc, `shot-list-${(production.name || 'production').replace(/\s+/g, '-').toLowerCase()}.pdf`, preview);
 }

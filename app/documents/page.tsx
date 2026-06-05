@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useData } from '@/hooks/useData';
-import { doc, getDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { doc, getDoc, getDocs, collection } from 'firebase/firestore';
+import { auth, db } from '@/lib/firebase';
 import {
   FileText, Users, MapPin, Film, Shield, UserCheck,
   ClipboardList, Printer, Eye, Download, X
@@ -30,18 +30,22 @@ const DOCS = [
 
 export default function DocumentsPage() {
   const namespace = useNamespace();
+  const getUid = () => namespace || auth.currentUser?.uid || null;
   const { data: productions } = useData('productions');
   const { data: crew } = useData('crew');
   const { data: locations } = useData('locations');
   const { data: inventory } = useData('inventory');
+  const { data: stripboardScenes } = useData('stripboard');
+  const { data: characters } = useData('characters');
   const [selectedProduction, setSelectedProduction] = useState('');
   const [generating, setGenerating] = useState<string | null>(null);
   const [preview, setPreview] = useState<{ title: string; dataUri: string; docItem: typeof DOCS[0] } | null>(null);
   const [company, setCompany] = useState<any>(null);
 
   useEffect(() => {
-    if (!namespace) return;
-    getDoc(doc(db, 'users', namespace, 'company', 'profile')).then(s => { if (s.exists()) setCompany(s.data()); });
+    const uid = getUid();
+    if (!uid) return;
+    getDoc(doc(db, 'users', uid, 'company', 'profile')).then(s => { if (s.exists()) setCompany(s.data()); });
   }, [namespace]);
 
   const getContext = async (includeWeather = false) => {
@@ -71,7 +75,7 @@ export default function DocumentsPage() {
       try {
         const { getDocs, collection } = await import('firebase/firestore');
         const { db } = await import('@/lib/firebase');
-        const snap = await getDocs(collection(db, 'users', namespace!, 'productions', selectedProduction, 'crew'));
+        const snap = await getDocs(collection(db, 'users', getUid()!, 'productions', selectedProduction, 'crew'));
         const assignments = snap.docs.reduce((acc: any, d) => {
           const data = d.data() as any;
           if (data.crew_id) acc[data.crew_id] = data;
@@ -84,7 +88,10 @@ export default function DocumentsPage() {
         }));
       } catch {}
     }
-    return { production, crew: crewWithTimes, locations, inventory, weather, forecast, company };
+    // Filter stripboard scenes and characters to this production
+    const prodStrips = stripboardScenes.filter((s: any) => !s.production_id || s.production_id === selectedProduction);
+    const prodChars = characters.filter((c: any) => !c.production_id || c.production_id === selectedProduction);
+    return { production, crew: crewWithTimes, locations, inventory, weather, forecast, company, stripboardScenes: prodStrips, characters: prodChars };
   };
 
   const handlePreview = async (docItem: typeof DOCS[0]) => {

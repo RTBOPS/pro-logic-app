@@ -1,113 +1,125 @@
 import { jsPDF } from 'jspdf';
 import { PDFContext, header, save } from './base';
 
-const STRIP_COLORS: Record<string, [number, number, number]> = {
-  day: [255, 255, 200],
-  night: [200, 220, 255],
-  dawn: [255, 220, 180],
-  dusk: [255, 200, 220],
-  int: [240, 255, 240],
-  ext: [220, 240, 255],
+const CATEGORY_COLORS: Record<string, [number, number, number]> = {
+  action:    [255, 255, 200],
+  dialogue:  [200, 230, 255],
+  montage:   [220, 255, 220],
+  transition:[255, 220, 180],
+  vfx:       [240, 200, 255],
+  insert:    [255, 240, 200],
+  default:   [245, 245, 245],
 };
 
-export async function generateStripboard({ production, locations, crew, preview }: PDFContext) {
+const DN_COLORS: Record<string, [number, number, number]> = {
+  DAY:   [255, 255, 200],
+  NIGHT: [200, 220, 255],
+  DAWN:  [255, 220, 180],
+  DUSK:  [255, 200, 220],
+};
+
+export async function generateStripboard({ production, locations, crew, stripboardScenes = [], preview }: PDFContext) {
   const doc = new jsPDF({ unit: 'mm', format: 'letter', orientation: 'l' });
   const pageW = doc.internal.pageSize.getWidth();
 
   header(doc, 'Stripboard', production);
   let y = 26;
 
+  if (stripboardScenes.length === 0) {
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text('No scenes added yet. Add scenes in the Stripboard section before generating this PDF.', 14, y + 10);
+    return save(doc, `stripboard-${(production.name || 'production').replace(/\s+/g, '-').toLowerCase()}.pdf`, preview);
+  }
+
+  // Sort by shoot_day then scene_number
+  const scenes = [...stripboardScenes].sort((a, b) => {
+    const dayDiff = (Number(a.shoot_day) || 0) - (Number(b.shoot_day) || 0);
+    if (dayDiff !== 0) return dayDiff;
+    return String(a.scene_number).localeCompare(String(b.scene_number));
+  });
+
   // Legend
-  doc.setFontSize(8);
-  doc.setFont('helvetica', 'bold');
-  doc.text('LEGEND:', 10, y);
-  const legend = [
-    ['DAY / EXT', STRIP_COLORS.day],
-    ['NIGHT / INT', STRIP_COLORS.night],
-    ['DAWN/DUSK', STRIP_COLORS.dawn],
-    ['INT', STRIP_COLORS.int],
-  ] as [string, [number, number, number]][];
+  doc.setFontSize(7.5); doc.setFont('helvetica', 'bold');
+  doc.text('COLOR KEY:', 10, y);
   let lx = 35;
-  legend.forEach(([label, color]) => {
+  Object.entries(DN_COLORS).slice(0,4).forEach(([label, color]) => {
     doc.setFillColor(...color);
     doc.rect(lx, y - 4, 5, 5, 'F');
-    doc.setDrawColor(180, 180, 180);
-    doc.rect(lx, y - 4, 5, 5);
-    doc.setFont('helvetica', 'normal');
-    doc.text(label, lx + 6, y);
-    lx += 35;
+    doc.setDrawColor(180, 180, 180); doc.rect(lx, y - 4, 5, 5);
+    doc.setFont('helvetica', 'normal'); doc.text(label, lx + 6, y);
+    lx += 28;
   });
-  y += 8;
+  doc.setDrawColor(0); y += 8;
 
   // Column headers
-  const cols = ['SCENE', 'INT/EXT', 'D/N', 'PAGES', 'SET / LOCATION', 'CHARACTERS', 'BRIEF DESCRIPTION', 'SHOOT DAY', 'NOTES'];
-  const colW = [18, 15, 12, 14, 45, 40, 60, 18, pageW - 10 - 18 - 15 - 12 - 14 - 45 - 40 - 60 - 18];
+  const cols = ['SCENE', 'INT/EXT', 'D/N', 'PAGES', 'SET / LOCATION', 'CAST', 'DESCRIPTION', 'DAY', 'STATUS', 'NOTES'];
+  const colW = [16, 14, 12, 13, 42, 38, 55, 12, 20, pageW - 10 - 16 - 14 - 12 - 13 - 42 - 38 - 55 - 12 - 20];
 
   doc.setFillColor(30, 30, 30);
   doc.rect(10, y - 5, colW.reduce((a, b) => a + b, 0), 7, 'F');
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(8);
-  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(255, 255, 255); doc.setFontSize(7); doc.setFont('helvetica', 'bold');
   let hx = 12;
-  cols.forEach((col, i) => {
-    doc.text(col, hx, y);
-    hx += colW[i];
-  });
-  doc.setTextColor(0, 0, 0);
-  y += 4;
+  cols.forEach((col, i) => { doc.text(col, hx, y); hx += colW[i]; });
+  doc.setTextColor(0, 0, 0); y += 4;
 
-  // Sample scene strips
-  const scenes = [
-    { scene: '1', ie: 'EXT', dn: 'DAY', pages: '1', set: locations[0]?.name || 'Location TBD', chars: crew.slice(0, 2).map((c: any) => c.name).join(', ') || 'TBD', desc: 'Opening establishing shot', day: '1', notes: '', color: STRIP_COLORS.day },
-    { scene: '2', ie: 'INT', dn: 'DAY', pages: '2/8', set: 'Studio A', chars: crew.slice(0, 3).map((c: any) => c.name).join(', ') || 'TBD', desc: 'Main dialogue scene', day: '1', notes: 'Coverage needed', color: STRIP_COLORS.int },
-    { scene: '3', ie: 'EXT', dn: 'NIGHT', pages: '1', set: locations[0]?.name || 'Location TBD', chars: crew.slice(1, 3).map((c: any) => c.name).join(', ') || 'TBD', desc: 'Night exterior', day: '2', notes: '', color: STRIP_COLORS.night },
-    { scene: '4', ie: 'INT', dn: 'NIGHT', pages: '3/8', set: 'Interior set', chars: crew.slice(0, 4).map((c: any) => c.name).join(', ') || 'TBD', desc: 'Night scene interior', day: '2', notes: 'Low key lighting', color: STRIP_COLORS.night },
-    { scene: '5', ie: 'EXT', dn: 'DAY', pages: '1 2/8', set: locations[1]?.name || 'Location 2 TBD', chars: crew.slice(0, 2).map((c: any) => c.name).join(', ') || 'TBD', desc: 'B-roll package', day: '3', notes: 'Drone shots', color: STRIP_COLORS.day },
-    { scene: '6', ie: 'INT', dn: 'DAY', pages: '2', set: 'Interview setup', chars: crew.slice(0, 1).map((c: any) => c.name).join(', ') || 'TBD', desc: 'Interview / testimonial', day: '3', notes: 'Lavalier + boom', color: STRIP_COLORS.int },
-    { scene: '7', ie: 'EXT', dn: 'DUSK', pages: '4/8', set: locations[0]?.name || 'Location TBD', chars: crew.slice(0, 3).map((c: any) => c.name).join(', ') || 'TBD', desc: 'Golden hour shots', day: '4', notes: 'Weather dependent', color: STRIP_COLORS.dawn },
-    { scene: '8', ie: 'INT', dn: 'DAY', pages: '1', set: 'Studio B', chars: 'All', desc: 'Group scene', day: '4', notes: 'Full cast', color: STRIP_COLORS.int },
-  ];
-
-  // Day break tracker
   let currentDay = '';
-  scenes.forEach((scene, i) => {
-    if (scene.day !== currentDay) {
-      currentDay = scene.day;
+  let totalPages = 0;
+
+  scenes.forEach(scene => {
+    if (y > 185) { doc.addPage(); y = 20; }
+
+    if (scene.shoot_day && scene.shoot_day !== currentDay) {
+      currentDay = scene.shoot_day;
       doc.setFillColor(50, 50, 50);
       doc.rect(10, y, colW.reduce((a, b) => a + b, 0), 5, 'F');
-      doc.setTextColor(255, 255, 255);
-      doc.setFontSize(8);
-      doc.setFont('helvetica', 'bold');
-      doc.text(`SHOOT DAY ${scene.day}`, 12, y + 3.5);
-      doc.setTextColor(0, 0, 0);
-      y += 5;
+      doc.setTextColor(255, 255, 255); doc.setFontSize(8); doc.setFont('helvetica', 'bold');
+      doc.text(`SHOOT DAY ${scene.shoot_day}`, 12, y + 3.5);
+      doc.setTextColor(0, 0, 0); y += 5;
     }
 
-    doc.setFillColor(...scene.color);
+    const dn = (scene.day_night || 'DAY').toUpperCase();
+    const color: [number, number, number] = DN_COLORS[dn] || CATEGORY_COLORS[scene.category] || CATEGORY_COLORS.default;
     const stripH = 6;
+
+    doc.setFillColor(...color);
     doc.rect(10, y, colW.reduce((a, b) => a + b, 0), stripH, 'F');
     doc.setDrawColor(200, 200, 200);
     doc.rect(10, y, colW.reduce((a, b) => a + b, 0), stripH);
 
-    doc.setFontSize(7.5);
-    doc.setFont('helvetica', 'normal');
-    const vals = [scene.scene, scene.ie, scene.dn, scene.pages, scene.set, scene.chars, scene.desc, scene.day, scene.notes];
+    const locName = locations.find((l: any) => l.id === scene.location)?.name || scene.set_name || scene.location || '';
+    const vals = [
+      scene.scene_number || '',
+      scene.int_ext || '',
+      dn,
+      scene.pages || '',
+      locName,
+      scene.cast_ids || '',
+      scene.description || '',
+      scene.shoot_day || '',
+      scene.status || '',
+      scene.notes || '',
+    ];
+
+    doc.setFontSize(7.5); doc.setFont('helvetica', 'normal');
     let sx = 12;
     vals.forEach((val, vi) => {
       const maxW = colW[vi] - 3;
-      const truncated = doc.splitTextToSize(val, maxW)[0] || '';
+      const truncated = doc.splitTextToSize(String(val), maxW)[0] || '';
       doc.text(truncated, sx, y + 4);
       sx += colW[vi];
     });
+
+    const p = parseFloat(scene.pages) || 0;
+    totalPages += p;
     y += stripH;
     if (y > 185) { doc.addPage(); y = 20; }
   });
 
-  // Summary
   y += 8;
-  doc.setFontSize(9);
-  doc.setFont('helvetica', 'bold');
-  doc.text(`Total Scenes: ${scenes.length}  |  Total Shoot Days: 4  |  Production: ${production.name}`, 10, y);
+  doc.setFontSize(9); doc.setFont('helvetica', 'bold');
+  const days = [...new Set(scenes.map(s => s.shoot_day).filter(Boolean))].length;
+  doc.text(`Total Scenes: ${scenes.length}  |  Shoot Days: ${days || '—'}  |  Total Pages: ${totalPages.toFixed(1)}  |  Production: ${production.name}`, 10, y);
 
-  return save(doc, `stripboard-${production.name.replace(/\s+/g, '-').toLowerCase()}.pdf`, preview);
+  return save(doc, `stripboard-${(production.name || 'production').replace(/\s+/g, '-').toLowerCase()}.pdf`, preview);
 }
