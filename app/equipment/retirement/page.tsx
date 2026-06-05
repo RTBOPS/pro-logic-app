@@ -6,6 +6,7 @@ import { auth, db } from '@/lib/firebase';
 import { useNamespace } from '@/hooks/useNamespace';
 import { Printer, Save, Loader2 } from 'lucide-react';
 import PageHeader from '@/components/PageHeader';
+import SignaturePad from '@/components/SignaturePad';
 
 const RETIREMENT_REASONS = ['End of Useful Life', 'Excessive Repair Cost', 'Obsolete Technology', 'Physical Damage', 'Lost / Stolen', 'Manufacturer Support Ended', 'Other'];
 const DISPOSITION_METHODS = ['Recycled', 'Sold', 'Donated', 'Scrapped', 'Parts Salvaged', 'Destroyed'];
@@ -21,7 +22,9 @@ export default function RetirementPage() {
   const [evaluationSummary, setEvaluationSummary] = useState('');
   const [disposition, setDisposition] = useState('');
   const [operationsManager, setOperationsManager] = useState('');
+  const [operationsManagerSig, setOperationsManagerSig] = useState('');
   const [technicalDirector, setTechnicalDirector] = useState('');
+  const [technicalDirectorSig, setTechnicalDirectorSig] = useState('');
 
   const setAsset1 = (k: string, v: string) => setAsset(f => ({ ...f, [k]: v }));
 
@@ -31,7 +34,7 @@ export default function RetirementPage() {
     setSaving(true);
     try {
       await addDoc(collection(db, 'users', uid, 'equipment_retirement'), {
-        asset, reasons, evaluationSummary, disposition, operationsManager, technicalDirector, createdAt: new Date().toISOString(),
+        asset, reasons, evaluationSummary, disposition, operationsManager, operationsManagerSig, technicalDirector, technicalDirectorSig, createdAt: new Date().toISOString(),
       });
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
@@ -43,10 +46,14 @@ export default function RetirementPage() {
   return (
     <div className="p-4 md:p-8 max-w-4xl mx-auto">
       {saving && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-white/60 backdrop-blur-sm pointer-events-none">
+        <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-white/80 backdrop-blur-sm">
           <div className="flex flex-col items-center gap-3">
-            <img src="/logo.png" alt="PRO-LOGIC" className="h-8 object-contain animate-pulse" />
-            <Loader2 size={20} className="animate-spin text-gray-700" />
+            <img src="/logo.png" alt="PRO-LOGIC" className="h-10 object-contain mb-4 opacity-80" />
+            <div className="w-48 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+              <div className="h-full bg-gray-900 rounded-full animate-[slide_1.2s_ease-in-out_infinite]" />
+            </div>
+            <p className="text-xs text-gray-400 mt-3 tracking-wide">Saving…</p>
+            <style>{`@keyframes slide{0%{width:0%;margin-left:0}50%{width:60%;margin-left:20%}100%{width:0%;margin-left:100%}}`}</style>
           </div>
         </div>
       )}
@@ -129,15 +136,21 @@ export default function RetirementPage() {
         <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
           <h2 className="font-bold text-gray-800 mb-4 text-sm uppercase tracking-wide">Approval</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Operations Manager</label>
-              <input value={operationsManager} onChange={e => setOperationsManager(e.target.value)}
-                className="w-full border-b-2 border-gray-300 pb-1 text-sm focus:outline-none focus:border-black" placeholder="Name & title" />
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Operations Manager — Name & Title</label>
+                <input value={operationsManager} onChange={e => setOperationsManager(e.target.value)}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-black" placeholder="Name & title" />
+              </div>
+              <SignaturePad label="Operations Manager — Signature" value={operationsManagerSig} onChange={setOperationsManagerSig} />
             </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Technical Director</label>
-              <input value={technicalDirector} onChange={e => setTechnicalDirector(e.target.value)}
-                className="w-full border-b-2 border-gray-300 pb-1 text-sm focus:outline-none focus:border-black" placeholder="Name & title" />
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Technical Director — Name & Title</label>
+                <input value={technicalDirector} onChange={e => setTechnicalDirector(e.target.value)}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-black" placeholder="Name & title" />
+              </div>
+              <SignaturePad label="Technical Director — Signature" value={technicalDirectorSig} onChange={setTechnicalDirectorSig} />
             </div>
           </div>
         </section>
