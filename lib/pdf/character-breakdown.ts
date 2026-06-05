@@ -1,7 +1,7 @@
 import { jsPDF } from 'jspdf';
 import { PDFContext, header, sectionTitle, save } from './base';
 
-export async function generateCharacterBreakdown({ production, crew, preview }: PDFContext) {
+export async function generateCharacterBreakdown({ production, characters: chars = [], preview }: PDFContext) {
   const doc = new jsPDF({ unit: 'mm', format: 'letter' });
   const pageW = doc.internal.pageSize.getWidth();
 
@@ -17,20 +17,19 @@ export async function generateCharacterBreakdown({ production, crew, preview }: 
   doc.text(`Production: ${production.name}  |  Client: ${production.client}`, pageW / 2, y, { align: 'center' });
   y += 12;
 
-  // Sample characters (in production, these would come from a characters collection)
-  const characters = crew.length > 0
-    ? crew.slice(0, 6).map((c: any, i: number) => ({
-        name: `Character ${i + 1}`,
-        actor: `${c.name} ${c.last_name}`,
-        role: c.role || 'Supporting',
-        age: '25-35',
-        gender: '—',
-        appearance: 'To be determined',
-        personality: 'To be determined',
-        motivation: 'To be determined',
-        arc: 'To be determined',
-        scenes: `${Math.floor(Math.random() * 5) + 1}`,
-        notes: '',
+  const characters = chars.length > 0
+    ? chars.map((c: any) => ({
+        name: c.character_name || 'Unnamed',
+        actor: c.actor_name || '(Cast TBD)',
+        role: c.status || 'Open',
+        age: c.age_range || '___',
+        gender: c.gender || '___',
+        appearance: c.physical_description || '',
+        personality: c.personality || '',
+        motivation: c.background || '',
+        arc: c.special_requirements || '',
+        scenes: c.scenes || '___',
+        notes: [c.costume_notes, c.notes].filter(Boolean).join(' | ') || '',
       }))
     : Array.from({ length: 3 }, (_, i) => ({
         name: `Character ${i + 1}`,
@@ -56,7 +55,7 @@ export async function generateCharacterBreakdown({ production, crew, preview }: 
     doc.text(`${char.name}  ·  ${char.role}`, 14, y + 0.5);
     doc.setFontSize(9);
     doc.setFont('helvetica', 'normal');
-    doc.text(`Actor: ${char.actor}`, pageW - 14, y + 0.5, { align: 'right' });
+    doc.text(`Actor: ${char.actor}  |  Status: ${char.role}`, pageW - 14, y + 0.5, { align: 'right' });
     y += 10;
 
     const row = (label: string, val: string) => {
@@ -68,14 +67,14 @@ export async function generateCharacterBreakdown({ production, crew, preview }: 
       y += 5.5;
     };
 
-    row('Age:', char.age);
+    row('Age Range:', char.age);
     row('Gender:', char.gender);
-    row('Appearance:', char.appearance);
+    row('Physical Description:', char.appearance);
     row('Personality:', char.personality);
-    row('Motivation / Goal:', char.motivation);
-    row('Character Arc:', char.arc);
+    row('Background / Backstory:', char.motivation);
+    row('Special Requirements:', char.arc);
     row('# of Scenes:', char.scenes);
-    row('Special Notes:', char.notes);
+    row('Costume / Notes:', char.notes);
 
     y += 6;
     doc.setDrawColor(220, 220, 220);
