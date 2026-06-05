@@ -7,7 +7,7 @@ const TIME_OPTIONS = Array.from({ length: 24 * 4 }, (_, i) => {
   const ampm = h < 12 ? 'AM' : 'PM'; const h12 = h % 12 || 12;
   return `${h12}:${String(m).padStart(2,'0')} ${ampm}`;
 });
-import { doc, getDoc, updateDoc, collection, getDocs, addDoc, deleteDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, collection, getDocs, addDoc, deleteDoc, setDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { useData } from '@/hooks/useData';
 import { useNamespace } from '@/hooks/useNamespace';
@@ -203,28 +203,51 @@ export default function ProductionDetail({ params }: { params: Promise<{ id: str
       await sendConfirmation(m);
   };
 
+  /* ── Get or create a public share token for this production's call sheet ── */
+  const getShareUrl = async (): Promise<string> => {
+    const uid = getUid()!;
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.pro-logic.studio';
+
+    // Reuse existing token if already set on the production
+    if (production?.share_token) {
+      return `${appUrl}/callsheet/${production.share_token}`;
+    }
+    // Generate new token and store on production + in top-level shared_callsheets
+    const token = crypto.randomUUID();
+    await setDoc(doc(db, 'shared_callsheets', token), {
+      uid, productionId: id, createdAt: new Date().toISOString(),
+    });
+    await updateDoc(doc(db, 'users', uid, 'productions', id), { share_token: token });
+    setProduction((p: any) => ({ ...p, share_token: token }));
+    return `${appUrl}/callsheet/${token}`;
+  };
+
   /* ── Send Call Sheet to ALL crew by email ── */
-  const sendCallSheetEmail = () => {
+  const sendCallSheetEmail = async () => {
     const crewWithEmail = assignedCrew.filter(c => c.email);
     if (crewWithEmail.length === 0) { alert('No crew members have email addresses.'); return; }
 
     const location = locations.find((l: any) => l.id === production?.location_id);
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.pro-logic.studio';
-    const callSheetUrl = `${appUrl}/documents`;
+    const callSheetUrl = await getShareUrl();
 
     const bcc = crewWithEmail.map(c => c.email).join(',');
-    const subject = encodeURIComponent(`[CALL SHEET] ${production?.name} — ${production?.start_date || 'TBD'}`);
+    const subject = encodeURIComponent(
+      `[CALL SHEET] ${production?.name} — ${production?.start_date || 'TBD'}`
+    );
     const body = encodeURIComponent([
       `CALL SHEET — ${production?.name}`,
       `Client: ${production?.client || '—'}`,
       production?.start_date ? `Date: ${production.start_date}` : '',
-      location?.name ? `Location: ${location.name}` : '',
+      location?.name        ? `Location: ${location.name}`       : '',
       production?.call_time ? `General Call Time: ${production.call_time}` : '',
       '',
-      'Individual call times:',
-      ...crewWithEmail.map(c => `  ${c.name} (${c.role || '—'}) — ${c.call_time || production?.call_time || 'TBD'}`),
+      'Your individual call times:',
+      ...crewWithEmail.map(c =>
+        `  ${c.name} (${c.role || '—'}) — Call: ${c.call_time || production?.call_time || 'TBD'}`
+      ),
       '',
-      `Generate full PDF call sheet: ${callSheetUrl}`,
+      '▶ View full call sheet (no login required):',
+      callSheetUrl,
       '',
       '— PRO-LOGIC Studio',
     ].filter(Boolean).join('\n'));
@@ -233,24 +256,21 @@ export default function ProductionDetail({ params }: { params: Promise<{ id: str
   };
 
   /* ── Send SMS broadcast to ALL crew ── */
-  const sendCallSheetSMS = () => {
+  const sendCallSheetSMS = async () => {
     const crewWithPhone = assignedCrew.filter(c => c.phone);
     if (crewWithPhone.length === 0) { alert('No crew members have phone numbers.'); return; }
 
     const location = locations.find((l: any) => l.id === production?.location_id);
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.pro-logic.studio';
+    const callSheetUrl = await getShareUrl();
 
-    // Open one SMS per crew member (native sms: links can't broadcast)
-    // First one opens immediately; tell user to repeat for others
     const message = encodeURIComponent([
       `[PRO-LOGIC] CALL SHEET: ${production?.name}`,
       production?.start_date ? `Date: ${production.start_date}` : '',
       location?.name ? `Location: ${location.name}` : '',
-      `Your call: ${crewWithPhone[0]?.call_time || production?.call_time || 'TBD'}`,
-      `Full details: ${appUrl}/documents`,
+      production?.call_time ? `General call: ${production.call_time}` : '',
+      `View call sheet: ${callSheetUrl}`,
     ].filter(Boolean).join(' | '));
 
-    // Build a multi-recipient SMS string (works on some platforms)
     const phones = crewWithPhone.map(c => c.phone.replace(/\D/g, '')).join(';');
     window.open(`sms:${phones}?body=${message}`, '_blank');
   };
