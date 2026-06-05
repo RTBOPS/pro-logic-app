@@ -9,6 +9,8 @@ export type PDFContext = {
   weather?: { temp_high: number; temp_low: number; description: string; icon: string; precipitation: number; wind_speed?: number } | null;
   forecast?: { date: string; temp_high: number; temp_low: number; description: string; icon: string; precipitation: number }[];
   company?: any;
+  stripboardScenes?: any[];
+  characters?: any[];
 };
 
 export function createDoc(orientation: 'p' | 'l' = 'p'): jsPDF {
