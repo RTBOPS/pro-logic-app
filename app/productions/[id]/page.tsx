@@ -213,6 +213,7 @@ export default function ProductionDetail({ params }: { params: Promise<{ id: str
   if (!production) return <div className="p-8 text-red-500">Production not found.</div>;
 
   const location = locations.find((l: any) => l.id === production.location_id);
+  const weatherSource = location || (production.city ? { name: production.city, city: production.city } : production.primary_location ? { name: production.primary_location, city: production.primary_location } : null);
   const confirmedCount = assignedCrew.filter(c => c.confirmation_status === 'confirmed').length;
   const pendingCount = assignedCrew.filter(c => c.confirmation_status === 'pending').length;
 
@@ -292,7 +293,7 @@ export default function ProductionDetail({ params }: { params: Promise<{ id: str
         </div>
 
         {/* Weather */}
-        {location && <WeatherCard location={location} />}
+        {weatherSource && <WeatherCard location={weatherSource} />}
       </div>
 
       {/* ── Tabs ── */}

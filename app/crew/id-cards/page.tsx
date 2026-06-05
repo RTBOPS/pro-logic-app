@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useData } from '@/hooks/useData';
 import { doc, getDoc, getDocs, collection } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
 import { Printer, IdCard, CreditCard } from 'lucide-react';
 import PageHeader from '@/components/PageHeader';
 import { useNamespace } from '@/hooks/useNamespace';
@@ -117,12 +117,14 @@ export default function IDCardsPage() {
   const [orientation, setOrientation] = useState<'horizontal' | 'vertical'>('horizontal');
   const [prodCrew, setProdCrew] = useState<string[]>([]); // crew IDs assigned to production
   const [loadingProd, setLoadingProd] = useState(false);
+  const getUid = () => namespace || auth.currentUser?.uid || null;
 
   // Load crew assigned to selected production
   useEffect(() => {
-    if (!selectedProd || !namespace) { setProdCrew([]); return; }
+    const uid = getUid();
+    if (!selectedProd || !uid) { setProdCrew([]); return; }
     setLoadingProd(true);
-    getDocs(collection(db, 'users', namespace, 'productions', selectedProd, 'crew')).then(snap => {
+    getDocs(collection(db, 'users', uid, 'productions', selectedProd, 'crew')).then(snap => {
       setProdCrew(snap.docs.map(d => (d.data() as any).crew_id));
       setLoadingProd(false);
     });
