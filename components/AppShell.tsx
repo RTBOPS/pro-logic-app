@@ -9,13 +9,13 @@ import { NamespaceProvider } from './NamespaceProvider';
 import { useCompany } from '@/hooks/useCompany';
 import { Menu, X } from 'lucide-react';
 
-const PUBLIC_PATHS = ['/auth', '/confirm'];
+const PUBLIC_PATHS = ['/', '/auth', '/confirm'];
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const path = usePathname();
   const company = useCompany();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const isPublic = PUBLIC_PATHS.some(p => path === p || path.startsWith(p + '/'));
+  const isPublic = path === '/' || PUBLIC_PATHS.filter(p => p !== '/').some(p => path === p || path.startsWith(p + '/'));
 
   // Close sidebar on route change
   useEffect(() => { setSidebarOpen(false); }, [path]);

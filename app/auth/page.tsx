@@ -27,7 +27,7 @@ export default function AuthPage() {
         const cred = await createUserWithEmailAndPassword(auth, form.email, form.password);
         await updateProfile(cred.user, { displayName: form.name });
       }
-      router.push('/');
+      router.push('/dashboard');
     } catch (err: any) {
       const msg: Record<string, string> = {
         'auth/invalid-credential': 'Invalid email or password.',

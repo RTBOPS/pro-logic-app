@@ -1,193 +1,306 @@
 'use client';
 
-import { useData } from '@/hooks/useData';
-import { Film, Users, Package, MapPin, CheckSquare } from 'lucide-react';
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import PageHeader from '@/components/PageHeader';
-import { useEffect, useState } from 'react';
-import { doc, getDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
-import { useNamespace } from '@/hooks/useNamespace';
-import { auth } from '@/lib/firebase';
+import { useAuth } from '@/hooks/useAuth';
+import {
+  Film, Users, Package, MapPin, FileText, ClipboardList,
+  CheckSquare, Layers, BarChart3, Shield, Zap, Globe,
+  ArrowRight, Star, ChevronRight, Camera, Mic, Lightbulb,
+  ClipboardCheck, IdCard, BookImage,
+} from 'lucide-react';
 
-const STATUS_COLOR: Record<string, string> = {
-  new: 'bg-blue-100 text-blue-700',
-  active: 'bg-green-100 text-green-700',
-  completed: 'bg-gray-100 text-gray-600',
-  cancelled: 'bg-red-100 text-red-600',
-};
+const FEATURES = [
+  { icon: Film, title: 'Productions', desc: 'Manage every production from brief to wrap. Track status, schedule, crew, and locations in one place.', color: 'bg-purple-50 text-purple-600' },
+  { icon: FileText, title: 'Documents & PDFs', desc: 'Generate professional call sheets, NDAs, crew deals, shot lists, and location releases — pre-filled instantly.', color: 'bg-blue-50 text-blue-600' },
+  { icon: Users, title: 'Crew & Cast', desc: 'Full crew profiles with departments, rates, availability, ID cards with QR codes, and deal memo signing.', color: 'bg-green-50 text-green-600' },
+  { icon: Package, title: 'Equipment Inventory', desc: 'Catalog every piece of gear with check-out/return forms, maintenance logs, and retirement reports.', color: 'bg-orange-50 text-orange-600' },
+  { icon: BookImage, title: 'Stripboard', desc: 'Professional scene scheduling with drag-and-drop strips, color coding, and instant PDF export.', color: 'bg-red-50 text-red-600' },
+  { icon: Layers, title: 'Storyboard Creator', desc: 'Draw storyboard panels directly in the browser with pen, pencil, and marker tools. Reorder with drag & drop.', color: 'bg-indigo-50 text-indigo-600' },
+  { icon: MapPin, title: 'Location Blueprint', desc: 'Design your set layout on an interactive canvas. Place equipment, crew marks, lighting, and props.', color: 'bg-teal-50 text-teal-600' },
+  { icon: CheckSquare, title: 'Equipment Checklists', desc: '9 pre-built checklists (camera, audio, lighting…) plus custom lists. Track readiness % per production.', color: 'bg-yellow-50 text-yellow-600' },
+  { icon: IdCard, title: 'ID Cards', desc: 'Generate color-coded crew ID cards with QR codes. Print on Avery sheets for every department.', color: 'bg-pink-50 text-pink-600' },
+  { icon: ClipboardCheck, title: 'Equipment Forms', desc: 'Digital check-out, return inspection, maintenance, and asset retirement forms with mobile signatures.', color: 'bg-cyan-50 text-cyan-600' },
+  { icon: BarChart3, title: 'Gantt & Scheduling', desc: 'Visual Gantt chart for your entire production timeline. See every task across all productions at once.', color: 'bg-emerald-50 text-emerald-600' },
+  { icon: ClipboardList, title: 'Shoot Log', desc: 'On-set take journal: log scene, shot, take, lens, aperture, ISO, shutter, sound roll — in real time.', color: 'bg-violet-50 text-violet-600' },
+];
 
-// Total checklist items across all default categories
-const DEFAULT_ITEM_COUNTS: Record<string, number> = {
-  camera: 16, audio: 13, lighting: 19, grip: 15,
-  production: 16, video: 12, team: 16, location: 16, transportation: 15,
-};
-const TOTAL_DEFAULT_ITEMS = Object.values(DEFAULT_ITEM_COUNTS).reduce((a, b) => a + b, 0);
+const PLANS = [
+  {
+    name: 'Free', price: '$0', period: 'forever',
+    features: ['1 active production', 'Up to 5 crew members', 'Up to 10 inventory items', 'Basic call sheet PDF', 'Community support'],
+    cta: 'Get started free', highlight: false,
+  },
+  {
+    name: 'Pro', price: '$29', period: '/month',
+    features: ['Unlimited productions', 'Unlimited crew & inventory', 'All PDF documents', 'Storyboard + Blueprint', 'Equipment database', 'Priority support'],
+    cta: 'Start Pro trial', highlight: true, badge: 'Most Popular',
+  },
+  {
+    name: 'Studio', price: '$79', period: '/month',
+    features: ['Everything in Pro', 'Team workspaces', 'Multi-user access', 'Custom branding', 'Dedicated support', 'API access'],
+    cta: 'Contact sales', highlight: false,
+  },
+];
 
-export default function Dashboard() {
-  const namespace = useNamespace();
-  const getUid = () => namespace || auth.currentUser?.uid || null;
-  const { data: productions, loading: lp } = useData('productions');
-  const { data: crew, loading: lc } = useData('crew');
-  const { data: inventory, loading: li } = useData('inventory');
-  const { data: locations } = useData('locations');
+const TESTIMONIALS = [
+  { name: 'Marco T.', role: 'Director of Photography', quote: 'PRO-LOGIC replaced three separate tools. Call sheets, inventory tracking, and crew management all in one. Game changer on set.' },
+  { name: 'Sara L.', role: 'Line Producer', quote: 'The equipment check-out forms with mobile signatures saved us so much paperwork. Our gear is finally accountable.' },
+  { name: 'James R.', role: 'Production Coordinator', quote: 'The checklists and shoot readiness dashboard on the main screen lets me know exactly where we stand every morning.' },
+];
 
-  // Checklist readiness per production
-  const [readiness, setReadiness] = useState<Record<string, number>>({});
+export default function LandingPage() {
+  const { user, loading } = useAuth();
+  const router = useRouter();
 
+  // If already logged in, go straight to dashboard
   useEffect(() => {
-    const uid = getUid();
-    if (!uid || productions.length === 0) return;
-    const recent = productions.slice(0, 6);
-    Promise.all(
-      recent.map(async (p: any) => {
-        try {
-          const snap = await getDoc(doc(db, 'users', uid, 'productions', p.id, 'checklists', 'main'));
-          const snap2 = await getDoc(doc(db, 'users', uid, 'productions', p.id, 'checklists', 'custom_lists'));
-          const data = snap.exists() ? snap.data() as Record<string, Record<string, boolean>> : {};
-          // Count default items checked
-          let done = 0;
-          let total = TOTAL_DEFAULT_ITEMS;
-          Object.entries(DEFAULT_ITEM_COUNTS).forEach(([listId, count]) => {
-            const listChecks = data[listId] || {};
-            done += Object.values(listChecks).filter(Boolean).length;
-          });
-          // Count custom list items
-          if (snap2.exists()) {
-            const customLists = snap2.data().lists || [];
-            customLists.forEach((list: any) => {
-              total += list.items.length;
-              const listChecks = data[list.id] || {};
-              done += Object.values(listChecks).filter(Boolean).length;
-            });
-          }
-          return [p.id, total > 0 ? Math.round((done / total) * 100) : 0] as [string, number];
-        } catch {
-          return [p.id, 0] as [string, number];
-        }
-      })
-    ).then(results => {
-      setReadiness(Object.fromEntries(results));
-    });
-  }, [productions, namespace]);
+    if (!loading && user) router.replace('/dashboard');
+  }, [user, loading, router]);
 
-  const stats = [
-    { label: 'Productions', value: productions.length, icon: Film, href: '/productions', color: 'text-purple-600 bg-purple-50' },
-    { label: 'Crew', value: crew.length, icon: Users, href: '/crew', color: 'text-blue-600 bg-blue-50' },
-    { label: 'Equipment', value: inventory.length, icon: Package, href: '/inventory', color: 'text-green-600 bg-green-50' },
-    { label: 'Locations', value: locations.length, icon: MapPin, href: '/locations', color: 'text-orange-600 bg-orange-50' },
-  ];
-
-  const recent = productions.slice(0, 6);
+  if (loading || user) return null;
 
   return (
-    <div className="p-4 md:p-8">
-      <PageHeader title="Dashboard" subtitle="Overview of your studio operations" />
+    <div className="min-h-screen bg-zinc-950 text-white" style={{ fontFamily: 'var(--font-geist-sans, system-ui, sans-serif)' }}>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        {stats.map(({ label, value, icon: Icon, href, color }) => (
-          <Link key={href} href={href}>
-            <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition-shadow cursor-pointer">
-              <div className={`inline-flex p-2 rounded-lg mb-3 ${color}`}><Icon size={20} /></div>
-              <div className="text-2xl font-bold text-gray-900">{lp || lc || li ? '—' : value}</div>
-              <div className="text-sm text-gray-500 mt-0.5">{label}</div>
+      {/* ── NAV ───────────────────────────────────────────────── */}
+      <nav className="fixed top-0 left-0 right-0 z-50 border-b border-white/10 bg-zinc-950/80 backdrop-blur-md">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
+          <img src="/logo-white.svg" alt="PRO-LOGIC" className="h-8 object-contain" />
+          <div className="hidden md:flex items-center gap-6 text-sm text-zinc-400">
+            <a href="#features" className="hover:text-white transition-colors">Features</a>
+            <a href="#pricing" className="hover:text-white transition-colors">Pricing</a>
+            <a href="#testimonials" className="hover:text-white transition-colors">Reviews</a>
+          </div>
+          <div className="flex items-center gap-3">
+            <Link href="/auth" className="text-sm text-zinc-400 hover:text-white transition-colors px-3 py-1.5">Sign in</Link>
+            <Link href="/auth"
+              className="bg-white text-zinc-950 text-sm font-semibold px-4 py-2 rounded-xl hover:bg-zinc-100 transition-colors">
+              Get started free
+            </Link>
+          </div>
+        </div>
+      </nav>
+
+      {/* ── HERO ──────────────────────────────────────────────── */}
+      <section className="pt-32 pb-20 px-4 sm:px-6 lg:px-8 text-center relative overflow-hidden">
+        {/* Background glow */}
+        <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[700px] h-[400px] bg-white/5 rounded-full blur-3xl" />
+        </div>
+
+        <div className="max-w-4xl mx-auto relative">
+          <div className="inline-flex items-center gap-2 bg-white/10 border border-white/20 rounded-full px-4 py-1.5 text-xs text-zinc-300 mb-8">
+            <Zap size={12} className="text-yellow-400" />
+            Built for film & video production teams
+          </div>
+
+          <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black leading-none tracking-tight mb-6">
+            Every production tool
+            <br />
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-zinc-200 to-zinc-500">
+              in one platform.
+            </span>
+          </h1>
+
+          <p className="text-lg sm:text-xl text-zinc-400 max-w-2xl mx-auto mb-10 leading-relaxed">
+            PRO-LOGIC Studio is the all-in-one production management platform for video and film professionals.
+            Manage crew, gear, documents, scheduling, and on-set operations from any device.
+          </p>
+
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Link href="/auth"
+              className="inline-flex items-center justify-center gap-2 bg-white text-zinc-950 font-bold text-base px-8 py-4 rounded-2xl hover:bg-zinc-100 transition-all hover:scale-105">
+              Start for free <ArrowRight size={18} />
+            </Link>
+            <a href="#features"
+              className="inline-flex items-center justify-center gap-2 border border-white/20 text-zinc-300 font-medium text-base px-8 py-4 rounded-2xl hover:bg-white/5 transition-colors">
+              Explore features <ChevronRight size={18} />
+            </a>
+          </div>
+
+          <p className="text-xs text-zinc-600 mt-6">No credit card required · Free plan forever · Cancel anytime</p>
+        </div>
+
+        {/* Feature strip */}
+        <div className="max-w-5xl mx-auto mt-16 grid grid-cols-2 sm:grid-cols-4 gap-4">
+          {[
+            { icon: Film, label: 'Productions' },
+            { icon: Users, label: 'Crew & Cast' },
+            { icon: Package, label: 'Equipment' },
+            { icon: FileText, label: 'PDF Documents' },
+          ].map(({ icon: Icon, label }) => (
+            <div key={label} className="flex items-center justify-center gap-2 bg-white/5 border border-white/10 rounded-2xl py-4 px-3">
+              <Icon size={18} className="text-zinc-400 shrink-0" />
+              <span className="text-sm text-zinc-300 font-medium">{label}</span>
             </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ── STATS ─────────────────────────────────────────────── */}
+      <section className="border-y border-white/10 py-12 px-4">
+        <div className="max-w-5xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
+          {[
+            { value: '12+', label: 'Production tools' },
+            { value: '9', label: 'Checklist categories' },
+            { value: '7', label: 'PDF document types' },
+            { value: '∞', label: 'Productions on Studio plan' },
+          ].map(({ value, label }) => (
+            <div key={label}>
+              <div className="text-4xl font-black text-white mb-1">{value}</div>
+              <div className="text-sm text-zinc-500">{label}</div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ── FEATURES ──────────────────────────────────────────── */}
+      <section id="features" className="py-24 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl sm:text-4xl md:text-5xl font-black mb-4">
+              Everything you need,<br />
+              <span className="text-zinc-400">nothing you don't.</span>
+            </h2>
+            <p className="text-zinc-400 text-lg max-w-2xl mx-auto">
+              From pre-production planning to post-wrap reports, every workflow is covered.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {FEATURES.map(({ icon: Icon, title, desc, color }) => (
+              <div key={title}
+                className="bg-zinc-900 border border-white/5 rounded-2xl p-5 hover:border-white/20 hover:bg-zinc-800/60 transition-all group">
+                <div className={`inline-flex p-2.5 rounded-xl mb-4 ${color}`}>
+                  <Icon size={20} />
+                </div>
+                <h3 className="font-bold text-white mb-2 text-sm">{title}</h3>
+                <p className="text-zinc-500 text-xs leading-relaxed group-hover:text-zinc-400 transition-colors">{desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── HOW IT WORKS ──────────────────────────────────────── */}
+      <section className="py-20 px-4 sm:px-6 lg:px-8 bg-zinc-900/50">
+        <div className="max-w-5xl mx-auto">
+          <div className="text-center mb-14">
+            <h2 className="text-3xl sm:text-4xl font-black mb-4">From setup to shoot day in minutes</h2>
+            <p className="text-zinc-400">Get your entire production organized in three steps.</p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {[
+              { step: '01', title: 'Create your production', desc: 'Add project details, assign crew, link locations, and attach your equipment inventory.' },
+              { step: '02', title: 'Generate all documents', desc: 'One click produces call sheets, NDAs, deal memos, shot lists — pre-filled with your data.' },
+              { step: '03', title: 'Manage on-set', desc: 'Log takes in real time, check out gear with signatures, track checklist readiness live.' },
+            ].map(({ step, title, desc }) => (
+              <div key={step} className="relative">
+                <div className="text-7xl font-black text-white/5 mb-2 leading-none">{step}</div>
+                <h3 className="text-xl font-bold text-white mb-2">{title}</h3>
+                <p className="text-zinc-400 text-sm leading-relaxed">{desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── TESTIMONIALS ──────────────────────────────────────── */}
+      <section id="testimonials" className="py-20 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-14">
+            <h2 className="text-3xl sm:text-4xl font-black mb-4">Trusted by production teams</h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {TESTIMONIALS.map(({ name, role, quote }) => (
+              <div key={name} className="bg-zinc-900 border border-white/10 rounded-2xl p-6">
+                <div className="flex gap-0.5 mb-4">
+                  {[...Array(5)].map((_, i) => <Star key={i} size={14} className="text-yellow-400 fill-yellow-400" />)}
+                </div>
+                <p className="text-zinc-300 text-sm leading-relaxed mb-5">"{quote}"</p>
+                <div>
+                  <div className="font-semibold text-white text-sm">{name}</div>
+                  <div className="text-zinc-500 text-xs">{role}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── PRICING ───────────────────────────────────────────── */}
+      <section id="pricing" className="py-20 px-4 sm:px-6 lg:px-8 bg-zinc-900/50">
+        <div className="max-w-5xl mx-auto">
+          <div className="text-center mb-14">
+            <h2 className="text-3xl sm:text-4xl font-black mb-4">Simple, transparent pricing</h2>
+            <p className="text-zinc-400">Start free. Scale as your studio grows.</p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {PLANS.map(({ name, price, period, features, cta, highlight, badge }) => (
+              <div key={name} className={`rounded-2xl p-7 flex flex-col ${highlight ? 'bg-white text-zinc-950 shadow-2xl scale-105' : 'bg-zinc-900 border border-white/10'}`}>
+                {badge && (
+                  <div className="inline-flex items-center bg-black text-white text-xs font-bold px-3 py-1 rounded-full mb-4 w-fit">{badge}</div>
+                )}
+                <div className="mb-1 text-xs font-semibold uppercase tracking-widest opacity-60">{name}</div>
+                <div className="flex items-end gap-1 mb-6">
+                  <span className="text-4xl font-black">{price}</span>
+                  <span className={`text-sm mb-1.5 ${highlight ? 'text-zinc-500' : 'text-zinc-500'}`}>{period}</span>
+                </div>
+                <ul className="space-y-2.5 flex-1 mb-8">
+                  {features.map(f => (
+                    <li key={f} className="flex items-start gap-2 text-sm">
+                      <span className={`mt-0.5 shrink-0 ${highlight ? 'text-green-600' : 'text-zinc-500'}`}>✓</span>
+                      <span className={highlight ? 'text-zinc-700' : 'text-zinc-400'}>{f}</span>
+                    </li>
+                  ))}
+                </ul>
+                <Link href="/auth"
+                  className={`text-center py-3 rounded-xl text-sm font-bold transition-colors ${highlight ? 'bg-black text-white hover:bg-zinc-800' : 'border border-white/20 text-white hover:bg-white/5'}`}>
+                  {cta}
+                </Link>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── CTA BANNER ────────────────────────────────────────── */}
+      <section className="py-24 px-4 sm:px-6 lg:px-8 text-center">
+        <div className="max-w-3xl mx-auto">
+          <h2 className="text-3xl sm:text-4xl md:text-5xl font-black mb-6">
+            Your next production,<br />fully organized.
+          </h2>
+          <p className="text-zinc-400 text-lg mb-10">
+            Join production teams that run tighter sets with PRO-LOGIC Studio.
+          </p>
+          <Link href="/auth"
+            className="inline-flex items-center gap-2 bg-white text-zinc-950 font-bold text-lg px-10 py-5 rounded-2xl hover:bg-zinc-100 transition-all hover:scale-105">
+            Get started for free <ArrowRight size={20} />
           </Link>
-        ))}
-      </div>
+          <p className="text-xs text-zinc-600 mt-5">No credit card · Free forever plan · Upgrade when ready</p>
+        </div>
+      </section>
 
-      {/* Shoot Readiness */}
-      {recent.length > 0 && (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mb-8">
-          <div className="flex items-center justify-between px-6 py-4 border-b">
-            <div className="flex items-center gap-2">
-              <CheckSquare size={16} className="text-green-600" />
-              <h2 className="font-semibold text-gray-800">Shoot Readiness</h2>
+      {/* ── FOOTER ────────────────────────────────────────────── */}
+      <footer className="border-t border-white/10 py-10 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <img src="/logo-white.svg" alt="PRO-LOGIC" className="h-7 object-contain" />
+            <span className="text-zinc-600 text-xs">© {new Date().getFullYear()} PRO-LOGIC Studio. All rights reserved.</span>
+          </div>
+          <div className="flex items-center gap-6 text-sm text-zinc-600">
+            <a href="#features" className="hover:text-zinc-300 transition-colors">Features</a>
+            <a href="#pricing" className="hover:text-zinc-300 transition-colors">Pricing</a>
+            <Link href="/auth" className="hover:text-zinc-300 transition-colors">Sign in</Link>
+            <div className="flex items-center gap-1">
+              <Globe size={12} />
+              <span>pro-logic.studio</span>
             </div>
-            <Link href="/checklists" className="text-sm text-blue-600 hover:underline">Manage checklists</Link>
-          </div>
-          <div className="divide-y divide-gray-50">
-            {recent.map((p: any) => {
-              const pct = readiness[p.id] ?? null;
-              const color = pct === null ? 'bg-gray-200' : pct === 100 ? 'bg-green-500' : pct >= 75 ? 'bg-blue-500' : pct >= 40 ? 'bg-yellow-400' : 'bg-gray-300';
-              return (
-                <Link key={p.id} href="/checklists" className="flex items-center gap-4 px-6 py-3 hover:bg-gray-50 transition-colors">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-sm font-medium text-gray-900 truncate">{p.name}</span>
-                      <span className={`text-xs font-bold ml-3 shrink-0 ${pct === 100 ? 'text-green-600' : 'text-gray-500'}`}>
-                        {pct === null ? '—' : `${pct}%`}
-                      </span>
-                    </div>
-                    <div className="w-full bg-gray-100 rounded-full h-1.5">
-                      <div className={`h-1.5 rounded-full transition-all ${color}`} style={{ width: `${pct ?? 0}%` }} />
-                    </div>
-                  </div>
-                  {pct === 100 && <span className="text-xs text-green-600 font-medium shrink-0">✓ Ready</span>}
-                </Link>
-              );
-            })}
           </div>
         </div>
-      )}
-
-      {/* Recent productions */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="flex items-center justify-between px-6 py-4 border-b">
-          <h2 className="font-semibold text-gray-800">Recent Productions</h2>
-          <Link href="/productions" className="text-sm text-blue-600 hover:underline">View all</Link>
-        </div>
-        {lp ? (
-          <div className="p-6 text-gray-600 text-sm">Loading…</div>
-        ) : recent.length === 0 ? (
-          <div className="p-6 text-gray-600 text-sm">No productions yet.</div>
-        ) : (
-          <>
-          <div className="md:hidden divide-y divide-gray-50">
-            {recent.map((p: any) => {
-              const loc = locations.find((l: any) => l.id === p.location_id);
-              return (
-                <Link key={p.id} href={`/productions/${p.id}`} className="flex items-center justify-between px-4 py-3 hover:bg-gray-50 active:bg-gray-100">
-                  <div>
-                    <div className="font-medium text-gray-900 text-sm">{p.name}</div>
-                    <div className="text-xs text-gray-600">{p.client}{loc?.name ? ` · ${loc.name}` : ''}</div>
-                  </div>
-                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize shrink-0 ml-2 ${STATUS_COLOR[p.status] || 'bg-gray-100 text-gray-600'}`}>{p.status}</span>
-                </Link>
-              );
-            })}
-          </div>
-          <table className="hidden md:table w-full text-sm">
-            <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
-              <tr>
-                <th className="text-left px-6 py-3">Name</th>
-                <th className="text-left px-6 py-3">Client</th>
-                <th className="text-left px-6 py-3">Status</th>
-                <th className="text-left px-6 py-3">Location</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {recent.map((p: any) => {
-                const loc = locations.find((l: any) => l.id === p.location_id);
-                return (
-                  <tr key={p.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-3 font-medium text-gray-900">
-                      <Link href={`/productions/${p.id}`} className="hover:underline">{p.name}</Link>
-                    </td>
-                    <td className="px-6 py-3 text-gray-600">{p.client}</td>
-                    <td className="px-6 py-3">
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize ${STATUS_COLOR[p.status] || 'bg-gray-100 text-gray-600'}`}>{p.status}</span>
-                    </td>
-                    <td className="px-6 py-3 text-gray-500">{loc?.name || '—'}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-          </>
-        )}
-      </div>
+      </footer>
     </div>
   );
 }

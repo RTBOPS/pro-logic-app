@@ -16,7 +16,7 @@ import { useWorkspaces } from '@/hooks/useNamespace';
 
 const nav = [
   { section: 'Overview' },
-  { href: '/', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/gantt', label: 'Gantt Chart', icon: CalendarDays },
   { section: 'Production' },
   { href: '/productions', label: 'Productions', icon: Film },
