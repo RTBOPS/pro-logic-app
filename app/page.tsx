@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/hooks/useAuth';
@@ -8,7 +8,7 @@ import {
   Film, Users, Package, MapPin, FileText, ClipboardList,
   CheckSquare, Layers, BarChart3, Zap, Globe,
   ArrowRight, Star, ChevronRight,
-  ClipboardCheck, IdCard, BookImage,
+  ClipboardCheck, IdCard, BookImage, Loader2, CreditCard,
 } from 'lucide-react';
 
 const FEATURES = [
@@ -28,19 +28,19 @@ const FEATURES = [
 
 const PLANS = [
   {
-    name: 'Free', price: '$0', period: 'forever',
+    name: 'Free', price: '$0', period: 'forever', planKey: null,
     features: ['1 active production', 'Up to 5 crew members', 'Up to 10 inventory items', 'Basic call sheet PDF', 'Community support'],
     cta: 'Get started free', highlight: false,
   },
   {
-    name: 'Pro', price: '$29', period: '/month',
+    name: 'Pro', price: '$29', period: '/month', planKey: 'pro',
     features: ['Unlimited productions', 'Unlimited crew & inventory', 'All PDF documents', 'Storyboard + Blueprint', 'Equipment forms & ID cards', 'Priority support'],
-    cta: 'Start Pro trial', highlight: true, badge: 'Most Popular',
+    cta: 'Subscribe — $29/mo', highlight: true, badge: 'Most Popular',
   },
   {
-    name: 'Studio', price: '$79', period: '/month',
+    name: 'Studio', price: '$79', period: '/month', planKey: 'studio',
     features: ['Everything in Pro', 'Team workspaces & multi-user', 'Custom branding', 'API access', 'Dedicated support'],
-    cta: 'Contact sales', highlight: false,
+    cta: 'Subscribe — $79/mo', highlight: false,
   },
 ];
 
@@ -53,10 +53,36 @@ const TESTIMONIALS = [
 export default function LandingPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
+  const [checkingOut, setCheckingOut] = useState<string | null>(null);
 
   useEffect(() => {
     if (!loading && user) router.replace('/dashboard');
   }, [user, loading, router]);
+
+  const handleSubscribe = async (planKey: string) => {
+    setCheckingOut(planKey);
+    try {
+      const res = await fetch('/api/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          plan: planKey,
+          uid: user?.uid || '',
+          email: user?.email || '',
+        }),
+      });
+      const data = await res.json();
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        alert('Could not start checkout. Please try again.');
+      }
+    } catch {
+      alert('Could not start checkout. Please try again.');
+    } finally {
+      setCheckingOut(null);
+    }
+  };
 
   if (loading || user) return null;
 
@@ -348,7 +374,7 @@ export default function LandingPage() {
             <p className="text-zinc-400 text-base sm:text-lg">Start free. Scale as your studio grows.</p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5 sm:gap-6 items-start md:items-center">
-            {PLANS.map(({ name, price, period, features, cta, highlight, badge }) => (
+            {PLANS.map(({ name, price, period, features, cta, highlight, badge, planKey }) => (
               <div key={name}
                 className={`rounded-2xl p-7 sm:p-8 flex flex-col transition-all ${highlight ? 'bg-white text-zinc-950 shadow-[0_0_60px_rgba(255,255,255,0.15)] md:scale-105' : 'bg-zinc-900 border border-white/10'}`}>
                 {badge && (
@@ -357,7 +383,7 @@ export default function LandingPage() {
                 <div className="mb-1 text-xs font-bold uppercase tracking-widest opacity-50">{name}</div>
                 <div className="flex items-end gap-1 mb-6">
                   <span className="text-4xl sm:text-5xl font-black">{price}</span>
-                  <span className={`text-sm mb-2 ${highlight ? 'text-zinc-500' : 'text-zinc-500'}`}>{period}</span>
+                  <span className="text-sm mb-2 text-zinc-500">{period}</span>
                 </div>
                 <ul className="space-y-3 flex-1 mb-8">
                   {features.map(f => (
@@ -367,10 +393,22 @@ export default function LandingPage() {
                     </li>
                   ))}
                 </ul>
-                <Link href="/auth"
-                  className={`text-center py-3.5 rounded-xl text-sm font-bold transition-all ${highlight ? 'bg-zinc-950 text-white hover:bg-zinc-800' : 'border border-white/15 text-white hover:bg-white/8 hover:border-white/30'}`}>
-                  {cta}
-                </Link>
+
+                {planKey ? (
+                  <button
+                    onClick={() => handleSubscribe(planKey)}
+                    disabled={checkingOut !== null}
+                    className={`flex items-center justify-center gap-2 py-3.5 rounded-xl text-sm font-bold transition-all disabled:opacity-60 ${highlight ? 'bg-zinc-950 text-white hover:bg-zinc-800' : 'border border-white/15 text-white hover:bg-white/10 hover:border-white/30'}`}>
+                    {checkingOut === planKey
+                      ? <><Loader2 size={15} className="animate-spin" /> Redirecting…</>
+                      : <><CreditCard size={15} /> {cta}</>}
+                  </button>
+                ) : (
+                  <Link href="/auth"
+                    className={`text-center py-3.5 rounded-xl text-sm font-bold transition-all border border-white/15 text-white hover:bg-white/10 hover:border-white/30`}>
+                    {cta}
+                  </Link>
+                )}
               </div>
             ))}
           </div>
