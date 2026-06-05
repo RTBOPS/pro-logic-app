@@ -8,7 +8,7 @@ import { auth, db, storage } from '@/lib/firebase';
 import Modal from '@/components/Modal';
 import {
   Plus, Pencil, Trash2, Search, Database, ExternalLink,
-  ChevronDown, ChevronUp, Zap, Upload, ClipboardCheck, X,
+  ChevronDown, ChevronUp, Zap, Upload, ClipboardCheck, X, Copy,
 } from 'lucide-react';
 import { useNamespace } from '@/hooks/useNamespace';
 import { loadEquipmentCatalog, CATALOG_CATEGORIES, CATALOG_STATUSES, CATALOG_CONDITIONS, type CatalogItem } from '@/lib/equipment-catalog';
@@ -204,6 +204,21 @@ export default function InventoryPage() {
     await deleteDoc(doc(db, 'users', getUid()!, 'inventory', id));
   };
 
+  const duplicate = async (item: any) => {
+    const uid = getUid();
+    if (!uid) return;
+    // Strip the Firestore id, generate a new item_id, mark name as copy
+    const { id: _id, ...rest } = item;
+    const newItem = {
+      ...rest,
+      name: `${rest.name} (copy)`,
+      item_id: `${rest.item_id || rest.name.slice(0, 4).toUpperCase()}-${Date.now().toString(36).toUpperCase()}`,
+      status: 'Available',
+      created_at: new Date().toISOString(),
+    };
+    await addDoc(collection(db, 'users', uid, 'inventory'), newItem);
+  };
+
   const dbResults = useMemo(() => {
     return catalog.filter(item => {
       const q = dbQuery.toLowerCase();
@@ -380,8 +395,9 @@ export default function InventoryPage() {
                   <td className="px-5 py-3" onClick={e => e.stopPropagation()}>
                     <div className="flex items-center gap-1.5 justify-end">
                       <button onClick={() => openInspection(i)} title="Rental inspection" className="text-gray-600 hover:text-blue-600"><ClipboardCheck size={14} /></button>
-                      <button onClick={() => openEdit(i)} className="text-gray-600 hover:text-gray-700"><Pencil size={14} /></button>
-                      <button onClick={() => remove(i.id)} className="text-gray-600 hover:text-red-600"><Trash2 size={14} /></button>
+                      <button onClick={() => duplicate(i)} title="Duplicate item" className="text-gray-400 hover:text-green-600"><Copy size={14} /></button>
+                      <button onClick={() => openEdit(i)} title="Edit" className="text-gray-600 hover:text-gray-700"><Pencil size={14} /></button>
+                      <button onClick={() => remove(i.id)} title="Delete" className="text-gray-600 hover:text-red-600"><Trash2 size={14} /></button>
                     </div>
                   </td>
                 </tr>
@@ -560,6 +576,10 @@ export default function InventoryPage() {
             <button onClick={() => { close(); openEdit(detailItem); }}
               className="flex-1 border border-gray-200 text-gray-700 py-2 rounded-lg text-sm font-medium hover:bg-gray-50">
               Edit
+            </button>
+            <button onClick={() => { duplicate(detailItem); close(); }}
+              className="flex items-center justify-center gap-1.5 flex-1 border border-gray-200 text-gray-700 py-2 rounded-lg text-sm font-medium hover:bg-green-50 hover:border-green-200 hover:text-green-700">
+              <Copy size={13} /> Duplicate
             </button>
             <button onClick={close} className="px-4 py-2 text-sm text-gray-500">Close</button>
           </div>
