@@ -6,24 +6,24 @@ import Link from 'next/link';
 import { useAuth } from '@/hooks/useAuth';
 import {
   Film, Users, Package, MapPin, FileText, ClipboardList,
-  CheckSquare, Layers, BarChart3, Shield, Zap, Globe,
-  ArrowRight, Star, ChevronRight, Camera, Mic, Lightbulb,
+  CheckSquare, Layers, BarChart3, Zap, Globe,
+  ArrowRight, Star, ChevronRight,
   ClipboardCheck, IdCard, BookImage,
 } from 'lucide-react';
 
 const FEATURES = [
-  { icon: Film, title: 'Productions', desc: 'Manage every production from brief to wrap. Track status, schedule, crew, and locations in one place.', color: 'bg-purple-50 text-purple-600' },
-  { icon: FileText, title: 'Documents & PDFs', desc: 'Generate professional call sheets, NDAs, crew deals, shot lists, and location releases — pre-filled instantly.', color: 'bg-blue-50 text-blue-600' },
-  { icon: Users, title: 'Crew & Cast', desc: 'Full crew profiles with departments, rates, availability, ID cards with QR codes, and deal memo signing.', color: 'bg-green-50 text-green-600' },
-  { icon: Package, title: 'Equipment Inventory', desc: 'Catalog every piece of gear with check-out/return forms, maintenance logs, and retirement reports.', color: 'bg-orange-50 text-orange-600' },
-  { icon: BookImage, title: 'Stripboard', desc: 'Professional scene scheduling with drag-and-drop strips, color coding, and instant PDF export.', color: 'bg-red-50 text-red-600' },
-  { icon: Layers, title: 'Storyboard Creator', desc: 'Draw storyboard panels directly in the browser with pen, pencil, and marker tools. Reorder with drag & drop.', color: 'bg-indigo-50 text-indigo-600' },
-  { icon: MapPin, title: 'Location Blueprint', desc: 'Design your set layout on an interactive canvas. Place equipment, crew marks, lighting, and props.', color: 'bg-teal-50 text-teal-600' },
-  { icon: CheckSquare, title: 'Equipment Checklists', desc: '9 pre-built checklists (camera, audio, lighting…) plus custom lists. Track readiness % per production.', color: 'bg-yellow-50 text-yellow-600' },
-  { icon: IdCard, title: 'ID Cards', desc: 'Generate color-coded crew ID cards with QR codes. Print on Avery sheets for every department.', color: 'bg-pink-50 text-pink-600' },
-  { icon: ClipboardCheck, title: 'Equipment Forms', desc: 'Digital check-out, return inspection, maintenance, and asset retirement forms with mobile signatures.', color: 'bg-cyan-50 text-cyan-600' },
-  { icon: BarChart3, title: 'Gantt & Scheduling', desc: 'Visual Gantt chart for your entire production timeline. See every task across all productions at once.', color: 'bg-emerald-50 text-emerald-600' },
-  { icon: ClipboardList, title: 'Shoot Log', desc: 'On-set take journal: log scene, shot, take, lens, aperture, ISO, shutter, sound roll — in real time.', color: 'bg-violet-50 text-violet-600' },
+  { icon: Film,          title: 'Productions',       desc: 'Manage every production from brief to wrap. Track status, schedule, crew, and locations in one place.',          color: 'bg-purple-500/10 text-purple-400' },
+  { icon: FileText,      title: 'Documents & PDFs',  desc: 'Generate call sheets, NDAs, crew deals, shot lists, and location releases — pre-filled with your production data.', color: 'bg-blue-500/10 text-blue-400' },
+  { icon: Users,         title: 'Crew & Cast',       desc: 'Full profiles, departments, rates, availability, ID cards with QR codes, and digital deal memos.',                 color: 'bg-green-500/10 text-green-400' },
+  { icon: Package,       title: 'Equipment Inventory', desc: 'Catalog every piece of gear. Check-out, return inspection, maintenance logs, and asset retirement forms.',      color: 'bg-orange-500/10 text-orange-400' },
+  { icon: BookImage,     title: 'Stripboard',        desc: 'Drag-and-drop scene scheduling with color-coded strips, scene breakdowns, and instant PDF export.',                color: 'bg-red-500/10 text-red-400' },
+  { icon: Layers,        title: 'Storyboard',        desc: 'Draw panel-by-panel directly in the browser. Pen, pencil, and marker tools. Reorder with drag & drop.',            color: 'bg-indigo-500/10 text-indigo-400' },
+  { icon: MapPin,        title: 'Location Blueprint', desc: 'Design your set layout on a canvas. Place equipment, crew marks, lighting, and props from your inventory.',      color: 'bg-teal-500/10 text-teal-400' },
+  { icon: CheckSquare,   title: 'Checklists',        desc: '9 pre-built checklists plus custom lists. Track shoot readiness % per production — live on the dashboard.',       color: 'bg-yellow-500/10 text-yellow-400' },
+  { icon: IdCard,        title: 'ID Cards',          desc: 'Color-coded crew ID cards with QR codes. Print on Avery sheets — one click for every department.',                 color: 'bg-pink-500/10 text-pink-400' },
+  { icon: ClipboardCheck, title: 'Equipment Forms',  desc: 'Digital check-out, return inspection, maintenance, and retirement forms with mobile finger signatures.',           color: 'bg-cyan-500/10 text-cyan-400' },
+  { icon: BarChart3,     title: 'Gantt Chart',       desc: 'Visual timeline across your entire production schedule. See every task, dependency, and deadline at once.',        color: 'bg-emerald-500/10 text-emerald-400' },
+  { icon: ClipboardList, title: 'Shoot Log',         desc: 'On-set take journal: scene, shot, lens, aperture, ISO, shutter speed, sound roll — all logged in real time.',     color: 'bg-violet-500/10 text-violet-400' },
 ];
 
 const PLANS = [
@@ -34,27 +34,26 @@ const PLANS = [
   },
   {
     name: 'Pro', price: '$29', period: '/month',
-    features: ['Unlimited productions', 'Unlimited crew & inventory', 'All PDF documents', 'Storyboard + Blueprint', 'Equipment database', 'Priority support'],
+    features: ['Unlimited productions', 'Unlimited crew & inventory', 'All PDF documents', 'Storyboard + Blueprint', 'Equipment forms & ID cards', 'Priority support'],
     cta: 'Start Pro trial', highlight: true, badge: 'Most Popular',
   },
   {
     name: 'Studio', price: '$79', period: '/month',
-    features: ['Everything in Pro', 'Team workspaces', 'Multi-user access', 'Custom branding', 'Dedicated support', 'API access'],
+    features: ['Everything in Pro', 'Team workspaces & multi-user', 'Custom branding', 'API access', 'Dedicated support'],
     cta: 'Contact sales', highlight: false,
   },
 ];
 
 const TESTIMONIALS = [
   { name: 'Marco T.', role: 'Director of Photography', quote: 'PRO-LOGIC replaced three separate tools. Call sheets, inventory tracking, and crew management all in one. Game changer on set.' },
-  { name: 'Sara L.', role: 'Line Producer', quote: 'The equipment check-out forms with mobile signatures saved us so much paperwork. Our gear is finally accountable.' },
-  { name: 'James R.', role: 'Production Coordinator', quote: 'The checklists and shoot readiness dashboard on the main screen lets me know exactly where we stand every morning.' },
+  { name: 'Sara L.', role: 'Line Producer', quote: 'The equipment check-out forms with mobile signatures saved us so much paperwork. Our gear is finally fully accountable.' },
+  { name: 'James R.', role: 'Production Coordinator', quote: 'The shoot readiness dashboard tells me exactly where we stand every morning — before I even get to set.' },
 ];
 
 export default function LandingPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
 
-  // If already logged in, go straight to dashboard
   useEffect(() => {
     if (!loading && user) router.replace('/dashboard');
   }, [user, loading, router]);
@@ -62,117 +61,132 @@ export default function LandingPage() {
   if (loading || user) return null;
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-white" style={{ fontFamily: 'var(--font-geist-sans, system-ui, sans-serif)' }}>
+    <div className="min-h-screen bg-zinc-950 text-white overflow-x-hidden" style={{ fontFamily: 'var(--font-geist-sans, system-ui, sans-serif)' }}>
 
-      {/* ── NAV ───────────────────────────────────────────────── */}
-      <nav className="fixed top-0 left-0 right-0 z-50 border-b border-white/10 bg-zinc-950/80 backdrop-blur-md">
+      {/* ── NAV ──────────────────────────────────────────────── */}
+      <nav className="fixed top-0 left-0 right-0 z-50 border-b border-white/10 bg-zinc-950/70 backdrop-blur-md">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
           <img src="/logo-white.svg" alt="PRO-LOGIC" className="h-8 object-contain" />
           <div className="hidden md:flex items-center gap-6 text-sm text-zinc-400">
             <a href="#features" className="hover:text-white transition-colors">Features</a>
-            <a href="#pricing" className="hover:text-white transition-colors">Pricing</a>
-            <a href="#testimonials" className="hover:text-white transition-colors">Reviews</a>
+            <a href="#pricing"  className="hover:text-white transition-colors">Pricing</a>
+            <a href="#reviews"  className="hover:text-white transition-colors">Reviews</a>
           </div>
-          <div className="flex items-center gap-3">
-            <Link href="/auth" className="text-sm text-zinc-400 hover:text-white transition-colors px-3 py-1.5">Sign in</Link>
-            <Link href="/auth"
-              className="bg-white text-zinc-950 text-sm font-semibold px-4 py-2 rounded-xl hover:bg-zinc-100 transition-colors">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <Link href="/auth" className="text-sm text-zinc-400 hover:text-white transition-colors px-2 sm:px-3 py-1.5 hidden sm:block">
+              Sign in
+            </Link>
+            <Link href="/auth" className="bg-white text-zinc-950 text-xs sm:text-sm font-bold px-3 sm:px-5 py-2 sm:py-2.5 rounded-xl hover:bg-zinc-100 transition-colors whitespace-nowrap">
               Get started free
             </Link>
           </div>
         </div>
       </nav>
 
-      {/* ── HERO ──────────────────────────────────────────────── */}
-      <section className="pt-32 pb-20 px-4 sm:px-6 lg:px-8 text-center relative overflow-hidden">
-        {/* Background glow */}
-        <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[700px] h-[400px] bg-white/5 rounded-full blur-3xl" />
+      {/* ── HERO — full-screen bg image ───────────────────────── */}
+      <section className="relative min-h-screen flex flex-col justify-end">
+        {/* Background photo */}
+        <div className="absolute inset-0">
+          <img
+            src="/img-hero.jpg"
+            alt=""
+            className="w-full h-full object-cover object-center"
+          />
+          {/* Multi-layer overlay for legibility */}
+          <div className="absolute inset-0 bg-gradient-to-b from-zinc-950/70 via-zinc-950/30 to-zinc-950/90" />
+          <div className="absolute inset-0 bg-zinc-950/20" />
         </div>
 
-        <div className="max-w-4xl mx-auto relative">
-          <div className="inline-flex items-center gap-2 bg-white/10 border border-white/20 rounded-full px-4 py-1.5 text-xs text-zinc-300 mb-8">
+        {/* Hero content — pinned to bottom of viewport */}
+        <div className="relative z-10 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 pb-20 pt-32">
+          <div className="inline-flex items-center gap-2 bg-white/10 border border-white/20 backdrop-blur-sm rounded-full px-4 py-1.5 text-xs text-zinc-300 mb-6">
             <Zap size={12} className="text-yellow-400" />
             Built for film & video production teams
           </div>
 
-          <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black leading-none tracking-tight mb-6">
+          <h1 className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-black leading-none tracking-tight mb-6 max-w-4xl">
             Every production tool
-            <br />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-zinc-200 to-zinc-500">
-              in one platform.
+            <br className="hidden sm:block" />
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-white to-zinc-400">
+              {' '}in one platform.
             </span>
           </h1>
 
-          <p className="text-lg sm:text-xl text-zinc-400 max-w-2xl mx-auto mb-10 leading-relaxed">
+          <p className="text-lg sm:text-xl text-zinc-300 max-w-2xl mb-10 leading-relaxed">
             PRO-LOGIC Studio is the all-in-one production management platform for video and film professionals.
-            Manage crew, gear, documents, scheduling, and on-set operations from any device.
+            Manage crew, gear, documents, scheduling, and on-set operations — from any device.
           </p>
 
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+          <div className="flex flex-col sm:flex-row gap-4">
             <Link href="/auth"
-              className="inline-flex items-center justify-center gap-2 bg-white text-zinc-950 font-bold text-base px-8 py-4 rounded-2xl hover:bg-zinc-100 transition-all hover:scale-105">
-              Start for free <ArrowRight size={18} />
+              className="inline-flex items-center justify-center gap-2 bg-white text-zinc-950 font-bold text-base sm:text-lg px-8 py-4 sm:py-5 rounded-2xl hover:bg-zinc-100 transition-all hover:scale-[1.02] shadow-2xl">
+              Start for free <ArrowRight size={20} />
             </Link>
             <a href="#features"
-              className="inline-flex items-center justify-center gap-2 border border-white/20 text-zinc-300 font-medium text-base px-8 py-4 rounded-2xl hover:bg-white/5 transition-colors">
-              Explore features <ChevronRight size={18} />
+              className="inline-flex items-center justify-center gap-2 border border-white/30 text-white font-medium text-base sm:text-lg px-8 py-4 sm:py-5 rounded-2xl hover:bg-white/10 transition-colors backdrop-blur-sm">
+              Explore features <ChevronRight size={20} />
             </a>
           </div>
-
-          <p className="text-xs text-zinc-600 mt-6">No credit card required · Free plan forever · Cancel anytime</p>
-        </div>
-
-        {/* Feature strip */}
-        <div className="max-w-5xl mx-auto mt-16 grid grid-cols-2 sm:grid-cols-4 gap-4">
-          {[
-            { icon: Film, label: 'Productions' },
-            { icon: Users, label: 'Crew & Cast' },
-            { icon: Package, label: 'Equipment' },
-            { icon: FileText, label: 'PDF Documents' },
-          ].map(({ icon: Icon, label }) => (
-            <div key={label} className="flex items-center justify-center gap-2 bg-white/5 border border-white/10 rounded-2xl py-4 px-3">
-              <Icon size={18} className="text-zinc-400 shrink-0" />
-              <span className="text-sm text-zinc-300 font-medium">{label}</span>
-            </div>
-          ))}
+          <p className="text-xs text-zinc-500 mt-5">No credit card required · Free plan forever · Cancel anytime</p>
         </div>
       </section>
 
-      {/* ── STATS ─────────────────────────────────────────────── */}
-      <section className="border-y border-white/10 py-12 px-4">
-        <div className="max-w-5xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
+      {/* ── STAT STRIP ───────────────────────────────────────── */}
+      <section className="border-y border-white/10 py-10 sm:py-14 px-4 bg-zinc-900/60 backdrop-blur-sm">
+        <div className="max-w-5xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-6 sm:gap-10 text-center">
           {[
             { value: '12+', label: 'Production tools' },
-            { value: '9', label: 'Checklist categories' },
-            { value: '7', label: 'PDF document types' },
-            { value: '∞', label: 'Productions on Studio plan' },
+            { value: '9',   label: 'Checklist categories' },
+            { value: '7',   label: 'PDF document types' },
+            { value: '∞',   label: 'Productions on Studio plan' },
           ].map(({ value, label }) => (
             <div key={label}>
-              <div className="text-4xl font-black text-white mb-1">{value}</div>
-              <div className="text-sm text-zinc-500">{label}</div>
+              <div className="text-3xl sm:text-5xl font-black text-white mb-1">{value}</div>
+              <div className="text-xs sm:text-sm text-zinc-500">{label}</div>
             </div>
           ))}
         </div>
       </section>
 
-      {/* ── FEATURES ──────────────────────────────────────────── */}
-      <section id="features" className="py-24 px-4 sm:px-6 lg:px-8">
+      {/* ── FULL-WIDTH CREW PHOTO + TAGLINE ──────────────────── */}
+      <section className="relative h-[50vh] sm:h-[60vh] md:h-[70vh] overflow-hidden">
+        <img
+          src="/img-studio-crew.jpg"
+          alt="Film production crew on set"
+          className="w-full h-full object-cover object-center"
+        />
+        <div className="absolute inset-0 bg-gradient-to-r from-zinc-950/80 via-zinc-950/40 to-zinc-950/10" />
+        <div className="absolute inset-0 flex flex-col justify-center px-6 sm:px-12 lg:px-24">
+          <div className="max-w-xl">
+            <p className="text-xs sm:text-sm text-zinc-400 uppercase tracking-widest mb-3 font-semibold">Built for the set</p>
+            <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black leading-tight text-white mb-4">
+              Every department.<br />One system.
+            </h2>
+            <p className="text-zinc-300 text-sm sm:text-base leading-relaxed">
+              From camera package to transportation, grip to catering —
+              every crew member and every piece of gear tracked in real time.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* ── FEATURES GRID ────────────────────────────────────── */}
+      <section id="features" className="py-20 sm:py-28 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-16">
+          <div className="text-center mb-14 sm:mb-20">
             <h2 className="text-3xl sm:text-4xl md:text-5xl font-black mb-4">
               Everything you need,<br />
-              <span className="text-zinc-400">nothing you don't.</span>
+              <span className="text-zinc-500">nothing you don't.</span>
             </h2>
-            <p className="text-zinc-400 text-lg max-w-2xl mx-auto">
-              From pre-production planning to post-wrap reports, every workflow is covered.
+            <p className="text-zinc-400 text-base sm:text-lg max-w-2xl mx-auto">
+              From pre-production planning to post-wrap reports — every workflow in one place.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
             {FEATURES.map(({ icon: Icon, title, desc, color }) => (
               <div key={title}
-                className="bg-zinc-900 border border-white/5 rounded-2xl p-5 hover:border-white/20 hover:bg-zinc-800/60 transition-all group">
+                className="bg-zinc-900 border border-white/5 rounded-2xl p-5 hover:border-white/20 hover:bg-zinc-800/60 transition-all group cursor-default">
                 <div className={`inline-flex p-2.5 rounded-xl mb-4 ${color}`}>
                   <Icon size={20} />
                 </div>
@@ -184,22 +198,106 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── HOW IT WORKS ──────────────────────────────────────── */}
-      <section className="py-20 px-4 sm:px-6 lg:px-8 bg-zinc-900/50">
-        <div className="max-w-5xl mx-auto">
-          <div className="text-center mb-14">
-            <h2 className="text-3xl sm:text-4xl font-black mb-4">From setup to shoot day in minutes</h2>
-            <p className="text-zinc-400">Get your entire production organized in three steps.</p>
+      {/* ── SPLIT: CAMERA + SLATE ────────────────────────────── */}
+      <section className="relative overflow-hidden">
+        <div className="flex flex-col lg:flex-row min-h-[60vh]">
+          {/* Image left */}
+          <div className="relative w-full lg:w-1/2 h-64 sm:h-80 lg:h-auto">
+            <img
+              src="/img-camera-slate.jpg"
+              alt="Hollywood production camera and clapperboard"
+              className="w-full h-full object-cover object-center"
+            />
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent to-zinc-950/80 hidden lg:block" />
+            <div className="absolute inset-0 bg-gradient-to-b from-transparent to-zinc-950/80 lg:hidden" />
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          {/* Text right */}
+          <div className="w-full lg:w-1/2 bg-zinc-950 flex flex-col justify-center px-8 sm:px-12 lg:px-16 py-14 lg:py-20">
+            <p className="text-xs text-zinc-500 uppercase tracking-widest mb-3 font-semibold">Documents</p>
+            <h2 className="text-3xl sm:text-4xl md:text-5xl font-black leading-tight mb-6">
+              Professional PDFs,<br />generated in seconds.
+            </h2>
+            <p className="text-zinc-400 text-sm sm:text-base leading-relaxed mb-8">
+              Call sheets, NDAs, crew deal memos, shot lists, location releases, stripboards,
+              and character breakdowns — all pre-filled with your production data.
+              One click. Print-ready.
+            </p>
+            <Link href="/auth"
+              className="inline-flex items-center gap-2 bg-white text-zinc-950 font-bold px-6 py-3 rounded-xl hover:bg-zinc-100 transition-colors w-fit text-sm">
+              Try it free <ArrowRight size={16} />
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* ── SPLIT: FILM STUDIO (reversed) ────────────────────── */}
+      <section className="relative overflow-hidden">
+        <div className="flex flex-col-reverse lg:flex-row min-h-[60vh]">
+          {/* Text left */}
+          <div className="w-full lg:w-1/2 bg-zinc-900 flex flex-col justify-center px-8 sm:px-12 lg:px-16 py-14 lg:py-20">
+            <p className="text-xs text-zinc-500 uppercase tracking-widest mb-3 font-semibold">Equipment</p>
+            <h2 className="text-3xl sm:text-4xl md:text-5xl font-black leading-tight mb-6">
+              Every piece of gear.<br />Fully accountable.
+            </h2>
+            <p className="text-zinc-400 text-sm sm:text-base leading-relaxed mb-8">
+              Digital check-out forms with mobile signatures. Return inspections with
+              damage assessment. Maintenance logs. Asset retirement reports. Your
+              entire equipment lifecycle — paperless, on any device.
+            </p>
+            <Link href="/auth"
+              className="inline-flex items-center gap-2 border border-white/20 text-white font-bold px-6 py-3 rounded-xl hover:bg-white/10 transition-colors w-fit text-sm">
+              Explore equipment tools <ArrowRight size={16} />
+            </Link>
+          </div>
+          {/* Image right */}
+          <div className="relative w-full lg:w-1/2 h-64 sm:h-80 lg:h-auto">
+            <img
+              src="/img-film-studio.jpg"
+              alt="Film studio with camera and lighting"
+              className="w-full h-full object-cover object-center"
+            />
+            <div className="absolute inset-0 bg-gradient-to-l from-transparent to-zinc-900/80 hidden lg:block" />
+            <div className="absolute inset-0 bg-gradient-to-t from-transparent to-zinc-900/60 lg:hidden" />
+          </div>
+        </div>
+      </section>
+
+      {/* ── LIGHTING RIG — full width atmospheric ────────────── */}
+      <section className="relative h-[40vh] sm:h-[50vh] md:h-[55vh] overflow-hidden">
+        <img
+          src="/img-lighting-rig.jpg"
+          alt="Stage lighting rigging technicians"
+          className="w-full h-full object-cover object-[center_60%]"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/50 to-zinc-950/20" />
+        <div className="absolute bottom-0 left-0 right-0 px-6 sm:px-12 lg:px-24 pb-10 sm:pb-16">
+          <div className="max-w-4xl mx-auto text-center">
+            <p className="text-zinc-400 text-sm sm:text-base md:text-lg leading-relaxed">
+              "From the production office to the set floor — PRO-LOGIC keeps every department
+              connected, every piece of gear tracked, every call sheet ready."
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* ── HOW IT WORKS ─────────────────────────────────────── */}
+      <section className="py-20 sm:py-28 px-4 sm:px-6 lg:px-8 bg-zinc-900/40">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-14 sm:mb-20">
+            <h2 className="text-3xl sm:text-4xl md:text-5xl font-black mb-4">
+              From setup to shoot day<br />
+              <span className="text-zinc-500">in minutes.</span>
+            </h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 sm:gap-12">
             {[
-              { step: '01', title: 'Create your production', desc: 'Add project details, assign crew, link locations, and attach your equipment inventory.' },
-              { step: '02', title: 'Generate all documents', desc: 'One click produces call sheets, NDAs, deal memos, shot lists — pre-filled with your data.' },
-              { step: '03', title: 'Manage on-set', desc: 'Log takes in real time, check out gear with signatures, track checklist readiness live.' },
+              { step: '01', title: 'Create your production', desc: 'Add project details, assign crew, link locations, and attach your equipment inventory. Everything in one place from day one.' },
+              { step: '02', title: 'Generate all documents', desc: 'One click produces call sheets, NDAs, deal memos, shot lists — all pre-filled with your production data. No manual entry.' },
+              { step: '03', title: 'Manage on-set', desc: 'Log takes in real time, check out gear with digital signatures, track checklist readiness live, and stay in control from any device.' },
             ].map(({ step, title, desc }) => (
-              <div key={step} className="relative">
-                <div className="text-7xl font-black text-white/5 mb-2 leading-none">{step}</div>
-                <h3 className="text-xl font-bold text-white mb-2">{title}</h3>
+              <div key={step} className="relative pl-4 border-l border-white/10">
+                <div className="text-6xl sm:text-7xl font-black text-white/5 mb-2 leading-none">{step}</div>
+                <h3 className="text-lg sm:text-xl font-bold text-white mb-3">{title}</h3>
                 <p className="text-zinc-400 text-sm leading-relaxed">{desc}</p>
               </div>
             ))}
@@ -207,22 +305,34 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── TESTIMONIALS ──────────────────────────────────────── */}
-      <section id="testimonials" className="py-20 px-4 sm:px-6 lg:px-8">
+      {/* ── TESTIMONIALS ─────────────────────────────────────── */}
+      <section id="reviews" className="py-20 sm:py-28 px-4 sm:px-6 lg:px-8">
         <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-14">
-            <h2 className="text-3xl sm:text-4xl font-black mb-4">Trusted by production teams</h2>
+          {/* Clapper image header */}
+          <div className="relative h-48 sm:h-64 rounded-3xl overflow-hidden mb-14">
+            <img
+              src="/img-clapper.jpg"
+              alt="Film production clapperboard"
+              className="w-full h-full object-cover object-center"
+            />
+            <div className="absolute inset-0 bg-zinc-950/60 flex items-center justify-center">
+              <div className="text-center">
+                <p className="text-xs text-zinc-400 uppercase tracking-widest mb-2 font-semibold">Testimonials</p>
+                <h2 className="text-2xl sm:text-3xl md:text-4xl font-black">Trusted by production teams</h2>
+              </div>
+            </div>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5 sm:gap-6">
             {TESTIMONIALS.map(({ name, role, quote }) => (
-              <div key={name} className="bg-zinc-900 border border-white/10 rounded-2xl p-6">
-                <div className="flex gap-0.5 mb-4">
+              <div key={name} className="bg-zinc-900 border border-white/10 rounded-2xl p-6 sm:p-7 flex flex-col">
+                <div className="flex gap-0.5 mb-5">
                   {[...Array(5)].map((_, i) => <Star key={i} size={14} className="text-yellow-400 fill-yellow-400" />)}
                 </div>
-                <p className="text-zinc-300 text-sm leading-relaxed mb-5">"{quote}"</p>
+                <p className="text-zinc-300 text-sm sm:text-base leading-relaxed flex-1 mb-6">"{quote}"</p>
                 <div>
-                  <div className="font-semibold text-white text-sm">{name}</div>
-                  <div className="text-zinc-500 text-xs">{role}</div>
+                  <div className="font-bold text-white text-sm">{name}</div>
+                  <div className="text-zinc-500 text-xs mt-0.5">{role}</div>
                 </div>
               </div>
             ))}
@@ -230,34 +340,35 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── PRICING ───────────────────────────────────────────── */}
-      <section id="pricing" className="py-20 px-4 sm:px-6 lg:px-8 bg-zinc-900/50">
+      {/* ── PRICING ──────────────────────────────────────────── */}
+      <section id="pricing" className="py-20 sm:py-28 px-4 sm:px-6 lg:px-8 bg-zinc-900/40">
         <div className="max-w-5xl mx-auto">
-          <div className="text-center mb-14">
-            <h2 className="text-3xl sm:text-4xl font-black mb-4">Simple, transparent pricing</h2>
-            <p className="text-zinc-400">Start free. Scale as your studio grows.</p>
+          <div className="text-center mb-14 sm:mb-20">
+            <h2 className="text-3xl sm:text-4xl md:text-5xl font-black mb-4">Simple, transparent pricing</h2>
+            <p className="text-zinc-400 text-base sm:text-lg">Start free. Scale as your studio grows.</p>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5 sm:gap-6 items-start md:items-center">
             {PLANS.map(({ name, price, period, features, cta, highlight, badge }) => (
-              <div key={name} className={`rounded-2xl p-7 flex flex-col ${highlight ? 'bg-white text-zinc-950 shadow-2xl scale-105' : 'bg-zinc-900 border border-white/10'}`}>
+              <div key={name}
+                className={`rounded-2xl p-7 sm:p-8 flex flex-col transition-all ${highlight ? 'bg-white text-zinc-950 shadow-[0_0_60px_rgba(255,255,255,0.15)] md:scale-105' : 'bg-zinc-900 border border-white/10'}`}>
                 {badge && (
                   <div className="inline-flex items-center bg-black text-white text-xs font-bold px-3 py-1 rounded-full mb-4 w-fit">{badge}</div>
                 )}
-                <div className="mb-1 text-xs font-semibold uppercase tracking-widest opacity-60">{name}</div>
+                <div className="mb-1 text-xs font-bold uppercase tracking-widest opacity-50">{name}</div>
                 <div className="flex items-end gap-1 mb-6">
-                  <span className="text-4xl font-black">{price}</span>
-                  <span className={`text-sm mb-1.5 ${highlight ? 'text-zinc-500' : 'text-zinc-500'}`}>{period}</span>
+                  <span className="text-4xl sm:text-5xl font-black">{price}</span>
+                  <span className={`text-sm mb-2 ${highlight ? 'text-zinc-500' : 'text-zinc-500'}`}>{period}</span>
                 </div>
-                <ul className="space-y-2.5 flex-1 mb-8">
+                <ul className="space-y-3 flex-1 mb-8">
                   {features.map(f => (
-                    <li key={f} className="flex items-start gap-2 text-sm">
-                      <span className={`mt-0.5 shrink-0 ${highlight ? 'text-green-600' : 'text-zinc-500'}`}>✓</span>
+                    <li key={f} className="flex items-start gap-2.5 text-sm">
+                      <span className={`mt-0.5 shrink-0 font-bold ${highlight ? 'text-green-600' : 'text-zinc-600'}`}>✓</span>
                       <span className={highlight ? 'text-zinc-700' : 'text-zinc-400'}>{f}</span>
                     </li>
                   ))}
                 </ul>
                 <Link href="/auth"
-                  className={`text-center py-3 rounded-xl text-sm font-bold transition-colors ${highlight ? 'bg-black text-white hover:bg-zinc-800' : 'border border-white/20 text-white hover:bg-white/5'}`}>
+                  className={`text-center py-3.5 rounded-xl text-sm font-bold transition-all ${highlight ? 'bg-zinc-950 text-white hover:bg-zinc-800' : 'border border-white/15 text-white hover:bg-white/8 hover:border-white/30'}`}>
                   {cta}
                 </Link>
               </div>
@@ -266,35 +377,54 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── CTA BANNER ────────────────────────────────────────── */}
-      <section className="py-24 px-4 sm:px-6 lg:px-8 text-center">
-        <div className="max-w-3xl mx-auto">
-          <h2 className="text-3xl sm:text-4xl md:text-5xl font-black mb-6">
-            Your next production,<br />fully organized.
+      {/* ── CONCERT CTA — full screen image (user-requested bottom) */}
+      <section className="relative min-h-[70vh] sm:min-h-[80vh] flex flex-col justify-end overflow-hidden">
+        <img
+          src="/img-concert.jpg"
+          alt="Sound engineer at live concert"
+          className="absolute inset-0 w-full h-full object-cover object-center"
+        />
+        {/* Rich gradient from bottom */}
+        <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/60 to-zinc-950/10" />
+        <div className="absolute inset-0 bg-zinc-950/20" />
+
+        <div className="relative z-10 max-w-4xl mx-auto w-full px-4 sm:px-6 lg:px-8 pb-20 sm:pb-28 text-center">
+          <p className="text-xs text-zinc-400 uppercase tracking-widest mb-4 font-semibold">Get started today</p>
+          <h2 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black mb-6 leading-tight">
+            Your next production,<br />
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-white to-zinc-400">
+              fully organized.
+            </span>
           </h2>
-          <p className="text-zinc-400 text-lg mb-10">
-            Join production teams that run tighter sets with PRO-LOGIC Studio.
+          <p className="text-zinc-300 text-lg sm:text-xl mb-10 max-w-2xl mx-auto leading-relaxed">
+            Join production teams that run tighter sets, ship faster deliverables,
+            and never lose track of a single piece of gear.
           </p>
-          <Link href="/auth"
-            className="inline-flex items-center gap-2 bg-white text-zinc-950 font-bold text-lg px-10 py-5 rounded-2xl hover:bg-zinc-100 transition-all hover:scale-105">
-            Get started for free <ArrowRight size={20} />
-          </Link>
-          <p className="text-xs text-zinc-600 mt-5">No credit card · Free forever plan · Upgrade when ready</p>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Link href="/auth"
+              className="inline-flex items-center justify-center gap-2 bg-white text-zinc-950 font-black text-base sm:text-lg px-10 py-5 rounded-2xl hover:bg-zinc-100 transition-all hover:scale-[1.03] shadow-2xl">
+              Start for free — it's on us <ArrowRight size={20} />
+            </Link>
+          </div>
+          <p className="text-xs text-zinc-600 mt-6">No credit card · Free forever plan · Upgrade when ready</p>
         </div>
       </section>
 
-      {/* ── FOOTER ────────────────────────────────────────────── */}
-      <footer className="border-t border-white/10 py-10 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
+      {/* ── FOOTER ───────────────────────────────────────────── */}
+      <footer className="border-t border-white/10 py-10 px-4 sm:px-6 lg:px-8 bg-zinc-950">
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-5">
+          <div className="flex items-center gap-3 sm:gap-5">
             <img src="/logo-white.svg" alt="PRO-LOGIC" className="h-7 object-contain" />
-            <span className="text-zinc-600 text-xs">© {new Date().getFullYear()} PRO-LOGIC Studio. All rights reserved.</span>
+            <span className="text-zinc-600 text-xs text-center sm:text-left">
+              © {new Date().getFullYear()} PRO-LOGIC Studio. All rights reserved.
+            </span>
           </div>
-          <div className="flex items-center gap-6 text-sm text-zinc-600">
-            <a href="#features" className="hover:text-zinc-300 transition-colors">Features</a>
-            <a href="#pricing" className="hover:text-zinc-300 transition-colors">Pricing</a>
-            <Link href="/auth" className="hover:text-zinc-300 transition-colors">Sign in</Link>
-            <div className="flex items-center gap-1">
+          <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6 text-sm text-zinc-600">
+            <a href="#features"  className="hover:text-zinc-300 transition-colors">Features</a>
+            <a href="#pricing"   className="hover:text-zinc-300 transition-colors">Pricing</a>
+            <a href="#reviews"   className="hover:text-zinc-300 transition-colors">Reviews</a>
+            <Link href="/auth"   className="hover:text-zinc-300 transition-colors">Sign in</Link>
+            <div className="flex items-center gap-1.5">
               <Globe size={12} />
               <span>pro-logic.studio</span>
             </div>
