@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useData } from '@/hooks/useData';
 import { doc, getDoc, getDocs, collection } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
-import { Printer, IdCard, CreditCard, Loader2 } from 'lucide-react';
+import { Printer, IdCard, CreditCard, Loader2, Eye, X } from 'lucide-react';
 import PageHeader from '@/components/PageHeader';
 import { useNamespace } from '@/hooks/useNamespace';
 import { deptLabel, DEPARTMENTS } from '@/lib/departments';
@@ -48,12 +48,12 @@ function IDCard({ c, company, orientation, productionName }: { c: any; company: 
     return (
       <div className="id-card bg-white rounded-2xl overflow-hidden shadow-lg border border-gray-200 flex flex-col"
         style={{ width: '54mm', minHeight: '90mm', breakInside: 'avoid', pageBreakInside: 'avoid' }}>
-        {/* Header with company logo LARGE */}
-        <div className="px-3 py-2.5 flex items-center justify-between" style={{ backgroundColor: headerColor }}>
+        {/* Header */}
+        <div className="px-3 py-2 flex items-center justify-between" style={{ backgroundColor: headerColor }}>
           {company?.logo_url
-            ? <img src={company.logo_url} className="h-7 object-contain" style={{ filter: 'brightness(0) invert(1)', maxWidth: '70px' }} alt="" />
+            ? <div className="bg-white rounded px-1.5 py-0.5"><img src={company.logo_url} className="h-6 object-contain" style={{ maxWidth: '64px' }} alt="" /></div>
             : <span className="text-white text-sm font-bold tracking-wide">{company?.name || 'STUDIO'}</span>}
-          <img src="/logo.png" className="h-5 object-contain" style={{ filter: 'brightness(0) invert(1)' }} alt="" />
+          <img src="/logo-white.svg" className="h-5 object-contain" alt="" onError={e => { (e.target as HTMLImageElement).src = '/logo.png'; (e.target as HTMLImageElement).style.filter = 'brightness(0) invert(1)'; }} />
         </div>
         {/* Large photo */}
         <div className="flex justify-center pt-3 pb-1">
@@ -82,11 +82,11 @@ function IDCard({ c, company, orientation, productionName }: { c: any; company: 
   return (
     <div className="id-card bg-white rounded-2xl overflow-hidden shadow-lg border border-gray-200 flex flex-col"
       style={{ width: '85.6mm', minHeight: '54mm', breakInside: 'avoid', pageBreakInside: 'avoid' }}>
-      <div className="px-3 py-2.5 flex items-center justify-between" style={{ backgroundColor: headerColor }}>
+      <div className="px-3 py-2 flex items-center justify-between" style={{ backgroundColor: headerColor }}>
         {company?.logo_url
-          ? <img src={company.logo_url} className="h-7 object-contain" style={{ filter: 'brightness(0) invert(1)', maxWidth: '80px' }} alt="" />
+          ? <div className="bg-white rounded px-1.5 py-0.5"><img src={company.logo_url} className="h-6 object-contain" style={{ maxWidth: '72px' }} alt="" /></div>
           : <span className="text-white text-sm font-bold">{company?.name || 'STUDIO'}</span>}
-        <img src="/logo.png" className="h-5 object-contain" style={{ filter: 'brightness(0) invert(1)' }} alt="" />
+        <img src="/logo-white.svg" className="h-5 object-contain" alt="" onError={e => { (e.target as HTMLImageElement).src = '/logo.png'; (e.target as HTMLImageElement).style.filter = 'brightness(0) invert(1)'; }} />
       </div>
       <div className="flex gap-3 p-3 flex-1">
         <img src={c.picture} className="w-20 h-20 rounded-xl object-cover shrink-0"
@@ -127,6 +127,7 @@ export default function IDCardsPage() {
   const [prodCrew, setProdCrew] = useState<string[]>([]);
   const [loadingProd, setLoadingProd] = useState(false);
   const [printing, setPrinting] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
   const getUid = () => namespace || auth.currentUser?.uid || null;
   const averyPreset = AVERY_PRESETS.find(p => p.id === avery) || AVERY_PRESETS[0];
 
@@ -188,6 +189,10 @@ export default function IDCardsPage() {
           >
             {AVERY_PRESETS.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
           </select>
+          <button onClick={() => setShowPreview(true)} disabled={filtered.length === 0}
+            className="flex items-center gap-2 border border-gray-200 text-gray-700 px-4 py-2 rounded-xl text-sm font-medium hover:bg-gray-50 disabled:opacity-40">
+            <Eye size={14} /> Preview
+          </button>
           <button onClick={handlePrint} disabled={printing}
             className="flex items-center gap-2 bg-black text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-zinc-800 disabled:opacity-40">
             {printing ? <Loader2 size={14} className="animate-spin" /> : <Printer size={14} />}
@@ -196,6 +201,45 @@ export default function IDCardsPage() {
         </div>
       </PageHeader>
       </div>
+
+      {/* Print Preview Modal */}
+      {showPreview && (
+        <div className="fixed inset-0 z-[100] flex flex-col bg-gray-700/90 backdrop-blur-sm">
+          {/* Toolbar */}
+          <div className="flex items-center justify-between px-5 py-3 bg-gray-900 text-white shrink-0">
+            <div className="flex items-center gap-3">
+              <img src="/logo-white.svg" className="h-6 object-contain" alt="PRO-LOGIC" />
+              <span className="text-sm font-medium">Print Preview — {filtered.length} card{filtered.length !== 1 ? 's' : ''}</span>
+              {avery !== 'free' && <span className="text-xs text-gray-400">· {AVERY_PRESETS.find(p => p.id === avery)?.label}</span>}
+            </div>
+            <div className="flex items-center gap-2">
+              <button onClick={() => { setShowPreview(false); handlePrint(); }}
+                className="flex items-center gap-2 bg-white text-gray-900 px-4 py-1.5 rounded-lg text-sm font-medium hover:bg-gray-100">
+                <Printer size={13} /> Print
+              </button>
+              <button onClick={() => setShowPreview(false)} className="p-1.5 text-gray-400 hover:text-white">
+                <X size={18} />
+              </button>
+            </div>
+          </div>
+          {/* Paper preview */}
+          <div className="flex-1 overflow-auto p-6 flex justify-center">
+            <div className="bg-white shadow-2xl"
+              style={{ width: '215.9mm', minHeight: '279.4mm', padding: averyPreset.pageMargin }}>
+              <div style={{
+                display: 'flex', flexWrap: 'wrap',
+                gap: averyPreset.gap,
+              }}>
+                {filtered.map(c => (
+                  <div key={c.id} style={averyPreset.cardW ? { width: averyPreset.cardW, flexShrink: 0 } : {}}>
+                    <IDCard c={c} company={company} orientation={orientation} productionName={selectedProduction?.name} />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {printing && (
         <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-white/80 backdrop-blur-sm no-print">
