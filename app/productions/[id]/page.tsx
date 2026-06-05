@@ -133,7 +133,7 @@ export default function ProductionDetail({ params }: { params: Promise<{ id: str
     const member = allCrew.find((c: any) => c.id === crewId);
     if (!member) return;
     const token = crypto.randomUUID();
-    await addDoc(collection(db, 'users', getUid()!, 'productions', id, 'crew'), {
+    const assignRef = await addDoc(collection(db, 'users', getUid()!, 'productions', id, 'crew'), {
       crew_id: crewId,
       name: `${member.name} ${member.last_name}`,
       role: member.role, department: member.department || 'other',
@@ -141,6 +141,14 @@ export default function ProductionDetail({ params }: { params: Promise<{ id: str
       confirmation_status: 'pending', confirm_token: token,
       call_time: production?.call_time || '',
     });
+    // Write a top-level lookup so the unauthenticated confirm page can find it
+    await import('firebase/firestore').then(({ setDoc, doc: fsDoc }) =>
+      setDoc(fsDoc(db, 'confirm_tokens', token), {
+        uid: getUid()!, productionId: id,
+        crewAssignId: assignRef.id,
+        createdAt: new Date().toISOString(),
+      })
+    );
     await loadAssignments();
   };
 
@@ -184,7 +192,7 @@ export default function ProductionDetail({ params }: { params: Promise<{ id: str
       token: member.confirm_token, location: location?.name,
       shootDates: production?.start_date ? `${production.start_date} → ${production.end_date || ''}` : undefined,
     });
-    if (!ok) alert('Email failed — check SENDGRID_API_KEY in .env.local');
+    if (!ok) alert('Could not open email client. Please send manually.');
     if (namespace) await updateDoc(doc(db, 'users', getUid()!, 'productions', id, 'crew', member.id), { email_sent_at: new Date().toISOString() });
     await loadAssignments();
     setSending(null);

@@ -14,10 +14,8 @@ export async function sendConfirmationEmail(opts: {
   shootDates?: string;
   location?: string;
 }): Promise<boolean> {
-  const appUrl =
-    typeof window !== 'undefined'
-      ? window.location.origin
-      : 'https://www.pro-logic.studio';
+  // Always use the production domain — never expose Vercel preview URLs in emails
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.pro-logic.studio';
 
   const confirmUrl = `${appUrl}/confirm/${opts.token}`;
 
