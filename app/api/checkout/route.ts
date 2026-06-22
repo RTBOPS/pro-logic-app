@@ -89,7 +89,7 @@ export async function POST(req: NextRequest) {
     if (!subscription.ok) {
       const err = await subscription.text();
       console.error('PayPal create subscription error:', err);
-      return NextResponse.json({ error: 'Failed to create PayPal subscription' }, { status: 500 });
+      return NextResponse.json({ error: `PayPal error: ${err}` }, { status: 500 });
     }
 
     const subData = await subscription.json();
