@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
       },
       body: JSON.stringify({
         plan_id: planConfig.planId,
-        custom_id: uid || '',
+        ...(uid ? { custom_id: uid } : {}),
         subscriber: email ? { email_address: email } : undefined,
         application_context: {
           brand_name: 'PRO-LOGIC Studio',
