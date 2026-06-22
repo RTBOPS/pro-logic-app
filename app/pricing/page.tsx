@@ -1,10 +1,9 @@
 'use client';
 
 import { useAuth } from '@/hooks/useAuth';
-import { doc, updateDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
 import { Check } from 'lucide-react';
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 const PLANS = [
   {
@@ -60,14 +59,43 @@ const PLANS = [
 
 export default function PricingPage() {
   const { user, profile } = useAuth();
+  const router = useRouter();
   const [upgrading, setUpgrading] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const selectPlan = async (planId: string) => {
-    if (!user) return;
+    if (!user) {
+      router.push('/auth');
+      return;
+    }
+
+    // Free plan doesn't need PayPal
+    if (planId === 'free') return;
+
     setUpgrading(planId);
-    await updateDoc(doc(db, 'users', user.uid), { plan: planId });
-    setUpgrading(null);
-    alert(`Plan updated to ${planId}. In production, this would trigger Stripe checkout.`);
+    setError(null);
+
+    try {
+      const res = await fetch('/api/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan: planId, uid: user.uid, email: user.email }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data.url) {
+        setError(data.error || 'Could not start checkout. Please try again.');
+        return;
+      }
+
+      // Redirect to PayPal approval page
+      window.location.href = data.url;
+    } catch {
+      setError('Network error. Please try again.');
+    } finally {
+      setUpgrading(null);
+    }
   };
 
   return (
@@ -78,6 +106,11 @@ export default function PricingPage() {
         {profile && (
           <p className="text-sm text-blue-600 mt-2 font-medium">
             Current plan: <span className="capitalize">{profile.plan}</span>
+          </p>
+        )}
+        {error && (
+          <p className="text-sm text-red-600 mt-3 bg-red-50 border border-red-200 rounded-lg px-4 py-2 inline-block">
+            {error}
           </p>
         )}
       </div>
@@ -118,12 +151,18 @@ export default function PricingPage() {
               {profile?.plan === plan.id
                 ? 'Current plan'
                 : upgrading === plan.id
-                ? 'Updating…'
-                : `Choose ${plan.name}`}
+                ? 'Redirecting to PayPal…'
+                : plan.id === 'free'
+                ? 'Get started free'
+                : `Subscribe with PayPal`}
             </button>
           </div>
         ))}
       </div>
+
+      <p className="text-center text-xs text-gray-400 mt-8">
+        Payments processed securely by PayPal. Cancel anytime from your PayPal account.
+      </p>
     </div>
   );
 }

@@ -1,29 +1,47 @@
 import { NextRequest, NextResponse } from 'next/server';
-import Stripe from 'stripe';
 
-const PLANS: Record<string, { name: string; amount: number; description: string }> = {
+const PLANS: Record<string, { planId: string; name: string }> = {
   pro: {
-    name: 'PRO-LOGIC Studio — Pro Plan',
-    amount: 2900,
-    description: 'Unlimited productions, crew, inventory, all PDF documents, storyboard, blueprint, equipment forms & ID cards.',
+    planId: process.env.PAYPAL_PRO_PLAN_ID || '',
+    name: 'Pro',
   },
   studio: {
-    name: 'PRO-LOGIC Studio — Studio Plan',
-    amount: 7900,
-    description: 'Everything in Pro plus team workspaces, multi-user access, custom branding, and dedicated support.',
+    planId: process.env.PAYPAL_STUDIO_PLAN_ID || '',
+    name: 'Studio',
   },
 };
 
-export async function POST(req: NextRequest) {
-  // Initialize Stripe inside handler so env var is always available at runtime
-  const key = process.env.STRIPE_SECRET_KEY;
-  if (!key) {
-    console.error('STRIPE_SECRET_KEY is not set');
-    return NextResponse.json({ error: 'Payment not configured. Please contact support.' }, { status: 503 });
+async function getPayPalAccessToken(): Promise<string> {
+  const clientId = process.env.PAYPAL_CLIENT_ID;
+  const clientSecret = process.env.PAYPAL_CLIENT_SECRET;
+
+  if (!clientId || !clientSecret) {
+    throw new Error('PayPal credentials not configured');
   }
 
-  const stripe = new Stripe(key, { apiVersion: '2026-05-27.dahlia' });
+  const base = process.env.PAYPAL_SANDBOX === 'true'
+    ? 'https://api-m.sandbox.paypal.com'
+    : 'https://api-m.paypal.com';
 
+  const res = await fetch(`${base}/v1/oauth2/token`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`,
+    },
+    body: 'grant_type=client_credentials',
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`PayPal token error: ${err}`);
+  }
+
+  const data = await res.json();
+  return data.access_token as string;
+}
+
+export async function POST(req: NextRequest) {
   try {
     const { plan, uid, email } = await req.json();
 
@@ -32,37 +50,58 @@ export async function POST(req: NextRequest) {
     }
 
     const planConfig = PLANS[plan];
-    // Always redirect to production domain, never Vercel preview URLs
-    const successUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://www.pro-logic.studio'}/dashboard?subscribed=${plan}`;
-    const cancelUrl  = `${process.env.NEXT_PUBLIC_APP_URL || 'https://www.pro-logic.studio'}/?canceled=true`;
-
-    const session = await stripe.checkout.sessions.create({
-      mode: 'subscription',
-      payment_method_types: ['card'],
-      customer_email: email || undefined,
-      line_items: [{
-        price_data: {
-          currency: 'usd',
-          product_data: { name: planConfig.name, description: planConfig.description },
-          unit_amount: planConfig.amount,
-          recurring: { interval: 'month' },
-        },
-        quantity: 1,
-      }],
-      metadata: { firebaseUid: uid || '', plan },
-      subscription_data: { metadata: { firebaseUid: uid || '', plan } },
-      success_url: successUrl,
-      cancel_url:  cancelUrl,
-      allow_promotion_codes: true,
-    });
-
-    if (!session.url) {
-      return NextResponse.json({ error: 'Stripe did not return a checkout URL.' }, { status: 500 });
+    if (!planConfig.planId) {
+      return NextResponse.json(
+        { error: `PayPal plan ID for "${plan}" is not configured. Set PAYPAL_${plan.toUpperCase()}_PLAN_ID.` },
+        { status: 503 }
+      );
     }
 
-    return NextResponse.json({ url: session.url });
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.pro-logic.studio';
+    const base = process.env.PAYPAL_SANDBOX === 'true'
+      ? 'https://api-m.sandbox.paypal.com'
+      : 'https://api-m.paypal.com';
+
+    const accessToken = await getPayPalAccessToken();
+
+    const subscription = await fetch(`${base}/v1/billing/subscriptions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({
+        plan_id: planConfig.planId,
+        custom_id: uid || '',
+        subscriber: email ? { email_address: email } : undefined,
+        application_context: {
+          brand_name: 'PRO-LOGIC Studio',
+          locale: 'en-US',
+          shipping_preference: 'NO_SHIPPING',
+          user_action: 'SUBSCRIBE_NOW',
+          payment_method: { payer_selected: 'PAYPAL', payee_preferred: 'IMMEDIATE_PAYMENT_REQUIRED' },
+          return_url: `${appUrl}/dashboard?subscribed=${plan}`,
+          cancel_url: `${appUrl}/pricing?canceled=true`,
+        },
+      }),
+    });
+
+    if (!subscription.ok) {
+      const err = await subscription.text();
+      console.error('PayPal create subscription error:', err);
+      return NextResponse.json({ error: 'Failed to create PayPal subscription' }, { status: 500 });
+    }
+
+    const subData = await subscription.json();
+    const approvalLink = (subData.links as { rel: string; href: string }[])?.find(l => l.rel === 'approve')?.href;
+
+    if (!approvalLink) {
+      return NextResponse.json({ error: 'No PayPal approval URL returned' }, { status: 500 });
+    }
+
+    return NextResponse.json({ url: approvalLink });
   } catch (err: any) {
-    console.error('Stripe checkout error:', err?.message || err);
+    console.error('PayPal checkout error:', err?.message || err);
     return NextResponse.json({ error: err?.message || 'Checkout failed' }, { status: 500 });
   }
 }
