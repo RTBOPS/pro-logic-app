@@ -45,6 +45,34 @@ const DEFAULT_CHECKLISTS = {
     label: 'Transportation', icon: '/icons/transportation.svg',
     items: ['All vehicles inspected','Fuel topped off on all vehicles','Vehicle insurance verified','Drivers confirmed and briefed','Driver licenses verified','Load plans distributed','Grip truck loaded and locked','Camera van loaded and locked','Production van stocked','Picture cars cleaned and staged','Route to location confirmed','Parking permits for vehicles','Backup vehicle arranged','Equipment manifest in each vehicle','Emergency roadside kit in each vehicle'],
   },
+  stage_rigging: {
+    label: 'Stage & Rigging', icon: '/icons/grip.svg',
+    items: ['Stage plot approved and distributed','Rigging plot with load calculations approved','Venue weight limits verified with house rigger','All motors/hoists load-tested','Safety cables on every flown fixture','Truss inspection completed','Stage deck rated and inspected','Barricade installed and inspected','Stage ramps and stairs secured','Risers built and rated','FOH position built (console riser)','Delay towers secured and ballasted','Exclusion zones marked during rigging','Daily rigging re-inspection scheduled'],
+  },
+  power: {
+    label: 'Power & Distribution', icon: '/icons/lighting.svg',
+    items: ['Total power load calculated per department','House power capacity confirmed with venue','Generator sized with 30% headroom','Backup generator / redundancy arranged','Licensed electrician on site','Distro placement per department mapped','Cable runs ramped or flown at crossings','Ground/earth verified on all distros','GFCI protection where wet or exterior','Audio on isolated/clean power (no dimmer sharing)','Generator fueling schedule and protocol','UPS on consoles, servers and media players','Power-up / power-down sequence agreed','Emergency power-off (EPO) locations known'],
+  },
+  led_video: {
+    label: 'LED / Video Wall', icon: '/icons/video.svg',
+    items: ['LED panel count and screen dimensions confirmed','Pixel map and resolution documented','Processors configured and redundant','Signal flow diagram (source → switcher → processor → wall)','Backup media server / playback redundancy','Content delivered in correct resolution/format','IMAG cameras positioned and shaded','Camera shading / color match completed','Video switcher programmed with show looks','Confidence monitors for talent placed','All video runs (SDI/fiber) tested','Spare panels and modules on site','LED wall power and data redundancy checked','Blackout / logo state programmed'],
+  },
+  sfx_pyro: {
+    label: 'SFX & Pyro', icon: '/icons/production.svg',
+    items: ['Licensed pyrotechnician contracted','Pyro permits filed and approved','Fire marshal inspection scheduled','Safety distances marked and enforced','Product stored per regulations','Firing system tested (with keys removed)','Cue list integrated into run of show','Fire watch assigned during show','Extinguishers staged at firing positions','Venue ceiling height verified for effects','Haze/smoke fluid stocked and detectors bypassed per venue protocol','Wind plan for outdoor effects','All-clear procedure after each effect','Emergency stop authority defined'],
+  },
+  security_medical: {
+    label: 'Security & Medical', icon: '/icons/team.svg',
+    items: ['Security company contracted and briefed','Guard posts mapped (gates, stage, barricade, backstage)','Credential zones defined (AA, backstage, stage, FOH)','Credential list distributed to all posts','Radio channel assigned to security','Ingress/egress plan with capacity counts','Show-stop procedure agreed with security lead','Paramedics / ambulance on site','Medical tent location marked','Nearest hospital route documented','Evacuation routes and muster points posted','Lost person / lost child procedure','Weather emergency triggers defined','Local police / authorities notified','Insurance certificates on file'],
+  },
+  backstage: {
+    label: 'Backstage & Hospitality', icon: '/icons/production.svg',
+    items: ['Dressing rooms assigned and labeled','Hospitality rider fulfilled per artist','Catering schedule for crew and artists','Green room stocked','Production office set up (power, wifi, printer)','Runner schedule and vehicles assigned','Artist transport / pickup times confirmed','Towels, steamer, wardrobe rack in each dressing room','Backstage credential checkpoint staffed','Quiet warm-up space arranged','Meet & greet area and schedule','Laundry / wardrobe support confirmed','Artist parking marked','Load-in / load-out meal times posted'],
+  },
+  broadcast_studio: {
+    label: 'Studio / Broadcast', icon: '/icons/camera.svg',
+    items: ['Rundown loaded and distributed','Scripts loaded in teleprompter','Prompter operator briefed','Anchor IFB checked (program + interrupt)','Lav mics fitted and gain-checked per anchor','Backup lav on each anchor','Studio cameras white-balanced and matched','Camera shading checked','Lower-third graphics list loaded and proofed','Playback packages (VTRs) loaded and cued','Studio lighting preset for each block','Set pieces and monitors clean and on','Talent makeup / touch-up done','Master control / stream output verified','Record backup running','Clock sync across studio (timecode)'],
+  },
 };
 
 type DefaultListId = keyof typeof DEFAULT_CHECKLISTS;

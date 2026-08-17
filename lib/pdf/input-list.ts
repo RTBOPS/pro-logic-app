@@ -10,6 +10,7 @@ export function generateInputListPDF(
     channels: any[];
     wireless: any[];
     monitors: any[];
+    comms?: any[];
     notes?: string;
   },
   stats: {
@@ -103,6 +104,27 @@ export function generateInputListPDF(
         (m.members || '').slice(0, 46),
         (m.notes || '').slice(0, 62),
       ], mWidths, y, 10, false, i % 2 === 1);
+    });
+    y += 4;
+  }
+
+  /* ── Comms / private channels ── */
+  const comms = plan.comms || [];
+  if (comms.length > 0) {
+    ensureRoom(24);
+    y = sectionTitle(doc, `Comms Plan — ${comms.length} channels`, y);
+    const cWidths = [22, 54, 22, 74, 50, 40];
+    y = tableRow(doc, ['CHANNEL', 'LABEL', 'TYPE', "WHO'S ON IT", 'DEVICE', 'NOTES'], cWidths, y, 10, true);
+    comms.forEach((c: any, i: number) => {
+      ensureRoom(8, 'Comms Plan (cont.)');
+      y = tableRow(doc, [
+        (c.channel || '').slice(0, 12),
+        (c.label || '').slice(0, 34),
+        c.type === 'intercom' ? 'PL' : (c.type || 'walkie').toUpperCase(),
+        (c.users || '').slice(0, 48),
+        (c.device || '').slice(0, 32),
+        (c.notes || '').slice(0, 26),
+      ], cWidths, y, 10, false, i % 2 === 1);
     });
     y += 4;
   }

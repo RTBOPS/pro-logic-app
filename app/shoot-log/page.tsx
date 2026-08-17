@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { useData } from '@/hooks/useData';
-import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, getDoc, getDocs } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
-import { Plus, Trash2, CheckCircle, Circle, Printer, Loader2 } from 'lucide-react';
+import { Plus, Trash2, CheckCircle, Circle, Printer, Loader2, FileText } from 'lucide-react';
 import { useNamespace } from '@/hooks/useNamespace';
 
 interface TakeEntry {
@@ -40,10 +40,42 @@ export default function ShootLogPage() {
   const [sceneFilter, setSceneFilter] = useState('');
   const [saving, setSaving] = useState(false);
   const [printing, setPrinting] = useState(false);
+  const [reportDate, setReportDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [reporting, setReporting] = useState(false);
 
   const handlePrint = () => {
     setPrinting(true);
     setTimeout(() => { window.print(); setPrinting(false); }, 150);
+  };
+
+  /* Daily Production Report: production info + the takes logged on reportDate */
+  const exportDailyReport = async () => {
+    const uid = getUid();
+    if (!uid || !selectedProduction) return;
+    setReporting(true);
+    try {
+      const [prodSnap, compSnap, crewSnap, locsSnap] = await Promise.all([
+        getDoc(doc(db, 'users', uid, 'productions', selectedProduction)),
+        getDoc(doc(db, 'users', uid, 'company', 'profile')),
+        getDocs(collection(db, 'users', uid, 'productions', selectedProduction, 'crew')),
+        getDocs(collection(db, 'users', uid, 'locations')),
+      ]);
+      const prod: any = { id: prodSnap.id, ...prodSnap.data() };
+      const location = locsSnap.docs.map(d => ({ id: d.id, ...d.data() }))
+        .find((l: any) => l.id === prod.location_id) || null;
+      const dayTakes = takes.filter(t => (t.timestamp || '').slice(0, 10) === reportDate);
+      const { generateDailyReportPDF } = await import('@/lib/pdf/daily-report');
+      generateDailyReportPDF(
+        prod,
+        compSnap.exists() ? compSnap.data() : null,
+        reportDate,
+        dayTakes,
+        crewSnap.size,
+        location
+      );
+    } catch (e: any) {
+      alert('Report failed: ' + e.message);
+    } finally { setReporting(false); }
   };
 
   useEffect(() => {
@@ -114,11 +146,20 @@ export default function ShootLogPage() {
             {productions.map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
           {selectedProduction && (
-            <button onClick={handlePrint} disabled={printing}
-              className="flex items-center gap-2 border border-gray-200 text-gray-700 px-3 py-2 rounded-xl text-sm hover:bg-gray-50 disabled:opacity-40">
-              {printing ? <Loader2 size={14} className="animate-spin" /> : <Printer size={14} />}
-              {printing ? 'Preparing…' : 'Print'}
-            </button>
+            <>
+              <input type="date" value={reportDate} onChange={e => setReportDate(e.target.value)}
+                className="border border-gray-200 rounded-xl px-2 py-2 text-sm text-gray-700" />
+              <button onClick={exportDailyReport} disabled={reporting}
+                className="flex items-center gap-2 bg-black text-white px-3 py-2 rounded-xl text-sm hover:bg-zinc-800 disabled:opacity-40">
+                {reporting ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}
+                Daily Report
+              </button>
+              <button onClick={handlePrint} disabled={printing}
+                className="flex items-center gap-2 border border-gray-200 text-gray-700 px-3 py-2 rounded-xl text-sm hover:bg-gray-50 disabled:opacity-40">
+                {printing ? <Loader2 size={14} className="animate-spin" /> : <Printer size={14} />}
+                {printing ? 'Preparing…' : 'Print'}
+              </button>
+            </>
           )}
         </div>
       </div>

@@ -45,15 +45,36 @@ interface MonitorMix {
   members: string;   // who listens to it
   notes: string;     // what they need in the mix
 }
+interface CommsRow {
+  id: string;
+  channel: string;   // CH 1, PL A, IFB 1…
+  label: string;     // Production, Camera, Security…
+  type: 'walkie' | 'intercom' | 'ifb';
+  users: string;     // who is on it
+  device: string;    // Motorola CP200, Clear-Com beltpack…
+  notes: string;
+}
 
 interface AudioPlan {
   channels: Channel[];
   wireless: WirelessRow[];
   monitors: MonitorMix[];
+  comms: CommsRow[];
   notes: string;
 }
 
-const EMPTY_PLAN: AudioPlan = { channels: [], wireless: [], monitors: [], notes: '' };
+const EMPTY_PLAN: AudioPlan = { channels: [], wireless: [], monitors: [], comms: [], notes: '' };
+
+/* Standard comms setup for a large show — one click to start from */
+const COMMS_PRESET: Omit<CommsRow, 'id'>[] = [
+  { channel: 'CH 1', label: 'Production',        type: 'walkie',   users: 'PM, stage manager, runners', device: 'Walkie UHF', notes: 'Main channel' },
+  { channel: 'CH 2', label: 'Audio',             type: 'walkie',   users: 'FOH, monitors, RF tech',     device: 'Walkie UHF', notes: '' },
+  { channel: 'CH 3', label: 'Video / LED',       type: 'walkie',   users: 'Video director, LED tech',   device: 'Walkie UHF', notes: '' },
+  { channel: 'CH 4', label: 'Lighting',          type: 'walkie',   users: 'LD, dimmer tech, spot ops',  device: 'Walkie UHF', notes: '' },
+  { channel: 'CH 5', label: 'Security',          type: 'walkie',   users: 'Security lead, posts',       device: 'Walkie UHF', notes: 'Keep clear for emergencies' },
+  { channel: 'PL A', label: 'Show calling',      type: 'intercom', users: 'Showcaller, all cue ops',    device: 'Clear-Com beltpack', notes: 'Cues only' },
+  { channel: 'IFB 1', label: 'Talent IFB',       type: 'ifb',      users: 'Presenters / MC',            device: 'IFB earpiece', notes: 'Program + producer interrupt' },
+];
 
 const TYPE_BADGE: Record<InputType, string> = {
   mic: 'bg-blue-100 text-blue-700',
@@ -74,7 +95,7 @@ function AudioPlannerInner() {
   const [plan, setPlan] = useState<AudioPlan>(EMPTY_PLAN);
   const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState<'idle' | 'saving' | 'saved'>('idle');
-  const [tab, setTab] = useState<'inputs' | 'wireless' | 'monitors' | 'summary'>('inputs');
+  const [tab, setTab] = useState<'inputs' | 'wireless' | 'monitors' | 'comms' | 'summary'>('inputs');
   const [showCatalog, setShowCatalog] = useState(false);
   const [showRider, setShowRider] = useState(false);
   const [catalogQuery, setCatalogQuery] = useState('');
@@ -178,6 +199,16 @@ function AudioPlannerInner() {
     return bad;
   }, [plan.wireless]);
 
+  /* ── Comms helpers ── */
+  const addComms = () =>
+    setPlan(p => ({ ...p, comms: [...p.comms, { id: uid8(), channel: `CH ${p.comms.length + 1}`, label: '', type: 'walkie', users: '', device: '', notes: '' }] }));
+  const loadCommsPreset = () =>
+    setPlan(p => ({ ...p, comms: [...p.comms, ...COMMS_PRESET.map(c => ({ ...c, id: uid8() }))] }));
+  const updateComms = (id: string, patch: Partial<CommsRow>) =>
+    setPlan(p => ({ ...p, comms: p.comms.map(c => c.id === id ? { ...c, ...patch } : c) }));
+  const removeComms = (id: string) =>
+    setPlan(p => ({ ...p, comms: p.comms.filter(c => c.id !== id) }));
+
   /* ── Monitor helpers ── */
   const addMonitor = (type: MonitorMix['type']) =>
     setPlan(p => ({ ...p, monitors: [...p.monitors, { id: uid8(), name: `Mix ${p.monitors.length + 1}`, type, members: '', notes: '' }] }));
@@ -278,6 +309,7 @@ function AudioPlannerInner() {
               ['inputs', <><Mic size={13} /> Input List ({plan.channels.length})</>],
               ['wireless', <><Radio size={13} /> Wireless / RF ({plan.wireless.length})</>],
               ['monitors', <><Headphones size={13} /> Monitors ({plan.monitors.length})</>],
+              ['comms', <><Radio size={13} /> Comms ({plan.comms.length})</>],
               ['summary', <><Zap size={13} /> Summary</>],
             ] as [typeof tab, React.ReactNode][]).map(([id, label]) => (
               <button key={id} onClick={() => setTab(id)}
@@ -467,6 +499,68 @@ function AudioPlannerInner() {
                   <datalist id="crew-names">
                     {crew.map((c: any) => <option key={c.id} value={`${c.name} ${c.last_name || ''}`.trim()} />)}
                   </datalist>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── COMMS / PRIVATE CHANNELS ── */}
+          {tab === 'comms' && (
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+              <div className="px-5 py-3 border-b flex flex-wrap items-center gap-2 bg-gray-50">
+                <button onClick={addComms} className="flex items-center gap-1.5 bg-black text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-zinc-800">
+                  <Plus size={13} /> Channel
+                </button>
+                <button onClick={loadCommsPreset} className="flex items-center gap-1.5 border border-gray-200 text-gray-700 px-3 py-1.5 rounded-lg text-xs hover:bg-white">
+                  <Zap size={13} /> Load standard show preset
+                </button>
+                <span className="ml-auto text-xs text-gray-400">Walkies · intercom partyline · talent IFB</span>
+              </div>
+              {plan.comms.length === 0 ? (
+                <div className="p-10 text-center text-gray-500 text-sm">
+                  No comms channels yet. Plan the private audio: walkie channels per department,
+                  wired/wireless intercom for show calling, and IFB for on-camera talent.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs min-w-[820px]">
+                    <thead className="bg-gray-50 text-gray-500 uppercase">
+                      <tr>
+                        <th className="px-3 py-2 text-left w-20">Channel</th>
+                        <th className="px-2 py-2 text-left">Label</th>
+                        <th className="px-2 py-2 text-left w-24">Type</th>
+                        <th className="px-2 py-2 text-left">Who&apos;s on it</th>
+                        <th className="px-2 py-2 text-left">Device</th>
+                        <th className="px-2 py-2 text-left">Notes</th>
+                        <th className="px-2 py-2 w-10"></th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {plan.comms.map(c => (
+                        <tr key={c.id} className="hover:bg-gray-50 group">
+                          <td className="px-2 py-1"><input className={`${inputCell} font-bold`} value={c.channel} onChange={e => updateComms(c.id, { channel: e.target.value })} /></td>
+                          <td className="px-1 py-1"><input className={inputCell} value={c.label} onChange={e => updateComms(c.id, { label: e.target.value })} placeholder="Production / Camera / Security…" /></td>
+                          <td className="px-2 py-1">
+                            <select value={c.type} onChange={e => updateComms(c.id, { type: e.target.value as CommsRow['type'] })}
+                              className={`text-xs rounded-full px-2 py-0.5 font-medium border-0 ${
+                                c.type === 'walkie' ? 'bg-orange-100 text-orange-700'
+                                : c.type === 'intercom' ? 'bg-blue-100 text-blue-700'
+                                : 'bg-pink-100 text-pink-700'}`}>
+                              <option value="walkie">WALKIE</option>
+                              <option value="intercom">PL</option>
+                              <option value="ifb">IFB</option>
+                            </select>
+                          </td>
+                          <td className="px-1 py-1"><input className={inputCell} value={c.users} onChange={e => updateComms(c.id, { users: e.target.value })} placeholder="Who" /></td>
+                          <td className="px-1 py-1"><input className={inputCell} value={c.device} onChange={e => updateComms(c.id, { device: e.target.value })} placeholder="Walkie / beltpack / earpiece" /></td>
+                          <td className="px-1 py-1"><input className={inputCell} value={c.notes} onChange={e => updateComms(c.id, { notes: e.target.value })} /></td>
+                          <td className="px-2 py-1">
+                            <button onClick={() => removeComms(c.id)} className="text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100"><Trash2 size={13} /></button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               )}
             </div>
