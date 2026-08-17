@@ -72,6 +72,10 @@ export function periodLabel(period: number, statusDetail?: string): string {
   return period <= 4 ? `Q${period}` : `OT${period - 4}`;
 }
 
+/* Default fire-portal FX video (alpha webm in the studio's Storage bucket) */
+export const DEFAULT_PORTAL_VIDEO =
+  'https://firebasestorage.googleapis.com/v0/b/prologicstudio-4a6f5.firebasestorage.app/o/graphics_assets%2Fportal-fire.webm?alt=media&token=274cfd8f-3713-4820-806f-e7a3971e7ec4';
+
 /* ESPN league slugs this CG can drive automatically */
 export const LEAGUES: { id: string; label: string }[] = [
   { id: 'nba', label: 'NBA' },

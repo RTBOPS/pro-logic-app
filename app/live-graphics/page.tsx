@@ -73,7 +73,7 @@ function ControlInner() {
   });
 
   /* Hoop portal (AR-style sponsor reveal aligned to the backboard shot) */
-  const [portalCfg, setPortalCfg] = useState({ x: 50, y: 30, size: 1, logo: '' });
+  const [portalCfg, setPortalCfg] = useState({ x: 50, y: 30, size: 1, logo: '', video: '', content: 'logo' as 'logo' | 'trivia' });
   const [banners, setBanners] = useState<BannerItem[]>([]);
   const [uploading, setUploading] = useState(false);
   const bannerRef = useRef<HTMLInputElement>(null);
@@ -104,7 +104,7 @@ function ControlInner() {
         if (d.theme.motion) setMotionFx(true);
       }
       if (d.trivia) setTrivia({ question: '', options: ['', '', ''], correct: 0, sponsor: '', reveal: false, ...d.trivia });
-      if (d.portalCfg) setPortalCfg({ x: 50, y: 30, size: 1, logo: '', ...d.portalCfg });
+      if (d.portalCfg) setPortalCfg({ x: 50, y: 30, size: 1, logo: '', video: '', content: 'logo', ...d.portalCfg });
     }).catch(() => {});
   }, []);
 
@@ -216,6 +216,21 @@ function ControlInner() {
       setBanners(b => [...b, { id: Math.random().toString(36).slice(2, 10), url, name: file.name }]);
     } catch (err: any) { alert('Upload failed: ' + err.message); }
     finally { setUploading(false); if (bannerRef.current) bannerRef.current.value = ''; }
+  };
+
+  /* Custom portal FX video upload (alpha webm/mov) */
+  const uploadPortalVideo = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    const uid = auth.currentUser?.uid;
+    if (!file || !uid) return;
+    setUploading(true);
+    try {
+      const path = `graphics_banners/${uid}/portalfx_${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+      const snap = await uploadBytes(storageRef(storage, path), file);
+      const url = await getDownloadURL(snap.ref);
+      setPortalCfg(c => ({ ...c, video: url }));
+    } catch (err: any) { alert('Upload failed: ' + err.message); }
+    finally { setUploading(false); }
   };
 
   const selectGame = (id: string) => {
@@ -769,11 +784,35 @@ function ControlInner() {
                 On the backboard camera shot: align the glowing portal with the real rim
                 (X/Y/size) — the sponsor logo drops out of the net.
               </p>
-              <select value={portalCfg.logo} onChange={e => setPortalCfg(c => ({ ...c, logo: e.target.value }))}
-                className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs bg-white">
-                <option value="">Logo: trivia sponsor / brand</option>
-                {banners.map(b => <option key={b.id} value={b.url}>{b.name}</option>)}
-              </select>
+              <div className="flex gap-1 bg-gray-100 rounded-xl p-1">
+                {(['logo', 'trivia'] as const).map(c => (
+                  <button key={c} onClick={() => setPortalCfg(cfg => ({ ...cfg, content: c }))}
+                    className={`flex-1 px-3 py-1.5 rounded-lg text-xs capitalize ${portalCfg.content === c ? 'bg-white shadow-sm font-medium text-gray-900' : 'text-gray-500'}`}>
+                    {c === 'logo' ? 'Sponsor logo' : 'Trivia'}
+                  </button>
+                ))}
+              </div>
+              <div className="flex items-center gap-2">
+                <select value={portalCfg.video} onChange={e => setPortalCfg(c => ({ ...c, video: e.target.value }))}
+                  className="flex-1 border border-gray-200 rounded-lg px-2 py-1.5 text-xs bg-white">
+                  <option value="">FX: Fire portal (default)</option>
+                  <option value="ring">FX: Golden ring (CSS)</option>
+                  {portalCfg.video && portalCfg.video !== 'ring' && !portalCfg.video.startsWith('http') === false && (
+                    <option value={portalCfg.video}>FX: Custom video</option>
+                  )}
+                </select>
+                <label className="cursor-pointer text-gray-400 hover:text-gray-700 shrink-0" title="Upload FX video (alpha webm/mov)">
+                  <Upload size={14} />
+                  <input type="file" accept="video/*" className="hidden" onChange={uploadPortalVideo} />
+                </label>
+              </div>
+              {portalCfg.content === 'logo' && (
+                <select value={portalCfg.logo} onChange={e => setPortalCfg(c => ({ ...c, logo: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs bg-white">
+                  <option value="">Logo: trivia sponsor / brand</option>
+                  {banners.map(b => <option key={b.id} value={b.url}>{b.name}</option>)}
+                </select>
+              )}
               {([['x', 'X', 0, 100], ['y', 'Y', 0, 100], ['size', 'Size', 0.5, 2]] as [keyof typeof portalCfg, string, number, number][]).map(([k, label, min, max]) => (
                 <label key={k} className="flex items-center gap-2 text-xs text-gray-500">
                   <span className="w-8">{label}</span>

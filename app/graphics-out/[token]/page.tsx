@@ -12,7 +12,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import PlayerPhoto from '@/components/PlayerPhoto';
 import {
   normalizeSummary, gameLeaders, comparedTeamStats, periodLabel, detectCallouts,
-  manualToSummary, topFive, type ManualGame,
+  manualToSummary, topFive, DEFAULT_PORTAL_VIDEO, type ManualGame,
   type Summary, type Athlete, type Callout,
 } from '@/lib/nba';
 
@@ -36,7 +36,7 @@ interface GfxDoc extends BusState {
   callout?: Callout | null;             // manual fire from the control panel
   theme?: { useTeamColors?: boolean; c1?: string; c2?: string; logoScale?: number; brandScale?: number; motion?: boolean } | null;
   trivia?: { question?: string; options?: string[]; correct?: number; sponsor?: string; reveal?: boolean } | null;
-  portalCfg?: { x?: number; y?: number; size?: number; logo?: string } | null;
+  portalCfg?: { x?: number; y?: number; size?: number; logo?: string; video?: string; content?: 'logo' | 'trivia' } | null;
 }
 
 const CALLOUT_MS = 4500;
@@ -295,57 +295,102 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
             )}
           </AnimatePresence>
 
-          {/* ── HOOP PORTAL (AR-style sponsor reveal on the backboard cam) ── */}
-          <AnimatePresence>
-            {bus.portal && (() => {
-              const cfg = gfx.portalCfg || {};
-              const size = cfg.size || 1;
-              const logo = cfg.logo || gfx.trivia?.sponsor || brand?.logo || '';
-              return (
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.6 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.6 }}
-                  transition={{ type: 'spring', stiffness: 200, damping: 20 }}
-                  className="absolute"
-                  style={{ left: `${cfg.x ?? 50}%`, top: `${cfg.y ?? 30}%`, transform: 'translate(-50%, -50%)' }}>
-                  {/* Light beam falling from the rim */}
-                  <motion.div
-                    initial={{ opacity: 0 }} animate={{ opacity: [0.15, 0.4, 0.15] }}
-                    transition={{ repeat: Infinity, duration: 2.4, ease: 'easeInOut' }}
-                    className="absolute left-1/2 -translate-x-1/2 pointer-events-none"
-                    style={{
-                      top: 20 * size, width: 190 * size, height: 190 * size,
-                      background: 'linear-gradient(180deg, rgba(251,191,36,0.5), transparent)',
-                      clipPath: 'polygon(22% 0, 78% 0, 95% 100%, 5% 100%)',
-                    }} />
-                  {/* Portal ring (perspective ellipse aligned to the rim) */}
-                  <motion.div
-                    animate={{ scale: [1, 1.05, 1], opacity: [0.95, 1, 0.95] }}
-                    transition={{ repeat: Infinity, duration: 1.8, ease: 'easeInOut' }}
-                    className="relative rounded-[50%]"
-                    style={{
-                      width: 240 * size, height: 84 * size,
-                      border: `${5 * size}px solid #fbbf24`,
-                      boxShadow: `0 0 ${30 * size}px rgba(251,191,36,0.9), inset 0 0 ${26 * size}px rgba(251,191,36,0.7)`,
-                      background: 'radial-gradient(ellipse at center, rgba(0,0,0,0.55), rgba(251,191,36,0.12))',
-                    }} />
-                  {/* Sponsor logo dropping through the net */}
-                  {logo && (
-                    <motion.div
-                      initial={{ y: -10 * size, scale: 0.15, opacity: 0 }}
-                      animate={{ y: 120 * size, scale: 1, opacity: 1 }}
-                      transition={{ type: 'spring', stiffness: 130, damping: 14, delay: 0.35 }}
-                      className="absolute left-1/2 top-0 -translate-x-1/2">
-                      <motion.img src={logo} alt=""
-                        animate={{ y: [0, -7, 0], rotate: [-2, 2, -2] }}
-                        transition={{ repeat: Infinity, duration: 3.2, ease: 'easeInOut' }}
-                        className="object-contain drop-shadow-2xl"
-                        style={{ maxWidth: 200 * size, maxHeight: 100 * size }} />
-                    </motion.div>
+          {/* ── HOOP PORTAL (AR-style sponsor/trivia reveal on the backboard cam)
+              Pure CSS animations: VP9-alpha decode can starve the JS rAF loop on
+              weaker machines, but compositor-driven CSS keeps animating. ── */}
+          {bus.portal && (() => {
+            const cfg = gfx.portalCfg || {};
+            const size = cfg.size || 1;
+            const video = cfg.video === 'ring' ? '' : (cfg.video || DEFAULT_PORTAL_VIDEO);
+            const logo = cfg.logo || gfx.trivia?.sponsor || brand?.logo || '';
+            const showTrivia = cfg.content === 'trivia';
+            const t = gfx.trivia || {};
+            const emergeFrom = video ? 170 * size : 0;
+            const contentY = showTrivia ? (video ? 335 * size : 105 * size) : (video ? 330 * size : 120 * size);
+            return (
+              <div className="absolute -translate-x-1/2 -translate-y-1/2"
+                style={{ left: `${cfg.x ?? 50}%`, top: `${cfg.y ?? 30}%` }}>
+                <style>{`
+                  @keyframes plg-portal-in { from { opacity: 0; transform: scale(0.55); } to { opacity: 1; transform: scale(1); } }
+                  @keyframes plg-drop { from { opacity: 0; transform: translate(-50%, var(--plg-from)) scale(0.25); } to { opacity: 1; transform: translate(-50%, var(--plg-to)) scale(1); } }
+                  @keyframes plg-float { 0%, 100% { transform: translateY(0) rotate(-1.5deg); } 50% { transform: translateY(-7px) rotate(1.5deg); } }
+                  @keyframes plg-ring-pulse { 0%, 100% { transform: scale(1); opacity: 0.95; } 50% { transform: scale(1.05); opacity: 1; } }
+                `}</style>
+                <div className="relative" style={{ animation: 'plg-portal-in 0.5s ease-out both' }}>
+
+                  {/* Content emerging from behind the portal, downward */}
+                  {(showTrivia || logo) && (
+                    <div className="absolute left-1/2 top-0 z-0"
+                      style={{
+                        '--plg-from': `${emergeFrom}px`,
+                        '--plg-to': `${contentY}px`,
+                        transformOrigin: 'top center',
+                        width: showTrivia ? 430 * size : 'auto',
+                        animation: 'plg-drop 0.8s cubic-bezier(0.34, 1.4, 0.64, 1) 0.35s both',
+                      } as React.CSSProperties}>
+                      {showTrivia ? (
+                        <div className="bg-zinc-900/95 text-white rounded-2xl shadow-2xl border border-amber-500/40 overflow-hidden">
+                          <div className="px-4 pt-3 pb-2 flex items-center justify-between gap-3">
+                            <span className="text-[9px] font-bold uppercase tracking-[0.22em] text-amber-400">
+                              Trivia {(t.sponsor || logo) && 'presented by'}
+                            </span>
+                            {(t.sponsor || logo) && <img src={t.sponsor || logo} className="h-6 max-w-[110px] object-contain" alt="" />}
+                          </div>
+                          <div className="px-4 pb-3 text-base font-black leading-tight">{t.question || '…'}</div>
+                          <div className="px-3 pb-3 space-y-1.5">
+                            {(t.options || []).map((opt, i) => {
+                              const isCorrect = t.reveal && i === (t.correct ?? 0);
+                              const dimmed = t.reveal && !isCorrect;
+                              return (
+                                <div key={i}
+                                  className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm font-bold transition-all duration-500 ${
+                                    isCorrect ? 'bg-green-500/25 ring-1 ring-green-400' : dimmed ? 'bg-zinc-800/50 opacity-40' : 'bg-zinc-800/80'}`}>
+                                  <span className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black shrink-0"
+                                    style={{ background: isCorrect ? '#22c55e' : '#f59e0b' }}>
+                                    {String.fromCharCode(65 + i)}
+                                  </span>
+                                  <span className="leading-tight">{opt || '—'}</span>
+                                  {isCorrect && <span className="ml-auto text-green-400 font-black">✓</span>}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ) : (
+                        <img src={logo} alt=""
+                          className="object-contain drop-shadow-2xl"
+                          style={{ maxWidth: 200 * size, maxHeight: 100 * size, animation: 'plg-float 3.2s ease-in-out 1.2s infinite' }} />
+                      )}
+                    </div>
                   )}
-                </motion.div>
-              );
-            })()}
-          </AnimatePresence>
+
+                  {/* The portal itself: fire FX video (alpha) or the CSS golden ring */}
+                  {video ? (
+                    <video src={video} autoPlay loop muted playsInline
+                      className="relative z-10 pointer-events-none"
+                      style={{ width: 700 * size, maxWidth: 'none' }} />
+                  ) : (
+                    <>
+                      <div className="absolute left-1/2 -translate-x-1/2 pointer-events-none"
+                        style={{
+                          top: 20 * size, width: 190 * size, height: 190 * size,
+                          background: 'linear-gradient(180deg, rgba(251,191,36,0.4), transparent)',
+                          clipPath: 'polygon(22% 0, 78% 0, 95% 100%, 5% 100%)',
+                        }} />
+                      <div className="relative z-10 rounded-[50%]"
+                        style={{
+                          width: 240 * size, height: 84 * size,
+                          border: `${5 * size}px solid #fbbf24`,
+                          boxShadow: `0 0 ${30 * size}px rgba(251,191,36,0.9), inset 0 0 ${26 * size}px rgba(251,191,36,0.7)`,
+                          background: 'radial-gradient(ellipse at center, rgba(0,0,0,0.55), rgba(251,191,36,0.12))',
+                          animation: 'plg-ring-pulse 1.8s ease-in-out infinite',
+                        }} />
+                    </>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
 
           {/* ── FULL SCREENS ── */}
           <AnimatePresence>
