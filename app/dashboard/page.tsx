@@ -22,7 +22,7 @@ const DEFAULT_ITEM_COUNTS: Record<string, number> = {
   camera: 16, audio: 13, lighting: 19, grip: 15,
   production: 16, video: 12, team: 16, location: 16, transportation: 15,
   stage_rigging: 14, power: 14, led_video: 14, sfx_pyro: 14,
-  security_medical: 15, backstage: 14, broadcast_studio: 16,
+  security_medical: 15, backstage: 14, broadcast_studio: 16, live_sports: 18,
 };
 const TOTAL_DEFAULT_ITEMS = Object.values(DEFAULT_ITEM_COUNTS).reduce((a, b) => a + b, 0);
 

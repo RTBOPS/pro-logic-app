@@ -26,7 +26,7 @@ export interface InstrumentTemplate {
 
 export const AUDIO_CATEGORIES = [
   'Drums', 'Percussion', 'Bass', 'Guitars', 'Keys & Playback',
-  'Vocals', 'Horns', 'Strings', 'DJ & Electronic', 'Utility',
+  'Vocals', 'Horns', 'Strings', 'DJ & Electronic', 'Sports Broadcast', 'Utility',
 ];
 
 export const INSTRUMENT_TEMPLATES: InstrumentTemplate[] = [
@@ -256,6 +256,62 @@ export const INSTRUMENT_TEMPLATES: InstrumentTemplate[] = [
     inputs: [
       { source: 'DJ L', mic: 'Radial ProD2 (DI)', type: 'di', phantom: false, stand: 'None', gain: '0–10 dB', hpf: 'Off', notes: 'Booth master out' },
       { source: 'DJ R', mic: 'Radial ProD2 (DI)', type: 'di', phantom: false, stand: 'None', gain: '0–10 dB', hpf: 'Off' },
+    ],
+  },
+
+  /* ── Sports Broadcast ──────────────────────────────────── */
+  {
+    id: 'announcer-pair', label: 'Announcers (pair, headsets)', category: 'Sports Broadcast',
+    keywords: ['announcer', 'comentarista', 'comentaristas', 'narrador', 'play-by-play', 'booth', 'cabina'],
+    inputs: [
+      { source: 'Announcer 1 (PxP)',   mic: 'Sennheiser HMD 26 (headset)', type: 'mic', phantom: false, stand: 'None', gain: '25–35 dB', hpf: '100 Hz', notes: 'IFB return in same headset' },
+      { source: 'Announcer 2 (Color)', mic: 'Sennheiser HMD 26 (headset)', type: 'mic', phantom: false, stand: 'None', gain: '25–35 dB', hpf: '100 Hz', notes: 'IFB return in same headset' },
+    ],
+  },
+  {
+    id: 'courtside-reporter', label: 'Courtside / Sideline Reporter', category: 'Sports Broadcast',
+    keywords: ['sideline', 'courtside', 'reportero', 'reportera', 'cancha reporter'],
+    inputs: [
+      { source: 'Reporter (RF)', mic: 'Shure Axient HH', type: 'wireless', phantom: false, stand: 'None', gain: '25–35 dB', hpf: '120 Hz', notes: 'Add to RF worksheet; IFB earpiece' },
+    ],
+  },
+  {
+    id: 'crowd-pair', label: 'Crowd / Arena Ambience (pair)', category: 'Sports Broadcast',
+    keywords: ['crowd', 'ambiente arena', 'publico arena', 'ambience'],
+    inputs: [
+      { source: 'Crowd L', mic: 'Shure KSM137', type: 'mic', phantom: true, stand: 'Tall boom / hung', gain: '35–45 dB', hpf: '120 Hz', notes: 'Aim at crowd, away from PA' },
+      { source: 'Crowd R', mic: 'Shure KSM137', type: 'mic', phantom: true, stand: 'Tall boom / hung', gain: '35–45 dB', hpf: '120 Hz' },
+    ],
+  },
+  {
+    id: 'rim-mics', label: 'Rim / Backboard Mics (pair)', category: 'Sports Broadcast',
+    keywords: ['rim mic', 'aro', 'tablero', 'canasta mic'],
+    inputs: [
+      { source: 'Rim Left',  mic: 'DPA 4061 (mounted)', type: 'mic', phantom: true, stand: 'Rim mount', gain: '25–35 dB', hpf: '80 Hz', notes: 'Swish & dunk impact' },
+      { source: 'Rim Right', mic: 'DPA 4061 (mounted)', type: 'mic', phantom: true, stand: 'Rim mount', gain: '25–35 dB', hpf: '80 Hz' },
+    ],
+  },
+  {
+    id: 'court-effects', label: 'Court Effects (shotgun pair)', category: 'Sports Broadcast',
+    keywords: ['court effects', 'efectos cancha', 'sneaker', 'floor mic'],
+    inputs: [
+      { source: 'Court FX L', mic: 'Sennheiser MKH 416 (shotgun)', type: 'mic', phantom: true, stand: 'Floor low-profile', gain: '30–40 dB', hpf: '100 Hz', notes: 'Sneaker squeaks, ball' },
+      { source: 'Court FX R', mic: 'Sennheiser MKH 416 (shotgun)', type: 'mic', phantom: true, stand: 'Floor low-profile', gain: '30–40 dB', hpf: '100 Hz' },
+    ],
+  },
+  {
+    id: 'parabolic', label: 'Parabolic Mic (operated)', category: 'Sports Broadcast',
+    keywords: ['parabolic', 'parabolica', 'parabólica'],
+    inputs: [
+      { source: 'Parab', mic: 'Klover MiK 16 (parabolic)', type: 'mic', phantom: true, stand: 'Handheld (operator)', gain: '30–40 dB', hpf: '120 Hz', notes: 'Follows the action' },
+    ],
+  },
+  {
+    id: 'pa-feed', label: 'Venue PA / Anthem Feed', category: 'Sports Broadcast',
+    keywords: ['pa feed', 'venue feed', 'himno', 'anthem', 'arena audio'],
+    inputs: [
+      { source: 'Venue PA L', mic: 'XLR Line (from house)', type: 'line', phantom: false, stand: 'None', gain: '0–10 dB', hpf: 'Off', notes: 'Anthem, arena announcer' },
+      { source: 'Venue PA R', mic: 'XLR Line (from house)', type: 'line', phantom: false, stand: 'None', gain: '0–10 dB', hpf: 'Off' },
     ],
   },
 
