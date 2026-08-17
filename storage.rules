@@ -1,9 +1,11 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
+    // Uploads and SDK reads require a signed-in user. Public pages (call
+    // sheets, confirmations) load images through tokenized download URLs,
+    // which keep working regardless of these rules.
     match /{allPaths=**} {
-      allow read: if true;
-      allow write: if request.auth != null;
+      allow read, write: if request.auth != null;
     }
   }
 }

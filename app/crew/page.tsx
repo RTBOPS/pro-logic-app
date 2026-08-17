@@ -11,6 +11,8 @@ import { DEPARTMENTS, deptColor, deptLabel } from '@/lib/departments';
 import { useNamespace } from '@/hooks/useNamespace';
 import { useAuth } from '@/hooks/useAuth';
 import PageHeader from '@/components/PageHeader';
+import { limitFor } from '@/lib/plans';
+import { LimitModal } from '@/components/UpgradeGate';
 
 const DEFAULT_PICTURE = 'https://img.freepik.com/free-photo/portrait-white-man-isolated_53876-40306.jpg';
 
@@ -69,7 +71,8 @@ const emptyForm = {
 };
 
 export default function CrewPage() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
+  const [limitHit, setLimitHit] = useState(false);
   const namespace = useNamespace();
   const getUid = () => namespace || auth.currentUser?.uid || user?.uid || null;
   const { data: crew, loading } = useData('crew');
@@ -106,7 +109,10 @@ export default function CrewPage() {
     })).filter(d => d.members.length > 0);
   }, [filtered]);
 
-  const openCreate = () => { setForm(emptyForm); setFormTab('identity'); setModal('create'); };
+  const openCreate = () => {
+    if (crew.length >= limitFor(profile?.plan, 'crew')) { setLimitHit(true); return; }
+    setForm(emptyForm); setFormTab('identity'); setModal('create');
+  };
   const openEdit = (c: any) => {
     setForm({
       name: c.name || '', last_name: c.last_name || '', person_code: c.person_code || '',
@@ -221,6 +227,7 @@ export default function CrewPage() {
 
   return (
     <div className="p-4 md:p-8">
+      {limitHit && <LimitModal item="crew members" limit={limitFor(profile?.plan, 'crew')} onClose={() => setLimitHit(false)} />}
       <PageHeader title="Crew & Cast" subtitle={`${crew.length} contacts`}>
         <button onClick={() => setModal('merge')} className="flex items-center gap-2 border border-gray-200 text-gray-600 px-3 py-2 rounded-xl text-sm hover:bg-gray-50">
           <Merge size={15} /> Merge

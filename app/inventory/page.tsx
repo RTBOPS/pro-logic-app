@@ -11,6 +11,9 @@ import {
   ChevronDown, ChevronUp, Zap, Upload, ClipboardCheck, X, Copy,
 } from 'lucide-react';
 import { useNamespace } from '@/hooks/useNamespace';
+import { useAuth } from '@/hooks/useAuth';
+import { limitFor } from '@/lib/plans';
+import { LimitModal } from '@/components/UpgradeGate';
 import { loadEquipmentCatalog, CATALOG_CATEGORIES, CATALOG_STATUSES, CATALOG_CONDITIONS, type CatalogItem } from '@/lib/equipment-catalog';
 
 const STATUS_COLOR: Record<string, string> = {
@@ -73,6 +76,9 @@ export default function InventoryPage() {
   const namespace = useNamespace();
   const getUid = () => namespace || auth.currentUser?.uid || null;
   const { data: inventory, loading } = useData('inventory');
+  const { profile } = useAuth();
+  const [limitHit, setLimitHit] = useState(false);
+  const inventoryLimit = limitFor(profile?.plan, 'inventory');
   const [catalog, setCatalog] = useState<CatalogItem[]>([]);
   const [catalogLoading, setCatalogLoading] = useState(false);
   const [modal, setModal] = useState<'create' | 'edit' | 'database' | 'detail' | null>(null);
@@ -154,7 +160,10 @@ export default function InventoryPage() {
     close();
   };
 
-  const openCreate = () => { setForm(emptyForm); setFormTab('basic'); setModal('create'); };
+  const openCreate = () => {
+    if (inventory.length >= inventoryLimit) { setLimitHit(true); return; }
+    setForm(emptyForm); setFormTab('basic'); setModal('create');
+  };
   const openEdit = (i: any) => {
     setForm({
       item_id: i.item_id || '', name: i.name || '', brand: i.brand || '',
@@ -207,6 +216,7 @@ export default function InventoryPage() {
   const duplicate = async (item: any) => {
     const uid = getUid();
     if (!uid) return;
+    if (inventory.length >= inventoryLimit) { setLimitHit(true); return; }
     // Strip the Firestore id, generate a new item_id, mark name as copy
     const { id: _id, ...rest } = item;
     const newItem = {
@@ -246,6 +256,7 @@ export default function InventoryPage() {
 
   const importSelected = async () => {
     const toImport = catalog.filter(i => selectedItems.has(i.item_id));
+    if (inventory.length + toImport.length > inventoryLimit) { setLimitHit(true); return; }
     for (const item of toImport) {
       const { data_confidence, ...rest } = item as any;
       await addDoc(collection(db, 'users', getUid()!, 'inventory'), { ...rest, status: 'Available' });
@@ -296,6 +307,7 @@ export default function InventoryPage() {
 
   return (
     <div className="p-4 md:p-8">
+      {limitHit && <LimitModal item="inventory items" limit={inventoryLimit} onClose={() => setLimitHit(false)} />}
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Inventory</h1>

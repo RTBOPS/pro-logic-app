@@ -2,41 +2,93 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // User namespace — each user owns their data
-    // Team members invited by the owner also get full access
-    match /users/{uid}/{document=**} {
-      allow read, write: if request.auth != null && (
-        request.auth.uid == uid ||
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    // Same encoding the app uses: email.replace(/[.@]/g, '_'), lowercased
+    function encodedEmail() {
+      return request.auth.token.email.lower().replace('[.@]', '_');
+    }
+
+    function isInvitedTo(uid) {
+      return signedIn()
+        && request.auth.token.email != null
+        && exists(/databases/$(database)/documents/invites/$(encodedEmail()))
+        && get(/databases/$(database)/documents/invites/$(encodedEmail())).data.ownerUid == uid;
+    }
+
+    // ── Workspace data (subcollections only; the profile doc is matched below) ──
+    // Owner has full access; team members invited by the owner too.
+    match /users/{uid}/{collection}/{document=**} {
+      allow read, write: if signedIn() && (request.auth.uid == uid || isInvitedTo(uid));
+    }
+
+    // Crew members respond to a confirmation link without an account.
+    // The path is only reachable via an unguessable token; the update may
+    // touch nothing but the confirmation fields.
+    match /users/{uid}/productions/{productionId}/crew/{assignId} {
+      allow update: if request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['confirmation_status', 'responded_at'])
+        && request.resource.data.confirmation_status in ['confirmed', 'declined'];
+    }
+
+    // ── User profile ──
+    // Owner may read and edit it, but plan/billing fields only change via the
+    // server (the PayPal webhook uses the Admin SDK, which bypasses rules).
+    match /users/{uid} {
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow create: if signedIn() && request.auth.uid == uid
+        && request.resource.data.get('plan', 'free') == 'free'
+        && !('paypalSubscriptionId' in request.resource.data);
+      allow update: if signedIn() && request.auth.uid == uid
+        && request.resource.data.get('plan', 'free') == resource.data.get('plan', 'free')
+        && request.resource.data.get('planStatus', '') == resource.data.get('planStatus', '')
+        && request.resource.data.get('paypalSubscriptionId', '') == resource.data.get('paypalSubscriptionId', '');
+    }
+
+    // ── Invites ──
+    // Only the workspace owner can create/delete invites (and only with their
+    // own uid). The invited user can read their invite and mark it accepted.
+    match /invites/{encoded} {
+      allow read: if signedIn() && (
+        resource.data.ownerUid == request.auth.uid ||
+        (request.auth.token.email != null && encoded == encodedEmail())
+      );
+      allow create: if signedIn() && request.resource.data.ownerUid == request.auth.uid;
+      allow delete: if signedIn() && resource.data.ownerUid == request.auth.uid;
+      allow update: if signedIn() && (
+        resource.data.ownerUid == request.auth.uid ||
         (
-          request.auth.token.email != null &&
-          exists(/databases/$(database)/documents/invites/$(request.auth.token.email.replace('.', '_').replace('@', '_'))) &&
-          get(/databases/$(database)/documents/invites/$(request.auth.token.email.replace('.', '_').replace('@', '_'))).data.ownerUid == uid
+          request.auth.token.email != null
+          && encoded == encodedEmail()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['accepted'])
         )
       );
     }
 
-    // User profile doc at top level
-    match /users/{uid} {
-      allow read, write: if request.auth != null && request.auth.uid == uid;
-    }
-
-    // Invite records — any authenticated user can read/write
-    match /invites/{encodedEmail} {
-      allow read, write: if request.auth != null;
-    }
-
-    // Confirmation tokens — public read (crew members click without logging in)
-    // Only authenticated users (production owners) can create them
+    // ── Confirmation tokens ──
+    // Public read (crew click the link without logging in). Owner manages them;
+    // anonymous visitors may only record their confirmation response.
     match /confirm_tokens/{token} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow create: if signedIn() && request.resource.data.uid == request.auth.uid;
+      allow delete: if signedIn() && resource.data.uid == request.auth.uid;
+      allow update: if
+        (signedIn() && resource.data.uid == request.auth.uid) ||
+        (
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['snapshot', 'responded_at'])
+          && request.resource.data.snapshot.confirmation_status in ['confirmed', 'declined']
+        );
     }
 
-    // Shared call sheets — public read so crew can view without login
-    // Only authenticated users (production owners) can create/update
+    // ── Shared call sheets ──
+    // Public read so crew can view without login; only the owner writes them.
     match /shared_callsheets/{token} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow create: if signedIn() && request.resource.data.uid == request.auth.uid;
+      allow update, delete: if signedIn() && resource.data.uid == request.auth.uid;
     }
   }
 }

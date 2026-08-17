@@ -7,15 +7,19 @@ import AuthGuard from './AuthGuard';
 import CompanyTheme from './CompanyTheme';
 import { NamespaceProvider } from './NamespaceProvider';
 import { useCompany } from '@/hooks/useCompany';
+import { useAuth } from '@/hooks/useAuth';
 import { Menu, X } from 'lucide-react';
 
-const PUBLIC_PATHS = ['/', '/auth', '/confirm'];
+const PUBLIC_PATHS = ['/', '/auth', '/confirm', '/callsheet'];
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const path = usePathname();
   const company = useCompany();
+  const { user } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const isPublic = path === '/' || PUBLIC_PATHS.filter(p => p !== '/').some(p => path === p || path.startsWith(p + '/'));
+  const isPublic = path === '/' || PUBLIC_PATHS.filter(p => p !== '/').some(p => path === p || path.startsWith(p + '/'))
+    // Pricing is public for visitors; logged-in users see it inside the app shell
+    || (path === '/pricing' && !user);
 
   // Close sidebar on route change
   useEffect(() => { setSidebarOpen(false); }, [path]);

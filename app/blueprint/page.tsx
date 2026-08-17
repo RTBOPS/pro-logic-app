@@ -1,5 +1,6 @@
 'use client';
 
+import { UpgradeGate } from '@/components/UpgradeGate';
 import { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { useData } from '@/hooks/useData';
@@ -10,7 +11,7 @@ import { Save, Printer, Loader2 } from 'lucide-react';
 
 const BlueprintCanvas = dynamic(() => import('@/components/BlueprintCanvas'), { ssr: false });
 
-export default function BlueprintPage() {
+function BlueprintPageInner() {
   const { data: productions } = useData('productions');
   const { data: locations } = useData('locations');
   const { data: inventory } = useData('inventory');
@@ -164,5 +165,13 @@ export default function BlueprintPage() {
         }
       `}</style>
     </div>
+  );
+}
+
+export default function BlueprintPage() {
+  return (
+    <UpgradeGate feature="Location Blueprints" requires="pro">
+      <BlueprintPageInner />
+    </UpgradeGate>
   );
 }

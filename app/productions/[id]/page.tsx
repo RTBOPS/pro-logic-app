@@ -141,14 +141,22 @@ export default function ProductionDetail({ params }: { params: Promise<{ id: str
       confirmation_status: 'pending', confirm_token: token,
       call_time: production?.call_time || '',
     });
-    // Write a top-level lookup so the unauthenticated confirm page can find it
-    await import('firebase/firestore').then(({ setDoc, doc: fsDoc }) =>
-      setDoc(fsDoc(db, 'confirm_tokens', token), {
-        uid: getUid()!, productionId: id,
-        crewAssignId: assignRef.id,
-        createdAt: new Date().toISOString(),
-      })
-    );
+    // Write a top-level lookup so the unauthenticated confirm page can find it.
+    // The snapshot lets the crew member see their assignment without reading
+    // users/{uid}/… (which Firestore rules protect).
+    await setDoc(doc(db, 'confirm_tokens', token), {
+      uid: getUid()!, productionId: id,
+      crewAssignId: assignRef.id,
+      createdAt: new Date().toISOString(),
+      snapshot: {
+        name: `${member.name} ${member.last_name}`,
+        role: member.role || '',
+        call_time: production?.call_time || '',
+        production_name: production?.name || '',
+        production_client: production?.client || '',
+        confirmation_status: 'pending',
+      },
+    });
     await loadAssignments();
   };
 
@@ -186,6 +194,19 @@ export default function ProductionDetail({ params }: { params: Promise<{ id: str
     if (!member.email) { alert('No email for this crew member.'); return; }
     setSending(member.id);
     const location = locations.find((l: any) => l.id === production?.location_id);
+    // Refresh the public confirm-token snapshot so the crew member sees current info
+    if (member.confirm_token) {
+      await setDoc(doc(db, 'confirm_tokens', member.confirm_token), {
+        snapshot: {
+          name: member.name || '',
+          role: member.role || '',
+          call_time: member.call_time || production?.call_time || '',
+          production_name: production?.name || '',
+          production_client: production?.client || '',
+          confirmation_status: member.confirmation_status || 'pending',
+        },
+      }, { merge: true });
+    }
     const ok = await sendConfirmationEmail({
       to: member.email, crewName: member.name, role: member.role || '',
       productionName: production?.name, client: production?.client,
@@ -203,22 +224,53 @@ export default function ProductionDetail({ params }: { params: Promise<{ id: str
       await sendConfirmation(m);
   };
 
-  /* ── Get or create a public share token for this production's call sheet ── */
+  /* ── Get or create a public share token for this production's call sheet ──
+     The token doc carries a full snapshot of the call sheet data, so crew can
+     view it without an account (Firestore only allows public reads on
+     shared_callsheets, not on users/{uid}/…). The snapshot is refreshed every
+     time the call sheet is shared. */
   const getShareUrl = async (): Promise<string> => {
     const uid = getUid()!;
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.pro-logic.studio';
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://pro-logic.studio';
+
+    const location = locations.find((l: any) => l.id === production?.location_id);
+    const compSnap = await getDoc(doc(db, 'users', uid, 'company', 'profile'));
+    const company = compSnap.exists() ? compSnap.data() : null;
+
+    const snapshot = {
+      production: {
+        name: production?.name || '',
+        client: production?.client || '',
+        start_date: production?.start_date || '',
+        call_time: production?.call_time || '',
+        notes: production?.notes || '',
+      },
+      location: location
+        ? { name: location.name || '', address: location.address || '' }
+        : null,
+      company: company
+        ? { name: company.name || '', logo_url: company.logo_url || '', primary_color: company.primary_color || '' }
+        : null,
+      crew: assignedCrew.map((c: any) => ({
+        id: c.id,
+        name: c.name || '',
+        role: c.role || '',
+        department: c.department || '',
+        call_time: c.call_time || '',
+        picture: c.picture || '',
+      })),
+    };
 
     // Reuse existing token if already set on the production
-    if (production?.share_token) {
-      return `${appUrl}/callsheet/${production.share_token}`;
-    }
-    // Generate new token and store on production + in top-level shared_callsheets
-    const token = crypto.randomUUID();
+    const token = production?.share_token || crypto.randomUUID();
     await setDoc(doc(db, 'shared_callsheets', token), {
-      uid, productionId: id, createdAt: new Date().toISOString(),
-    });
-    await updateDoc(doc(db, 'users', uid, 'productions', id), { share_token: token });
-    setProduction((p: any) => ({ ...p, share_token: token }));
+      uid, productionId: id, snapshot,
+      createdAt: new Date().toISOString(),
+    }, { merge: true });
+    if (!production?.share_token) {
+      await updateDoc(doc(db, 'users', uid, 'productions', id), { share_token: token });
+      setProduction((p: any) => ({ ...p, share_token: token }));
+    }
     return `${appUrl}/callsheet/${token}`;
   };
 

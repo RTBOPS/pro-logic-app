@@ -1,5 +1,6 @@
 'use client';
 
+import { UpgradeGate } from '@/components/UpgradeGate';
 import { useState, useEffect } from 'react';
 import { useData } from '@/hooks/useData';
 import { doc, getDoc, getDocs, collection } from 'firebase/firestore';
@@ -28,7 +29,7 @@ const DOCS = [
   { id: 'crew-deal', title: 'Crew Deal Memo & Contract', desc: 'Standard crew deal memo with payment terms', icon: Users, color: 'bg-indigo-50 text-indigo-600', generate: generateCrewDeal },
 ];
 
-export default function DocumentsPage() {
+function DocumentsPageInner() {
   const namespace = useNamespace();
   const getUid = () => namespace || auth.currentUser?.uid || null;
   const { data: productions, loading: loadingData } = useData('productions');
@@ -218,5 +219,13 @@ export default function DocumentsPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function DocumentsPage() {
+  return (
+    <UpgradeGate feature="Document generation" requires="pro">
+      <DocumentsPageInner />
+    </UpgradeGate>
   );
 }

@@ -4,6 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { Check } from 'lucide-react';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 
 const PLANS = [
   {
@@ -99,6 +100,23 @@ export default function PricingPage() {
   };
 
   return (
+    <div className="min-h-screen w-full bg-gray-50">
+      {/* Top bar for visitors browsing pricing without an account */}
+      {!user && (
+        <header className="bg-black text-white">
+          <div className="max-w-5xl mx-auto px-6 h-14 flex items-center justify-between">
+            <Link href="/" className="flex items-center gap-2">
+              <img src="/logo.png" alt="PRO-LOGIC" className="h-7 object-contain" style={{ filter: 'brightness(0) invert(1)' }} />
+            </Link>
+            <div className="flex items-center gap-4">
+              <Link href="/auth" className="text-sm text-zinc-300 hover:text-white">Sign in</Link>
+              <Link href="/auth" className="text-sm font-medium bg-white text-black px-4 py-1.5 rounded-full hover:bg-zinc-200">
+                Get started free
+              </Link>
+            </div>
+          </div>
+        </header>
+      )}
     <div className="p-8 max-w-5xl mx-auto">
       <div className="text-center mb-10">
         <h1 className="text-3xl font-bold text-gray-900">Choose your plan</h1>
@@ -115,7 +133,7 @@ export default function PricingPage() {
         )}
       </div>
 
-      <div className="grid grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {PLANS.map(plan => (
           <div
             key={plan.id}
@@ -163,6 +181,7 @@ export default function PricingPage() {
       <p className="text-center text-xs text-gray-400 mt-8">
         Payments processed securely by PayPal. Cancel anytime from your PayPal account.
       </p>
+    </div>
     </div>
   );
 }

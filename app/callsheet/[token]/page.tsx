@@ -27,9 +27,24 @@ export default function PublicCallSheet({ params }: { params: Promise<{ token: s
         const tokenSnap = await getDoc(doc(db, 'shared_callsheets', token));
         if (!tokenSnap.exists()) { setStatus('error'); return; }
 
-        const { uid, productionId } = tokenSnap.data();
+        const data = tokenSnap.data();
 
-        // Load production, crew, locations, company in parallel
+        // New tokens carry a full snapshot — no auth needed for anything else
+        if (data.snapshot) {
+          const snap = data.snapshot;
+          setProduction(snap.production);
+          setCrew(
+            (snap.crew || []).slice().sort((a: any, b: any) =>
+              (a.department || '').localeCompare(b.department || ''))
+          );
+          setLocation(snap.location || null);
+          setCompany(snap.company || null);
+          setStatus('ready');
+          return;
+        }
+
+        // Legacy tokens (pre-snapshot): live reads — only work for signed-in owners
+        const { uid, productionId } = data;
         const [prodSnap, crewSnap, locsSnap, compSnap] = await Promise.all([
           getDoc(doc(db, 'users', uid, 'productions', productionId)),
           getDocs(collection(db, 'users', uid, 'productions', productionId, 'crew')),
@@ -62,7 +77,7 @@ export default function PublicCallSheet({ params }: { params: Promise<{ token: s
 
   if (status === 'loading') {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen w-full bg-gray-50 flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
           <img src="/logo.png" alt="PRO-LOGIC" className="h-8 object-contain animate-pulse" />
           <div className="w-32 h-1 bg-gray-200 rounded-full overflow-hidden">
@@ -76,7 +91,7 @@ export default function PublicCallSheet({ params }: { params: Promise<{ token: s
 
   if (status === 'error') {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="min-h-screen w-full bg-gray-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-lg p-8 max-w-sm w-full text-center">
           <img src="/logo.png" alt="PRO-LOGIC" className="h-8 mx-auto mb-4 object-contain" />
           <h1 className="font-bold text-gray-800 mb-2">Call sheet not found</h1>
@@ -102,7 +117,7 @@ export default function PublicCallSheet({ params }: { params: Promise<{ token: s
   });
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-10">
+    <div className="min-h-screen w-full bg-gray-50 pb-10">
       {/* Header bar */}
       <div className="px-4 py-3 flex items-center justify-between" style={{ backgroundColor: brandColor }}>
         {company?.logo_url

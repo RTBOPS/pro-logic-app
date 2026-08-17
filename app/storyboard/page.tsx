@@ -1,5 +1,6 @@
 'use client';
 
+import { UpgradeGate } from '@/components/UpgradeGate';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useData } from '@/hooks/useData';
 import { addDoc, updateDoc, deleteDoc, collection, doc } from 'firebase/firestore';
@@ -211,7 +212,7 @@ function DrawingCanvas({ value, onChange }: { value: string; onChange: (v: strin
 }
 
 
-export default function StoryboardPage() {
+function StoryboardPageInner() {
   const namespace = useNamespace();
   const getUid = () => namespace || auth.currentUser?.uid || null;
   const { data: productions } = useData('productions');
@@ -439,5 +440,13 @@ export default function StoryboardPage() {
         }
       `}</style>
     </div>
+  );
+}
+
+export default function StoryboardPage() {
+  return (
+    <UpgradeGate feature="Storyboard" requires="pro">
+      <StoryboardPageInner />
+    </UpgradeGate>
   );
 }

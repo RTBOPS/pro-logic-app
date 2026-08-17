@@ -1,5 +1,6 @@
 'use client';
 
+import { UpgradeGate } from '@/components/UpgradeGate';
 import { useState, useMemo } from 'react';
 import { useData } from '@/hooks/useData';
 import { addDoc, updateDoc, deleteDoc, collection, doc } from 'firebase/firestore';
@@ -26,7 +27,7 @@ const empty = {
   category: 'action', notes: '', status: 'Not Filmed',
 };
 
-export default function StripboardPage() {
+function StripboardPageInner() {
   const namespace = useNamespace();
   const getUid = () => namespace || auth.currentUser?.uid || null;
   const { data: scenes, loading } = useData('stripboard');
@@ -221,5 +222,13 @@ export default function StripboardPage() {
         </Modal>
       )}
     </div>
+  );
+}
+
+export default function StripboardPage() {
+  return (
+    <UpgradeGate feature="Stripboard" requires="pro">
+      <StripboardPageInner />
+    </UpgradeGate>
   );
 }

@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.pro-logic.studio';
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://pro-logic.studio';
     const base = process.env.PAYPAL_SANDBOX === 'true'
       ? 'https://api-m.sandbox.paypal.com'
       : 'https://api-m.paypal.com';

@@ -10,6 +10,8 @@ import { Upload, Building2, Save, UserPlus, Trash2, Users, Share2, Lock } from '
 import PageHeader from '@/components/PageHeader';
 import { useData } from '@/hooks/useData';
 import Image from 'next/image';
+import { planAtLeast } from '@/lib/plans';
+import { FeatureModal } from '@/components/UpgradeGate';
 
 const empty = {
   name: '', tagline: '', address: '', city: '', state: '', zip: '', country: 'USA',
@@ -43,6 +45,7 @@ export default function CompanyPage() {
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState('Editor');
   const [inviting, setInviting] = useState(false);
+  const [teamGate, setTeamGate] = useState(false);
   const { data: crew } = useData('crew');
 
   const PLAN_LIMITS: Record<string, number> = { free: 5, pro: 50, studio: Infinity };
@@ -91,6 +94,7 @@ export default function CompanyPage() {
   };
 
   const addTeamMember = async () => {
+    if (!planAtLeast(profile?.plan, 'studio')) { setTeamGate(true); return; }
     if (!inviteEmail.trim() || !namespace || !user) return;
     const email = inviteEmail.trim().toLowerCase();
     if (team.find(m => m.email === email)) { alert('Already invited'); return; }
@@ -131,6 +135,7 @@ export default function CompanyPage() {
 
   return (
     <div className="p-8 max-w-3xl">
+      {teamGate && <FeatureModal feature="Team members" requires="studio" onClose={() => setTeamGate(false)} />}
       <PageHeader title="Company Information" subtitle="This info appears on all generated documents and ID cards">
         {(
           <button onClick={save} disabled={saving || !namespace}

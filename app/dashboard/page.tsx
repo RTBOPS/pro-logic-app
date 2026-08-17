@@ -35,6 +35,37 @@ export default function Dashboard() {
   // Checklist readiness per production
   const [readiness, setReadiness] = useState<Record<string, number>>({});
 
+  // PayPal return flow: ?subscribed=pro|studio — the webhook activates the
+  // plan server-side, so poll the profile until it flips (or we time out)
+  const [activating, setActivating] = useState<null | 'pending' | 'done' | 'timeout'>(null);
+  const [activatedPlan, setActivatedPlan] = useState('');
+
+  useEffect(() => {
+    const plan = new URLSearchParams(window.location.search).get('subscribed');
+    if (!plan) return;
+    setActivating('pending');
+    let tries = 0;
+    const timer = setInterval(async () => {
+      tries++;
+      const u = auth.currentUser;
+      if (u) {
+        try {
+          const snap = await getDoc(doc(db, 'users', u.uid));
+          const p = snap.exists() ? (snap.data() as any).plan : null;
+          if (p === plan) {
+            setActivatedPlan(p);
+            setActivating('done');
+            clearInterval(timer);
+            window.history.replaceState({}, '', '/dashboard');
+            return;
+          }
+        } catch { /* keep polling */ }
+      }
+      if (tries >= 20) { setActivating('timeout'); clearInterval(timer); }
+    }, 3000);
+    return () => clearInterval(timer);
+  }, []);
+
   useEffect(() => {
     const uid = getUid();
     if (!uid || productions.length === 0) return;
@@ -82,6 +113,23 @@ export default function Dashboard() {
 
   return (
     <div className="p-4 md:p-8">
+      {activating === 'pending' && (
+        <div className="mb-6 bg-blue-50 border border-blue-200 text-blue-800 rounded-2xl px-5 py-3.5 text-sm flex items-center gap-3">
+          <div className="w-4 h-4 border-2 border-blue-300 border-t-blue-700 rounded-full animate-spin shrink-0" />
+          Payment approved — activating your plan. This usually takes a few seconds…
+        </div>
+      )}
+      {activating === 'done' && (
+        <div className="mb-6 bg-green-50 border border-green-200 text-green-800 rounded-2xl px-5 py-3.5 text-sm font-medium">
+          🎉 Your <span className="capitalize">{activatedPlan}</span> plan is now active. Welcome aboard!
+        </div>
+      )}
+      {activating === 'timeout' && (
+        <div className="mb-6 bg-yellow-50 border border-yellow-200 text-yellow-800 rounded-2xl px-5 py-3.5 text-sm">
+          Payment received. Activation is taking longer than usual — refresh this page in a minute.
+          If your plan doesn&apos;t appear, contact support.
+        </div>
+      )}
       <PageHeader title="Dashboard" subtitle="Overview of your studio operations" />
 
       {/* Stats */}

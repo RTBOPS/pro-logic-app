@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, use } from 'react';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { CheckCircle, XCircle } from 'lucide-react';
 
@@ -23,8 +23,19 @@ export default function ConfirmPage({ params }: { params: Promise<{ token: strin
           return;
         }
 
-        const { uid, productionId, crewAssignId } = tokenSnap.data();
+        const data = tokenSnap.data();
+        const { uid, productionId, crewAssignId } = data;
         const crewPath = `users/${uid}/productions/${productionId}/crew/${crewAssignId}`;
+
+        // New tokens carry a snapshot — no reads into users/{uid}/… needed
+        if (data.snapshot) {
+          setAssignment(data.snapshot);
+          setAssignDocPath(crewPath);
+          setStatus('found');
+          return;
+        }
+
+        // Legacy tokens: live reads (require the owner to be signed in)
         const crewSnap = await getDoc(doc(db, crewPath));
 
         if (!crewSnap.exists()) {
@@ -53,13 +64,25 @@ export default function ConfirmPage({ params }: { params: Promise<{ token: strin
   const respond = async (answer: 'confirmed' | 'declined') => {
     if (!assignDocPath) return;
     setResponding(true);
-    await updateDoc(doc(db, assignDocPath), {
-      confirmation_status: answer,
-      responded_at: new Date().toISOString(),
-    });
-    setStatus('done');
-    setAssignment((a: any) => ({ ...a, confirmation_status: answer }));
-    setResponding(false);
+    const respondedAt = new Date().toISOString();
+    try {
+      // Firestore rules allow this specific update (confirmation fields only)
+      await updateDoc(doc(db, assignDocPath), {
+        confirmation_status: answer,
+        responded_at: respondedAt,
+      });
+      // Keep the public token snapshot in sync for repeat visits
+      await setDoc(doc(db, 'confirm_tokens', token), {
+        snapshot: { confirmation_status: answer },
+        responded_at: respondedAt,
+      }, { merge: true }).catch(() => {});
+      setStatus('done');
+      setAssignment((a: any) => ({ ...a, confirmation_status: answer }));
+    } catch {
+      alert('Could not record your response. Please try again or contact production.');
+    } finally {
+      setResponding(false);
+    }
   };
 
   if (status === 'loading') {

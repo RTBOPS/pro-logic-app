@@ -11,6 +11,9 @@ import Link from 'next/link';
 import { Plus, Pencil, Trash2, ChevronRight, Upload } from 'lucide-react';
 import { useNamespace } from '@/hooks/useNamespace';
 import PageHeader from '@/components/PageHeader';
+import { useAuth } from '@/hooks/useAuth';
+import { limitFor } from '@/lib/plans';
+import { LimitModal } from '@/components/UpgradeGate';
 
 // Generate 24H time options every 15 min
 const TIME_OPTIONS = Array.from({ length: 24 * 4 }, (_, i) => {
@@ -82,6 +85,9 @@ export default function ProductionsPage() {
   const [modal, setModal] = useState<'create' | 'edit' | null>(null);
   const [imgUploading, setImgUploading] = useState(false);
   const imgRef = useRef<HTMLInputElement>(null);
+  const { profile } = useAuth();
+  const [limitHit, setLimitHit] = useState(false);
+  const productionLimit = limitFor(profile?.plan, 'productions');
 
   const handleProductionImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -100,7 +106,10 @@ export default function ProductionsPage() {
   const [editId, setEditId] = useState<string | null>(null);
 
   // Always create a fresh copy to prevent stale date/time values
-  const openCreate = () => { setForm({ ...empty }); setFormTab('basic'); setModal('create'); };
+  const openCreate = () => {
+    if (productions.length >= productionLimit) { setLimitHit(true); return; }
+    setForm({ ...empty }); setFormTab('basic'); setModal('create');
+  };
   const openEdit = (p: any) => {
     const keys = Object.keys(empty) as (keyof typeof empty)[];
     const f: any = {};
@@ -136,6 +145,7 @@ export default function ProductionsPage() {
 
   return (
     <div className="p-4 md:p-8">
+      {limitHit && <LimitModal item="active productions" limit={productionLimit} onClose={() => setLimitHit(false)} />}
       <PageHeader title="Productions" subtitle={`${productions.length} total`}>
         <button onClick={openCreate} className="flex items-center gap-2 bg-black text-white px-4 py-2 rounded-xl text-sm hover:bg-zinc-800 transition-colors">
           <Plus size={16} /> New Production
