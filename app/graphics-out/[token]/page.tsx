@@ -5,13 +5,13 @@
    ?bg=dark for preview. No login: it reads a public live_graphics token doc
    for the operator's cues and polls the NBA feed for live data. */
 
-import { useState, useEffect, useMemo, use } from 'react';
+import { useState, useEffect, useMemo, useRef, use } from 'react';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
-  normalizeSummary, gameLeaders, comparedTeamStats, periodLabel,
-  type Summary, type Athlete,
+  normalizeSummary, gameLeaders, comparedTeamStats, periodLabel, detectCallouts,
+  type Summary, type Athlete, type Callout,
 } from '@/lib/nba';
 
 interface GfxDoc {
@@ -19,13 +19,24 @@ interface GfxDoc {
   bug?: boolean;
   lowerId?: string | null;
   full?: 'teamstats' | 'lineups' | 'leaders' | null;
+  brand?: { logo?: string; name?: string } | null;
+  showBrand?: boolean;
+  autoCallouts?: boolean;
+  callout?: Callout | null;             // manual fire from the control panel
+  theme?: { useTeamColors?: boolean; c1?: string; c2?: string } | null;
+  banner?: string | null;               // URL of the currently-aired banner
 }
+
+const CALLOUT_MS = 4500;
 
 export default function GraphicsOutput({ params }: { params: Promise<{ token: string }> }) {
   const { token } = use(params);
   const [gfx, setGfx] = useState<GfxDoc>({});
   const [summary, setSummary] = useState<Summary | null>(null);
   const [bg, setBg] = useState('transparent');
+  const [queue, setQueue] = useState<Callout[]>([]);
+  const prevSummary = useRef<Summary | null>(null);
+  const lastManual = useRef<string>('');
 
   useEffect(() => {
     const p = new URLSearchParams(window.location.search).get('bg');
@@ -40,27 +51,61 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
       () => setGfx({}));
   }, [token]);
 
-  /* Live game data (4 s poll) */
+  /* Manual callouts from the control panel */
+  useEffect(() => {
+    const c = gfx.callout;
+    if (c?.id && c.id !== lastManual.current) {
+      lastManual.current = c.id;
+      setQueue(q => [...q, c].slice(-6));
+    }
+  }, [gfx.callout]);
+
+  /* Live game data (4 s poll) + auto callout detection */
   useEffect(() => {
     const eventId = gfx.eventId;
-    if (!eventId) { setSummary(null); return; }
+    if (!eventId) { setSummary(null); prevSummary.current = null; return; }
     let alive = true;
     const load = async () => {
       try {
         const res = await fetch(`/api/nba/summary?event=${eventId}`);
         const json = await res.json();
-        if (alive) setSummary(normalizeSummary(json));
+        if (!alive) return;
+        const next = normalizeSummary(json);
+        if (next) {
+          if (gfx.autoCallouts !== false && next.state === 'in') {
+            const events = detectCallouts(prevSummary.current, next);
+            if (events.length) setQueue(q => [...q, ...events].slice(-6));
+          }
+          prevSummary.current = next;
+          setSummary(next);
+        }
       } catch { /* keep last */ }
     };
     load();
     const t = setInterval(load, 4000);
     return () => { alive = false; clearInterval(t); };
-  }, [gfx.eventId]);
+  }, [gfx.eventId, gfx.autoCallouts]);
+
+  /* Callout queue: show one at a time */
+  const current = queue[0] || null;
+  useEffect(() => {
+    if (!current) return;
+    const t = setTimeout(() => setQueue(q => q.slice(1)), current.ms || CALLOUT_MS);
+    return () => clearTimeout(t);
+  }, [current?.id]);
 
   const lower: Athlete | null = useMemo(() => {
     if (!summary || !gfx.lowerId) return null;
     return [...summary.home.athletes, ...summary.away.athletes].find(a => a.id === gfx.lowerId) || null;
   }, [summary, gfx.lowerId]);
+
+  /* Theme: official team colors by default, operator overrides at will */
+  const custom = gfx.theme && gfx.theme.useTeamColors === false;
+  const awayColor = custom && gfx.theme?.c1 ? gfx.theme.c1 : summary?.away.color || '#1f2937';
+  const homeColor = custom && gfx.theme?.c2 ? gfx.theme.c2 : summary?.home.color || '#1f2937';
+  const calloutColor = (c: Callout) => (custom ? awayColor : c.color) || '#7c3aed';
+
+  const brand = gfx.showBrand !== false && gfx.brand?.logo ? gfx.brand : null;
 
   return (
     <div className="fixed inset-0 overflow-hidden font-sans" style={{ background: bg }}>
@@ -72,20 +117,61 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
               <motion.div
                 initial={{ y: 90, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 90, opacity: 0 }}
                 transition={{ type: 'spring', stiffness: 260, damping: 26 }}
-                className="absolute bottom-8 left-8 flex items-stretch rounded-xl overflow-hidden shadow-2xl text-white"
+                className="absolute bottom-8 left-8"
                 style={{ fontVariantNumeric: 'tabular-nums' }}>
-                <TeamCell team={summary.away} />
-                <div className="bg-zinc-900 px-4 flex flex-col items-center justify-center min-w-[92px]">
-                  {summary.state === 'in' ? (
-                    <>
-                      <span className="text-yellow-400 font-bold text-lg leading-tight">{summary.clock}</span>
-                      <span className="text-zinc-400 text-xs font-semibold">{periodLabel(summary.period)}</span>
-                    </>
-                  ) : (
-                    <span className="text-zinc-300 text-xs font-bold uppercase text-center leading-tight px-1">{summary.statusDetail}</span>
+
+                {/* Callout pill above the bug */}
+                <AnimatePresence mode="popLayout">
+                  {current && (
+                    <motion.div key={current.id}
+                      initial={{ y: 24, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: -14, opacity: 0 }}
+                      transition={{ type: 'spring', stiffness: 300, damping: 24 }}
+                      className="mb-2 inline-flex items-center gap-3 rounded-xl overflow-hidden shadow-2xl text-white">
+                      <div className="px-4 py-2 font-black text-lg tracking-wide"
+                        style={{ background: calloutColor(current) }}>
+                        {current.title}
+                      </div>
+                      {current.sub && (
+                        <div className="pr-4 py-2 -ml-1 text-sm font-semibold bg-zinc-900/95 pl-3 self-stretch flex items-center">
+                          {current.sub}
+                        </div>
+                      )}
+                    </motion.div>
                   )}
+                </AnimatePresence>
+
+                <div className="flex items-stretch rounded-xl overflow-hidden shadow-2xl text-white">
+                  {/* Company brand chip */}
+                  {brand && (
+                    <div className="bg-white px-3 flex items-center">
+                      <img src={brand.logo} className="h-8 max-w-[72px] object-contain" alt={brand.name || ''} />
+                    </div>
+                  )}
+                  <TeamCell team={summary.away} color={awayColor} />
+                  <div className="bg-zinc-900 px-4 flex flex-col items-center justify-center min-w-[92px]">
+                    {summary.state === 'in' ? (
+                      <>
+                        <span className="text-yellow-400 font-bold text-lg leading-tight">{summary.clock}</span>
+                        <span className="text-zinc-400 text-xs font-semibold">{periodLabel(summary.period)}</span>
+                      </>
+                    ) : (
+                      <span className="text-zinc-300 text-xs font-bold uppercase text-center leading-tight px-1">{summary.statusDetail}</span>
+                    )}
+                  </div>
+                  <TeamCell team={summary.home} color={homeColor} reverse />
                 </div>
-                <TeamCell team={summary.home} reverse />
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* ── CUSTOM BANNER ── */}
+          <AnimatePresence>
+            {gfx.banner && (
+              <motion.div key={gfx.banner}
+                initial={{ y: 60, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 60, opacity: 0 }}
+                transition={{ type: 'spring', stiffness: 240, damping: 26 }}
+                className="absolute bottom-8 left-1/2 -translate-x-1/2">
+                <img src={gfx.banner} className="max-h-28 max-w-[860px] object-contain rounded-xl shadow-2xl" alt="" />
               </motion.div>
             )}
           </AnimatePresence>
@@ -99,18 +185,18 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
                 transition={{ type: 'spring', stiffness: 240, damping: 26 }}
                 className="absolute bottom-28 left-8 flex items-end">
                 <div className="w-36 h-36 rounded-2xl overflow-hidden shadow-2xl relative"
-                  style={{ background: `linear-gradient(160deg, ${lower.teamColor}, #111)` }}>
+                  style={{ background: `linear-gradient(160deg, ${custom ? awayColor : lower.teamColor}, #111)` }}>
                   {lower.headshot && <img src={lower.headshot} className="absolute inset-0 w-full h-full object-cover object-top" alt="" />}
                 </div>
                 <div className="ml-[-10px] mb-2">
                   <div className="bg-zinc-900/95 text-white pl-6 pr-8 py-3 rounded-tr-2xl shadow-2xl">
                     <div className="text-2xl font-black leading-none">{lower.name}</div>
-                    <div className="text-xs font-semibold mt-1" style={{ color: lower.teamColor === '#1f2937' ? '#9ca3af' : lower.teamColor }}>
+                    <div className="text-xs font-semibold mt-1 text-zinc-400">
                       {lower.teamAbbr} · #{lower.jersey} · {lower.pos}
                     </div>
                   </div>
                   <div className="flex text-white shadow-2xl rounded-br-2xl overflow-hidden">
-                    <StatChip label="PTS" value={lower.stats.pts} color={lower.teamColor} big />
+                    <StatChip label="PTS" value={lower.stats.pts} color={custom ? awayColor : lower.teamColor} big />
                     <StatChip label="REB" value={lower.stats.reb} />
                     <StatChip label="AST" value={lower.stats.ast} />
                     <StatChip label="FG" value={lower.stats.fg} />
@@ -129,13 +215,12 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
                 transition={{ duration: 0.25 }}
                 className="absolute inset-0 flex items-center justify-center">
                 <div className="w-[900px] max-w-[92vw] bg-zinc-900/95 text-white rounded-3xl shadow-2xl overflow-hidden">
-                  {/* Header */}
                   <div className="flex items-center justify-between px-8 py-4"
-                    style={{ background: `linear-gradient(90deg, ${summary.away.color}cc, #18181b 45%, #18181b 55%, ${summary.home.color}cc)` }}>
+                    style={{ background: `linear-gradient(90deg, ${awayColor}cc, #18181b 45%, #18181b 55%, ${homeColor}cc)` }}>
                     <div className="flex items-center gap-3">
                       {summary.away.logo && <img src={summary.away.logo} className="w-10 h-10" alt="" />}
                       <span className="text-2xl font-black">{summary.away.abbr}</span>
-                      <span className="text-3xl font-black">{summary.away.score}</span>
+                      <Score value={summary.away.score} />
                     </div>
                     <div className="text-center">
                       <div className="text-sm font-bold text-yellow-400">{summary.state === 'in' ? `${periodLabel(summary.period)} · ${summary.clock}` : summary.statusDetail}</div>
@@ -144,18 +229,22 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
-                      <span className="text-3xl font-black">{summary.home.score}</span>
+                      <Score value={summary.home.score} />
                       <span className="text-2xl font-black">{summary.home.abbr}</span>
                       {summary.home.logo && <img src={summary.home.logo} className="w-10 h-10" alt="" />}
                     </div>
                   </div>
 
-                  {gfx.full === 'teamstats' && <TeamStats summary={summary} />}
-                  {gfx.full === 'lineups' && <Lineups summary={summary} />}
-                  {gfx.full === 'leaders' && <Leaders summary={summary} />}
+                  {gfx.full === 'teamstats' && <TeamStats summary={summary} awayColor={awayColor} homeColor={homeColor} />}
+                  {gfx.full === 'lineups' && <Lineups summary={summary} awayColor={awayColor} homeColor={homeColor} />}
+                  {gfx.full === 'leaders' && <Leaders summary={summary} custom={custom} awayColor={awayColor} />}
 
-                  <div className="px-8 py-2.5 bg-black/40 text-right text-[10px] uppercase tracking-widest text-zinc-500">
-                    PRO-LOGIC Studio · Live Graphics
+                  <div className="px-8 py-2.5 bg-black/40 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      {brand && <img src={brand.logo} className="h-5 max-w-[90px] object-contain brightness-0 invert opacity-80" alt="" />}
+                      {brand?.name && <span className="text-[10px] font-semibold text-zinc-400">{brand.name}</span>}
+                    </div>
+                    <span className="text-[10px] uppercase tracking-widest text-zinc-500">PRO-LOGIC Studio · Live Graphics</span>
                   </div>
                 </div>
               </motion.div>
@@ -167,13 +256,25 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
   );
 }
 
-function TeamCell({ team, reverse = false }: { team: Summary['home']; reverse?: boolean }) {
+/* Score number with a pulse when it changes */
+function Score({ value, big = false }: { value: string; big?: boolean }) {
+  return (
+    <motion.span key={value} initial={{ scale: 1.45, color: '#fde047' }} animate={{ scale: 1, color: '#ffffff' }}
+      transition={{ duration: 0.6, ease: 'easeOut' }}
+      className={`font-black inline-block ${big ? 'text-3xl' : 'text-3xl'}`}
+      style={{ fontVariantNumeric: 'tabular-nums' }}>
+      {value}
+    </motion.span>
+  );
+}
+
+function TeamCell({ team, color, reverse = false }: { team: Summary['home']; color: string; reverse?: boolean }) {
   return (
     <div className={`flex items-center gap-3 px-4 py-2.5 ${reverse ? 'flex-row-reverse' : ''}`}
-      style={{ background: `linear-gradient(${reverse ? '270deg' : '90deg'}, ${team.color}, #18181b 140%)` }}>
+      style={{ background: `linear-gradient(${reverse ? '270deg' : '90deg'}, ${color}, #18181b 140%)` }}>
       {team.logo && <img src={team.logo} className="w-9 h-9 drop-shadow" alt="" />}
       <span className="font-black text-xl tracking-wide">{team.abbr}</span>
-      <span className="font-black text-3xl">{team.score}</span>
+      <Score value={team.score} />
     </div>
   );
 }
@@ -188,7 +289,7 @@ function StatChip({ label, value, color, big = false }: { label: string; value: 
   );
 }
 
-function TeamStats({ summary }: { summary: Summary }) {
+function TeamStats({ summary, awayColor, homeColor }: { summary: Summary; awayColor: string; homeColor: string }) {
   const rows = comparedTeamStats(summary);
   const pct = (v: string) => Math.min(100, parseFloat(v) || 0);
   return (
@@ -204,8 +305,8 @@ function TeamStats({ summary }: { summary: Summary }) {
               <span style={{ fontVariantNumeric: 'tabular-nums' }}>{r.home}</span>
             </div>
             <div className="flex h-1.5 rounded-full overflow-hidden bg-zinc-800">
-              <div style={{ width: `${(a / total) * 100}%`, background: summary.away.color }} />
-              <div className="flex-1" style={{ background: summary.home.color, opacity: 0.9 }} />
+              <div style={{ width: `${(a / total) * 100}%`, background: awayColor }} />
+              <div className="flex-1" style={{ background: homeColor, opacity: 0.9 }} />
             </div>
           </div>
         );
@@ -214,13 +315,13 @@ function TeamStats({ summary }: { summary: Summary }) {
   );
 }
 
-function Lineups({ summary }: { summary: Summary }) {
+function Lineups({ summary, awayColor, homeColor }: { summary: Summary; awayColor: string; homeColor: string }) {
   const five = (t: Summary['home']) => t.athletes.filter(a => a.starter).slice(0, 5);
   return (
     <div className="px-8 py-6 grid grid-cols-2 gap-8">
-      {[summary.away, summary.home].map(team => (
+      {[{ team: summary.away, color: awayColor }, { team: summary.home, color: homeColor }].map(({ team, color }) => (
         <div key={team.abbr}>
-          <div className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: team.color }}>{team.name}</div>
+          <div className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color }}>{team.name}</div>
           <div className="space-y-2">
             {five(team).map(a => (
               <div key={a.id} className="flex items-center gap-3 bg-zinc-800/60 rounded-xl px-3 py-1.5">
@@ -238,32 +339,35 @@ function Lineups({ summary }: { summary: Summary }) {
   );
 }
 
-function Leaders({ summary }: { summary: Summary }) {
+function Leaders({ summary, custom, awayColor }: { summary: Summary; custom: boolean; awayColor: string }) {
   const top = gameLeaders(summary, 3);
   return (
     <div className="px-8 py-8 grid grid-cols-3 gap-6">
-      {top.map((a, i) => (
-        <div key={a.id} className="rounded-2xl overflow-hidden bg-zinc-800/60">
-          <div className="h-40 relative" style={{ background: `linear-gradient(160deg, ${a.teamColor}, #111)` }}>
-            {a.headshot && <img src={a.headshot} className="absolute inset-0 w-full h-full object-cover object-top" alt="" />}
-            <div className="absolute top-2 left-2 bg-black/60 text-[10px] font-bold px-2 py-0.5 rounded-full">
-              {i === 0 ? '★ GAME LEADER' : `#${i + 1}`}
+      {top.map((a, i) => {
+        const color = custom ? awayColor : a.teamColor;
+        return (
+          <div key={a.id} className="rounded-2xl overflow-hidden bg-zinc-800/60">
+            <div className="h-40 relative" style={{ background: `linear-gradient(160deg, ${color}, #111)` }}>
+              {a.headshot && <img src={a.headshot} className="absolute inset-0 w-full h-full object-cover object-top" alt="" />}
+              <div className="absolute top-2 left-2 bg-black/60 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                {i === 0 ? '★ GAME LEADER' : `#${i + 1}`}
+              </div>
+            </div>
+            <div className="p-4">
+              <div className="font-black leading-tight">{a.name}</div>
+              <div className="text-[10px] font-semibold mb-3" style={{ color }}>{a.teamAbbr} · #{a.jersey} · {a.pos}</div>
+              <div className="flex gap-4 text-center">
+                {[['PTS', a.stats.pts], ['REB', a.stats.reb], ['AST', a.stats.ast]].map(([l, v]) => (
+                  <div key={l}>
+                    <div className="text-xl font-black">{v || '0'}</div>
+                    <div className="text-[9px] text-zinc-400 font-bold tracking-widest">{l}</div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
-          <div className="p-4">
-            <div className="font-black leading-tight">{a.name}</div>
-            <div className="text-[10px] font-semibold mb-3" style={{ color: a.teamColor }}>{a.teamAbbr} · #{a.jersey} · {a.pos}</div>
-            <div className="flex gap-4 text-center">
-              {[['PTS', a.stats.pts], ['REB', a.stats.reb], ['AST', a.stats.ast]].map(([l, v]) => (
-                <div key={l}>
-                  <div className="text-xl font-black">{v || '0'}</div>
-                  <div className="text-[9px] text-zinc-400 font-bold tracking-widest">{l}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

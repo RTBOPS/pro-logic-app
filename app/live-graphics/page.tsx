@@ -1,28 +1,33 @@
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { doc, setDoc } from 'firebase/firestore';
-import { auth, db } from '@/lib/firebase';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { auth, db, storage } from '@/lib/firebase';
+import { useCompany } from '@/hooks/useCompany';
 import PageHeader from '@/components/PageHeader';
 import { UpgradeGate } from '@/components/UpgradeGate';
 import {
   MonitorPlay, Copy, ExternalLink, Loader2, RefreshCw, Eye, EyeOff, Search,
+  Upload, Trash2, Zap,
 } from 'lucide-react';
 import {
-  normalizeScoreboard, normalizeSummary, gameLeaders, periodLabel,
-  type Game, type Summary, type Athlete,
+  normalizeScoreboard, normalizeSummary, gameLeaders, periodLabel, buildCallout,
+  type Game, type Summary, type Athlete, type Callout,
 } from '@/lib/nba';
 
 /* Live Graphics control panel — pick an NBA game, everything populates from
    the live feed (scores, official clock, player stats, headshots), and the
    operator fires graphics onto the output page captured by OBS/vMix/ATEM. */
 
+interface BannerItem { id: string; url: string; name: string }
 interface GfxState {
   bug: boolean;
   lowerId: string | null;
   full: 'teamstats' | 'lineups' | 'leaders' | null;
+  banner: string | null;
 }
-const GFX_OFF: GfxState = { bug: false, lowerId: null, full: null };
+const GFX_OFF: GfxState = { bug: false, lowerId: null, full: null, banner: null };
 
 const DEMO = { label: 'Demo: Finals 2024 — DAL @ BOS (G5)', date: '20240617' };
 
@@ -37,12 +42,36 @@ function ControlInner() {
   const [copied, setCopied] = useState(false);
   const [playerQuery, setPlayerQuery] = useState('');
   const pushing = useRef(false);
+  const company = useCompany();
 
-  /* Output token: stable per browser so the OBS source URL survives reloads */
+  /* Branding & presentation settings */
+  const [showBrand, setShowBrand] = useState(true);
+  const [autoCallouts, setAutoCallouts] = useState(true);
+  const [useTeamColors, setUseTeamColors] = useState(true);
+  const [c1, setC1] = useState('#7c3aed');
+  const [c2, setC2] = useState('#0ea5e9');
+  const [banners, setBanners] = useState<BannerItem[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const bannerRef = useRef<HTMLInputElement>(null);
+
+  /* Output token: stable per browser so the OBS source URL survives reloads.
+     Hydrate persisted settings (banners, colors) from the existing doc. */
   useEffect(() => {
     let t = localStorage.getItem('plg_gfx_token');
     if (!t) { t = crypto.randomUUID(); localStorage.setItem('plg_gfx_token', t); }
     setToken(t);
+    getDoc(doc(db, 'live_graphics', t)).then(snap => {
+      if (!snap.exists()) return;
+      const d = snap.data() as any;
+      if (Array.isArray(d.banners)) setBanners(d.banners);
+      if (d.showBrand === false) setShowBrand(false);
+      if (d.autoCallouts === false) setAutoCallouts(false);
+      if (d.theme) {
+        if (d.theme.useTeamColors === false) setUseTeamColors(false);
+        if (d.theme.c1) setC1(d.theme.c1);
+        if (d.theme.c2) setC2(d.theme.c2);
+      }
+    }).catch(() => {});
   }, []);
 
   /* Scoreboard polling (15 s) */
@@ -78,18 +107,55 @@ function ControlInner() {
   }, [eventId]);
 
   /* Push graphics state to the public output doc */
-  const push = async (next: GfxState, nextEventId = eventId) => {
+  const push = async (next: GfxState, nextEventId = eventId, extra: Record<string, any> = {}) => {
     setGfx(next);
     const uid = auth.currentUser?.uid;
-    if (!uid || !token || pushing.current) { if (!uid || !token) return; }
+    if (!uid || !token) return;
     pushing.current = true;
     try {
       await setDoc(doc(db, 'live_graphics', token), {
         uid, eventId: nextEventId, ...next,
+        brand: { logo: company?.logo_url || '', name: company?.name || '' },
+        showBrand, autoCallouts,
+        theme: { useTeamColors, c1, c2 },
+        banners,
         updatedAt: new Date().toISOString(),
+        ...extra,
       }, { merge: true });
     } catch (e) { console.error('gfx push failed', e); }
     finally { pushing.current = false; }
+  };
+
+  /* Re-push settings when branding/theme changes (only once a game is loaded) */
+  useEffect(() => {
+    if (eventId && token) push(gfx);
+  }, [showBrand, autoCallouts, useTeamColors, c1, c2, banners]);
+
+  /* Fire a play callout for the on-air player (or top scorer) */
+  const calloutTarget: Athlete | null = useMemo(() => {
+    if (!summary) return null;
+    const all = [...summary.home.athletes, ...summary.away.athletes];
+    return all.find(a => a.id === gfx.lowerId) || gameLeaders(summary, 1)[0] || null;
+  }, [summary, gfx.lowerId]);
+
+  const fireCallout = (kind: Callout['kind']) => {
+    if (!calloutTarget) return;
+    push(gfx, eventId, { callout: buildCallout(calloutTarget, kind) });
+  };
+
+  /* Banner upload to Storage */
+  const uploadBanner = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    const uid = auth.currentUser?.uid;
+    if (!file || !uid) return;
+    setUploading(true);
+    try {
+      const path = `graphics_banners/${uid}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+      const snap = await uploadBytes(storageRef(storage, path), file);
+      const url = await getDownloadURL(snap.ref);
+      setBanners(b => [...b, { id: Math.random().toString(36).slice(2, 10), url, name: file.name }]);
+    } catch (err: any) { alert('Upload failed: ' + err.message); }
+    finally { setUploading(false); if (bannerRef.current) bannerRef.current.value = ''; }
   };
 
   const selectGame = (id: string) => {
@@ -234,6 +300,101 @@ function ControlInner() {
                 className="w-full px-4 py-2 rounded-xl text-xs text-gray-500 border border-gray-200 hover:bg-gray-50">
                 CLEAR ALL
               </button>
+            </div>
+
+            {/* Play callouts */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-3">
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-semibold text-gray-800">Play callouts</h2>
+                <button onClick={() => setAutoCallouts(v => !v)}
+                  className={`text-xs px-2.5 py-1 rounded-full font-medium ${autoCallouts ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                  <Zap size={10} className="inline mr-1" />Auto {autoCallouts ? 'ON' : 'OFF'}
+                </button>
+              </div>
+              <p className="text-xs text-gray-400">
+                Auto detects threes, buckets, assists and double-doubles from the live feed.
+                Manual fire targets: <span className="font-semibold text-gray-600">{calloutTarget?.name || '—'}</span>
+              </p>
+              <div className="grid grid-cols-3 gap-2">
+                {([
+                  ['3pt', '3-POINTER'], ['2pt', '+2'], ['ft', '+1 FT'],
+                  ['ast', 'ASSIST'], ['dd', 'DOUBLE-DBL'], ['td', 'TRIPLE-DBL'],
+                ] as [Callout['kind'], string][]).map(([kind, label]) => (
+                  <button key={kind} onClick={() => fireCallout(kind)} disabled={!calloutTarget}
+                    className="px-2 py-2 rounded-lg text-[11px] font-bold bg-gray-100 text-gray-700 hover:bg-yellow-100 hover:text-yellow-800 disabled:opacity-40">
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Branding & look */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-4">
+              <h2 className="text-sm font-semibold text-gray-800">Branding & look</h2>
+
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 min-w-0">
+                  {company?.logo_url
+                    ? <img src={company.logo_url} className="h-6 max-w-[70px] object-contain" alt="" />
+                    : <span className="text-xs text-gray-400">No logo — set it in Company Info</span>}
+                  <span className="text-xs text-gray-600 truncate">{company?.name}</span>
+                </div>
+                <button onClick={() => setShowBrand(v => !v)} disabled={!company?.logo_url}
+                  className={`text-xs px-2.5 py-1 rounded-full font-medium shrink-0 ${showBrand && company?.logo_url ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                  {showBrand ? 'On air' : 'Hidden'}
+                </button>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-medium text-gray-600">Colors</span>
+                  <button onClick={() => setUseTeamColors(v => !v)}
+                    className={`text-xs px-2.5 py-1 rounded-full font-medium ${useTeamColors ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
+                    {useTeamColors ? 'Official team colors' : 'Custom colors'}
+                  </button>
+                </div>
+                {!useTeamColors && (
+                  <div className="flex items-center gap-3">
+                    <label className="flex items-center gap-1.5 text-xs text-gray-500">
+                      Away <input type="color" value={c1} onChange={e => setC1(e.target.value)} className="w-8 h-8 rounded cursor-pointer border border-gray-200" />
+                    </label>
+                    <label className="flex items-center gap-1.5 text-xs text-gray-500">
+                      Home <input type="color" value={c2} onChange={e => setC2(e.target.value)} className="w-8 h-8 rounded cursor-pointer border border-gray-200" />
+                    </label>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-medium text-gray-600">Banners ({banners.length})</span>
+                  <button onClick={() => bannerRef.current?.click()} disabled={uploading}
+                    className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-gray-100 text-gray-700 hover:bg-gray-200 disabled:opacity-40">
+                    {uploading ? <Loader2 size={11} className="animate-spin" /> : <Upload size={11} />} Upload
+                  </button>
+                  <input ref={bannerRef} type="file" accept="image/*" onChange={uploadBanner} className="hidden" />
+                </div>
+                {banners.length === 0 ? (
+                  <p className="text-xs text-gray-400">Upload sponsor or show banners (PNG with transparency works best).</p>
+                ) : (
+                  <div className="space-y-1.5">
+                    {banners.map(b => (
+                      <div key={b.id} className={`flex items-center gap-2 rounded-lg px-2 py-1.5 ${gfx.banner === b.url ? 'bg-green-50 border border-green-200' : 'bg-gray-50'}`}>
+                        <img src={b.url} className="h-6 w-14 object-contain shrink-0" alt="" />
+                        <span className="text-xs text-gray-600 truncate flex-1">{b.name}</span>
+                        <button onClick={() => push({ ...gfx, banner: gfx.banner === b.url ? null : b.url })}
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${gfx.banner === b.url ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`}>
+                          {gfx.banner === b.url ? 'ON AIR' : 'AIR'}
+                        </button>
+                        <button onClick={() => {
+                          if (gfx.banner === b.url) push({ ...gfx, banner: null });
+                          setBanners(list => list.filter(x => x.id !== b.id));
+                        }} className="text-gray-300 hover:text-red-500"><Trash2 size={12} /></button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Leaders quick-fire */}

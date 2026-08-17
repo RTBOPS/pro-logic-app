@@ -202,6 +202,61 @@ export function gameLeaders(summary: Summary, n = 3): Athlete[] {
     .slice(0, n);
 }
 
+/* ── Play callouts ─────────────────────────────────────────
+   Flash-graphics fired over the score bug: manually by the operator, or
+   auto-detected by diffing consecutive live boxscores. */
+export interface Callout {
+  id: string;
+  kind: '3pt' | '2pt' | 'ft' | 'ast' | 'dd' | 'td' | 'custom';
+  title: string;
+  sub?: string;
+  color?: string;
+  ms?: number;      // on-air duration override (default 4500)
+}
+
+const num = (s?: string) => parseInt(s || '0', 10) || 0;
+const madeOf = (s?: string) => num((s || '').split('-')[0]);
+const ddCats = (s: AthleteStats) =>
+  [s.pts, s.reb, s.ast, s.stl, s.blk].filter(v => num(v) >= 10).length;
+
+export function buildCallout(a: Athlete, kind: Callout['kind']): Callout {
+  const base = { id: Math.random().toString(36).slice(2, 10), kind, color: a.teamColor };
+  switch (kind) {
+    case '3pt': return { ...base, title: '3-POINTER!', sub: `${a.shortName} · ${madeOf(a.stats.tp)} threes · ${a.stats.pts} PTS` };
+    case '2pt': return { ...base, title: '+2', sub: `${a.shortName} · ${a.stats.pts} PTS` };
+    case 'ft':  return { ...base, title: '+1 FT', sub: `${a.shortName} · ${a.stats.pts} PTS` };
+    case 'ast': return { ...base, title: 'ASSIST', sub: `${a.shortName} · ${a.stats.ast} AST` };
+    case 'dd':  return { ...base, title: 'DOUBLE-DOUBLE!', sub: `${a.shortName} · ${a.stats.pts} PTS · ${a.stats.reb} REB · ${a.stats.ast} AST` };
+    case 'td':  return { ...base, title: 'TRIPLE-DOUBLE!', sub: `${a.shortName} · ${a.stats.pts} PTS · ${a.stats.reb} REB · ${a.stats.ast} AST` };
+    default:    return { ...base, title: '' };
+  }
+}
+
+/* Diff two consecutive summaries → the callouts a broadcast would flash */
+export function detectCallouts(prev: Summary | null, curr: Summary): Callout[] {
+  if (!prev) return [];
+  const prevMap = new Map(
+    [...prev.home.athletes, ...prev.away.athletes].map(a => [a.id, a]));
+  const events: Callout[] = [];
+  for (const a of [...curr.home.athletes, ...curr.away.athletes]) {
+    const p = prevMap.get(a.id);
+    if (!p) continue;
+    const ptsD = num(a.stats.pts) - num(p.stats.pts);
+    const tpD = madeOf(a.stats.tp) - madeOf(p.stats.tp);
+    const astD = num(a.stats.ast) - num(p.stats.ast);
+    if (tpD > 0) events.push(buildCallout(a, '3pt'));
+    else if (ptsD === 2) events.push(buildCallout(a, '2pt'));
+    else if (ptsD === 1) events.push(buildCallout(a, 'ft'));
+    if (astD > 0) events.push(buildCallout(a, 'ast'));
+    const cats = ddCats(a.stats), prevCats = ddCats(p.stats);
+    if (cats >= 3 && prevCats < 3) events.push(buildCallout(a, 'td'));
+    else if (cats === 2 && prevCats < 2) events.push(buildCallout(a, 'dd'));
+  }
+  // Milestones outrank routine buckets; cap the burst per poll
+  const rank: Record<string, number> = { td: 0, dd: 1, '3pt': 2, '2pt': 3, ft: 4, ast: 5, custom: 6 };
+  return events.sort((x, y) => rank[x.kind] - rank[y.kind]).slice(0, 4);
+}
+
 /* The team-stat rows worth comparing on air */
 const STAT_LABELS = ['Field Goal %', 'Three Point %', 'Free Throw %', 'Rebounds', 'Assists', 'Turnovers', 'Points in Paint', 'Fast Break Points', 'Largest Lead'];
 export function comparedTeamStats(summary: Summary): { label: string; away: string; home: string }[] {
