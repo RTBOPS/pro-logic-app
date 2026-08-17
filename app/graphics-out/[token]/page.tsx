@@ -9,6 +9,7 @@ import { useState, useEffect, useMemo, useRef, use } from 'react';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { AnimatePresence, motion } from 'framer-motion';
+import PlayerPhoto from '@/components/PlayerPhoto';
 import {
   normalizeSummary, gameLeaders, comparedTeamStats, periodLabel, detectCallouts,
   manualToSummary, topFive, type ManualGame,
@@ -18,8 +19,9 @@ import {
 interface BusState {
   bug?: boolean;
   lowerId?: string | null;
-  full?: 'teamstats' | 'lineups' | 'leaders' | 'matchup' | null;
+  full?: 'teamstats' | 'lineups' | 'leaders' | 'matchup' | 'trivia' | null;
   banner?: string | null;               // URL of the currently-aired banner
+  portal?: boolean;                     // hoop-portal sponsor reveal
 }
 
 interface GfxDoc extends BusState {
@@ -32,7 +34,9 @@ interface GfxDoc extends BusState {
   showBrand?: boolean;
   autoCallouts?: boolean;
   callout?: Callout | null;             // manual fire from the control panel
-  theme?: { useTeamColors?: boolean; c1?: string; c2?: string } | null;
+  theme?: { useTeamColors?: boolean; c1?: string; c2?: string; logoScale?: number; brandScale?: number; motion?: boolean } | null;
+  trivia?: { question?: string; options?: string[]; correct?: number; sponsor?: string; reveal?: boolean } | null;
+  portalCfg?: { x?: number; y?: number; size?: number; logo?: string } | null;
 }
 
 const CALLOUT_MS = 4500;
@@ -178,6 +182,9 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
   const calloutColor = (c: Callout) => (custom ? awayColor : c.color) || '#7c3aed';
 
   const brand = gfx.showBrand !== false && gfx.brand?.logo ? gfx.brand : null;
+  const logoScale = gfx.theme?.logoScale || 1;
+  const brandScale = gfx.theme?.brandScale || 1;
+  const motionOn = !!gfx.theme?.motion;
 
   return (
     <div className="fixed inset-0 overflow-hidden font-sans"
@@ -213,14 +220,20 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
                   )}
                 </AnimatePresence>
 
-                <div className="flex items-stretch rounded-xl overflow-hidden shadow-2xl text-white">
+                <div className="relative flex items-stretch rounded-xl overflow-hidden shadow-2xl text-white">
+                  {motionOn && (
+                    <motion.div
+                      animate={{ x: ['-130%', '430%'] }}
+                      transition={{ repeat: Infinity, duration: 1.8, repeatDelay: 4.5, ease: 'easeInOut' }}
+                      className="absolute inset-y-0 w-1/3 bg-gradient-to-r from-transparent via-white/25 to-transparent pointer-events-none z-10" />
+                  )}
                   {/* Company brand chip */}
                   {brand && (
                     <div className="bg-white px-3 flex items-center">
-                      <img src={brand.logo} className="h-8 max-w-[72px] object-contain" alt={brand.name || ''} />
+                      <img src={brand.logo} className="object-contain" style={{ height: 32 * brandScale, maxWidth: 72 * brandScale }} alt={brand.name || ''} />
                     </div>
                   )}
-                  <TeamCell team={summary.away} color={awayColor} />
+                  <TeamCell team={summary.away} color={awayColor} scale={logoScale} float={motionOn} />
                   <div className="bg-zinc-900 px-4 flex flex-col items-center justify-center min-w-[92px]">
                     {summary.state === 'in' ? (
                       <>
@@ -231,7 +244,7 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
                       <span className="text-zinc-300 text-xs font-bold uppercase text-center leading-tight px-1">{summary.statusDetail}</span>
                     )}
                   </div>
-                  <TeamCell team={summary.home} color={homeColor} reverse />
+                  <TeamCell team={summary.home} color={homeColor} scale={logoScale} float={motionOn} reverse />
                 </div>
               </motion.div>
             )}
@@ -259,11 +272,7 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
                 className="absolute bottom-28 left-8 flex items-end">
                 <div className="w-36 h-36 rounded-2xl overflow-hidden shadow-2xl relative"
                   style={{ background: `linear-gradient(160deg, ${custom ? awayColor : lower.teamColor}, #111)` }}>
-                  {lower.headshot
-                    ? <img src={lower.headshot} className="absolute inset-0 w-full h-full object-cover object-top" alt="" />
-                    : <div className="absolute inset-0 flex items-center justify-center text-white text-5xl font-black opacity-90">
-                        {lower.name.split(' ').map(w => w[0]).slice(0, 2).join('')}
-                      </div>}
+                  <PlayerPhoto src={lower.headshot} className="absolute inset-0 w-full h-full object-cover object-top" />
                 </div>
                 <div className="ml-[-10px] mb-2">
                   <div className="bg-zinc-900/95 text-white pl-6 pr-8 py-3 rounded-tr-2xl shadow-2xl">
@@ -283,6 +292,58 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
             )}
           </AnimatePresence>
 
+          {/* ── HOOP PORTAL (AR-style sponsor reveal on the backboard cam) ── */}
+          <AnimatePresence>
+            {bus.portal && (() => {
+              const cfg = gfx.portalCfg || {};
+              const size = cfg.size || 1;
+              const logo = cfg.logo || gfx.trivia?.sponsor || brand?.logo || '';
+              return (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.6 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.6 }}
+                  transition={{ type: 'spring', stiffness: 200, damping: 20 }}
+                  className="absolute"
+                  style={{ left: `${cfg.x ?? 50}%`, top: `${cfg.y ?? 30}%`, transform: 'translate(-50%, -50%)' }}>
+                  {/* Light beam falling from the rim */}
+                  <motion.div
+                    initial={{ opacity: 0 }} animate={{ opacity: [0.15, 0.4, 0.15] }}
+                    transition={{ repeat: Infinity, duration: 2.4, ease: 'easeInOut' }}
+                    className="absolute left-1/2 -translate-x-1/2 pointer-events-none"
+                    style={{
+                      top: 20 * size, width: 190 * size, height: 190 * size,
+                      background: 'linear-gradient(180deg, rgba(251,191,36,0.5), transparent)',
+                      clipPath: 'polygon(22% 0, 78% 0, 95% 100%, 5% 100%)',
+                    }} />
+                  {/* Portal ring (perspective ellipse aligned to the rim) */}
+                  <motion.div
+                    animate={{ scale: [1, 1.05, 1], opacity: [0.95, 1, 0.95] }}
+                    transition={{ repeat: Infinity, duration: 1.8, ease: 'easeInOut' }}
+                    className="relative rounded-[50%]"
+                    style={{
+                      width: 240 * size, height: 84 * size,
+                      border: `${5 * size}px solid #fbbf24`,
+                      boxShadow: `0 0 ${30 * size}px rgba(251,191,36,0.9), inset 0 0 ${26 * size}px rgba(251,191,36,0.7)`,
+                      background: 'radial-gradient(ellipse at center, rgba(0,0,0,0.55), rgba(251,191,36,0.12))',
+                    }} />
+                  {/* Sponsor logo dropping through the net */}
+                  {logo && (
+                    <motion.div
+                      initial={{ y: -10 * size, scale: 0.15, opacity: 0 }}
+                      animate={{ y: 120 * size, scale: 1, opacity: 1 }}
+                      transition={{ type: 'spring', stiffness: 130, damping: 14, delay: 0.35 }}
+                      className="absolute left-1/2 top-0 -translate-x-1/2">
+                      <motion.img src={logo} alt=""
+                        animate={{ y: [0, -7, 0], rotate: [-2, 2, -2] }}
+                        transition={{ repeat: Infinity, duration: 3.2, ease: 'easeInOut' }}
+                        className="object-contain drop-shadow-2xl"
+                        style={{ maxWidth: 200 * size, maxHeight: 100 * size }} />
+                    </motion.div>
+                  )}
+                </motion.div>
+              );
+            })()}
+          </AnimatePresence>
+
           {/* ── FULL SCREENS ── */}
           <AnimatePresence>
             {bus.full && (
@@ -295,20 +356,20 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
                   <div className="flex items-center justify-between px-8 py-4"
                     style={{ background: `linear-gradient(90deg, ${awayColor}cc, #18181b 45%, #18181b 55%, ${homeColor}cc)` }}>
                     <div className="flex items-center gap-3">
-                      {summary.away.logo && <img src={summary.away.logo} className="w-10 h-10" alt="" />}
+                      {summary.away.logo && <img src={summary.away.logo} style={{ width: 40 * logoScale, height: 40 * logoScale }} alt="" />}
                       <span className="text-2xl font-black">{summary.away.abbr}</span>
                       <Score value={summary.away.score} />
                     </div>
                     <div className="text-center">
                       <div className="text-sm font-bold text-yellow-400">{summary.state === 'in' ? `${periodLabel(summary.period)} · ${summary.clock}` : summary.statusDetail}</div>
                       <div className="text-[10px] uppercase tracking-widest text-zinc-400 mt-0.5">
-                        {bus.full === 'teamstats' ? 'Team Stats' : bus.full === 'lineups' ? 'Starting Lineups' : bus.full === 'matchup' ? 'Matchup — Top 5' : 'Top Performers'}
+                        {bus.full === 'teamstats' ? 'Team Stats' : bus.full === 'lineups' ? 'Starting Lineups' : bus.full === 'matchup' ? 'Matchup — Top 5' : bus.full === 'trivia' ? 'Trivia' : 'Top Performers'}
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
                       <Score value={summary.home.score} />
                       <span className="text-2xl font-black">{summary.home.abbr}</span>
-                      {summary.home.logo && <img src={summary.home.logo} className="w-10 h-10" alt="" />}
+                      {summary.home.logo && <img src={summary.home.logo} style={{ width: 40 * logoScale, height: 40 * logoScale }} alt="" />}
                     </div>
                   </div>
 
@@ -316,6 +377,7 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
                   {bus.full === 'lineups' && <Lineups summary={summary} awayColor={awayColor} homeColor={homeColor} />}
                   {bus.full === 'leaders' && <Leaders summary={summary} custom={custom} awayColor={awayColor} />}
                   {bus.full === 'matchup' && <Matchup summary={summary} awayColor={awayColor} homeColor={homeColor} />}
+                  {bus.full === 'trivia' && <Trivia trivia={gfx.trivia || {}} sponsorFallback={brand?.logo || ''} accent={awayColor} />}
 
                   <div className="px-8 py-2.5 bg-black/40 flex items-center justify-between">
                     <div className="flex items-center gap-2">
@@ -346,11 +408,16 @@ function Score({ value, big = false }: { value: string; big?: boolean }) {
   );
 }
 
-function TeamCell({ team, color, reverse = false }: { team: Summary['home']; color: string; reverse?: boolean }) {
+function TeamCell({ team, color, scale = 1, float = false, reverse = false }: { team: Summary['home']; color: string; scale?: number; float?: boolean; reverse?: boolean }) {
   return (
     <div className={`flex items-center gap-3 px-4 py-2.5 ${reverse ? 'flex-row-reverse' : ''}`}
       style={{ background: `linear-gradient(${reverse ? '270deg' : '90deg'}, ${color}, #18181b 140%)` }}>
-      {team.logo && <img src={team.logo} className="w-9 h-9 drop-shadow" alt="" />}
+      {team.logo && (
+        <motion.img src={team.logo} className="drop-shadow" alt=""
+          style={{ width: 36 * scale, height: 36 * scale }}
+          animate={float ? { y: [0, -2.5, 0], scale: [1, 1.05, 1] } : { y: 0, scale: 1 }}
+          transition={float ? { repeat: Infinity, duration: 3, ease: 'easeInOut' } : undefined} />
+      )}
       <span className="font-black text-xl tracking-wide">{team.abbr}</span>
       <Score value={team.score} />
     </div>
@@ -403,7 +470,7 @@ function Lineups({ summary, awayColor, homeColor }: { summary: Summary; awayColo
           <div className="space-y-2">
             {five(team).map(a => (
               <div key={a.id} className="flex items-center gap-3 bg-zinc-800/60 rounded-xl px-3 py-1.5">
-                {a.headshot ? <img src={a.headshot} className="w-10 h-10 rounded-full object-cover object-top bg-zinc-700" alt="" /> : <div className="w-10 h-10 rounded-full bg-zinc-700" />}
+                <PlayerPhoto src={a.headshot} className="w-10 h-10 rounded-full object-cover object-top bg-zinc-700 shrink-0" />
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-bold truncate">{a.name}</div>
                   <div className="text-[10px] text-zinc-400">#{a.jersey} · {a.pos}</div>
@@ -413,6 +480,47 @@ function Lineups({ summary, awayColor, homeColor }: { summary: Summary; awayColo
           </div>
         </div>
       ))}
+    </div>
+  );
+}
+
+/* Sponsored trivia: question + options, correct answer revealed live */
+function Trivia({ trivia, sponsorFallback, accent }: {
+  trivia: { question?: string; options?: string[]; correct?: number; sponsor?: string; reveal?: boolean };
+  sponsorFallback: string;
+  accent: string;
+}) {
+  const opts = (trivia.options || []).filter(o => o !== undefined);
+  const sponsor = trivia.sponsor || sponsorFallback;
+  return (
+    <div className="px-10 py-8">
+      <div className="flex items-center justify-between mb-6">
+        <div className="text-[11px] font-bold uppercase tracking-[0.25em] text-zinc-400">
+          Trivia {sponsor && 'presented by'}
+        </div>
+        {sponsor && <img src={sponsor} className="h-10 max-w-[180px] object-contain" alt="" />}
+      </div>
+      <div className="text-3xl font-black leading-tight mb-8">{trivia.question || '…'}</div>
+      <div className="grid grid-cols-3 gap-4">
+        {opts.map((opt, i) => {
+          const isCorrect = trivia.reveal && i === (trivia.correct ?? 0);
+          const dimmed = trivia.reveal && !isCorrect;
+          return (
+            <motion.div key={i}
+              animate={isCorrect ? { scale: [1, 1.06, 1] } : { scale: 1 }}
+              transition={isCorrect ? { duration: 0.5 } : undefined}
+              className={`rounded-2xl px-5 py-4 flex items-center gap-3 border-2 transition-colors duration-500 ${
+                isCorrect ? 'bg-green-500/20 border-green-400' : dimmed ? 'bg-zinc-800/40 border-transparent opacity-40' : 'bg-zinc-800/70 border-transparent'}`}>
+              <span className="w-8 h-8 rounded-full flex items-center justify-center font-black text-sm shrink-0"
+                style={{ background: isCorrect ? '#22c55e' : accent }}>
+                {String.fromCharCode(65 + i)}
+              </span>
+              <span className="text-lg font-bold leading-tight">{opt || '—'}</span>
+              {isCorrect && <span className="ml-auto text-green-400 text-2xl font-black">✓</span>}
+            </motion.div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -439,11 +547,7 @@ function Matchup({ summary, awayColor, homeColor }: { summary: Summary; awayColo
                 transition={{ delay: delay + i * 0.18, type: 'spring', stiffness: 220, damping: 22 }}
                 className="rounded-xl overflow-hidden bg-zinc-800/60">
                 <div className="h-24 relative" style={{ background: `linear-gradient(160deg, ${color}, #111)` }}>
-                  {a.headshot
-                    ? <img src={a.headshot} className="absolute inset-0 w-full h-full object-cover object-top" alt="" />
-                    : <div className="absolute inset-0 flex items-center justify-center text-white text-3xl font-black opacity-90">
-                        {a.name.split(' ').map(w => w[0]).slice(0, 2).join('')}
-                      </div>}
+                  <PlayerPhoto src={a.headshot} className="absolute inset-0 w-full h-full object-cover object-top" />
                   <div className="absolute top-1.5 left-1.5 bg-black/60 text-[10px] font-bold px-1.5 py-0.5 rounded-full">#{a.jersey}</div>
                 </div>
                 <div className="px-2.5 py-2">
@@ -470,7 +574,7 @@ function Leaders({ summary, custom, awayColor }: { summary: Summary; custom: boo
         return (
           <div key={a.id} className="rounded-2xl overflow-hidden bg-zinc-800/60">
             <div className="h-40 relative" style={{ background: `linear-gradient(160deg, ${color}, #111)` }}>
-              {a.headshot && <img src={a.headshot} className="absolute inset-0 w-full h-full object-cover object-top" alt="" />}
+              <PlayerPhoto src={a.headshot} className="absolute inset-0 w-full h-full object-cover object-top" />
               <div className="absolute top-2 left-2 bg-black/60 text-[10px] font-bold px-2 py-0.5 rounded-full">
                 {i === 0 ? '★ GAME LEADER' : `#${i + 1}`}
               </div>

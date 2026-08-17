@@ -6,6 +6,7 @@ import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage
 import { auth, db, storage } from '@/lib/firebase';
 import { useCompany } from '@/hooks/useCompany';
 import PageHeader from '@/components/PageHeader';
+import PlayerPhoto from '@/components/PlayerPhoto';
 import { UpgradeGate } from '@/components/UpgradeGate';
 import {
   MonitorPlay, Copy, ExternalLink, Loader2, RefreshCw, Eye, EyeOff, Search,
@@ -25,10 +26,11 @@ interface BannerItem { id: string; url: string; name: string }
 interface GfxState {
   bug: boolean;
   lowerId: string | null;
-  full: 'teamstats' | 'lineups' | 'leaders' | 'matchup' | null;
+  full: 'teamstats' | 'lineups' | 'leaders' | 'matchup' | 'trivia' | null;
   banner: string | null;
+  portal: boolean;
 }
-const GFX_OFF: GfxState = { bug: false, lowerId: null, full: null, banner: null };
+const GFX_OFF: GfxState = { bug: false, lowerId: null, full: null, banner: null, portal: false };
 
 const DEMO = { label: 'Demo: Finals 2024 — DAL @ BOS (G5)', date: '20240617' };
 
@@ -61,6 +63,17 @@ function ControlInner() {
   const [useTeamColors, setUseTeamColors] = useState(true);
   const [c1, setC1] = useState('#7c3aed');
   const [c2, setC2] = useState('#0ea5e9');
+  const [logoScale, setLogoScale] = useState(1);      // team logos on bug & headers
+  const [brandScale, setBrandScale] = useState(1);    // company logo chip
+  const [motionFx, setMotionFx] = useState(false);    // breathing logos + shine sweep
+
+  /* Sponsored trivia */
+  const [trivia, setTrivia] = useState({
+    question: '', options: ['', '', ''], correct: 0, sponsor: '', reveal: false,
+  });
+
+  /* Hoop portal (AR-style sponsor reveal aligned to the backboard shot) */
+  const [portalCfg, setPortalCfg] = useState({ x: 50, y: 30, size: 1, logo: '' });
   const [banners, setBanners] = useState<BannerItem[]>([]);
   const [uploading, setUploading] = useState(false);
   const bannerRef = useRef<HTMLInputElement>(null);
@@ -86,7 +99,12 @@ function ControlInner() {
         if (d.theme.useTeamColors === false) setUseTeamColors(false);
         if (d.theme.c1) setC1(d.theme.c1);
         if (d.theme.c2) setC2(d.theme.c2);
+        if (d.theme.logoScale) setLogoScale(d.theme.logoScale);
+        if (d.theme.brandScale) setBrandScale(d.theme.brandScale);
+        if (d.theme.motion) setMotionFx(true);
       }
+      if (d.trivia) setTrivia({ question: '', options: ['', '', ''], correct: 0, sponsor: '', reveal: false, ...d.trivia });
+      if (d.portalCfg) setPortalCfg({ x: 50, y: 30, size: 1, logo: '', ...d.portalCfg });
     }).catch(() => {});
   }, []);
 
@@ -140,7 +158,9 @@ function ControlInner() {
         sourceMode: source, league,
         brand: { logo: company?.logo_url || '', name: company?.name || '' },
         showBrand, autoCallouts,
-        theme: { useTeamColors, c1, c2 },
+        theme: { useTeamColors, c1, c2, logoScale, brandScale, motion: motionFx },
+        trivia,
+        portalCfg,
         banners,
         updatedAt: new Date().toISOString(),
         ...fields,
@@ -169,7 +189,7 @@ function ControlInner() {
   /* Re-push settings when branding/theme changes (only once a game is loaded) */
   useEffect(() => {
     if ((eventId || source === 'manual') && token) pushDoc({});
-  }, [showBrand, autoCallouts, useTeamColors, c1, c2, banners]);
+  }, [showBrand, autoCallouts, useTeamColors, c1, c2, banners, logoScale, brandScale, motionFx, trivia, portalCfg]);
 
   /* Fire a play callout for the on-air player (or top scorer) */
   const calloutTarget: Athlete | null = useMemo(() => {
@@ -644,6 +664,28 @@ function ControlInner() {
                 )}
               </div>
 
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-gray-600">Logo sizes</span>
+                  <button onClick={() => setMotionFx(v => !v)}
+                    className={`text-xs px-2.5 py-1 rounded-full font-medium ${motionFx ? 'bg-pink-100 text-pink-700' : 'bg-gray-100 text-gray-500'}`}>
+                    ✦ Motion {motionFx ? 'ON' : 'OFF'}
+                  </button>
+                </div>
+                <label className="flex items-center gap-2 text-xs text-gray-500">
+                  <span className="w-14">Teams</span>
+                  <input type="range" min={0.7} max={2} step={0.05} value={logoScale}
+                    onChange={e => setLogoScale(parseFloat(e.target.value))} className="flex-1" />
+                  <span className="w-10 text-right tabular-nums">{logoScale.toFixed(2)}×</span>
+                </label>
+                <label className="flex items-center gap-2 text-xs text-gray-500">
+                  <span className="w-14">Brand</span>
+                  <input type="range" min={0.7} max={2} step={0.05} value={brandScale}
+                    onChange={e => setBrandScale(parseFloat(e.target.value))} className="flex-1" />
+                  <span className="w-10 text-right tabular-nums">{brandScale.toFixed(2)}×</span>
+                </label>
+              </div>
+
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs font-medium text-gray-600">Banners ({banners.length})</span>
@@ -676,6 +718,72 @@ function ControlInner() {
               </div>
             </div>
 
+            {/* Sponsored Trivia */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-3">
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-semibold text-gray-800">Sponsored Trivia</h2>
+                <button onClick={() => fire({ full: active.full === 'trivia' ? null : 'trivia' })}
+                  className={`text-xs px-3 py-1.5 rounded-lg font-bold ${active.full === 'trivia' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
+                  {active.full === 'trivia' ? (mode === 'preview' ? 'IN PVW' : 'ON AIR') : 'FIRE'}
+                </button>
+              </div>
+              <input value={trivia.question} onChange={e => setTrivia(t => ({ ...t, question: e.target.value }))}
+                placeholder="Question — e.g. ¿Cuántos campeonatos tiene el equipo?"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-black" />
+              {trivia.options.map((opt, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <button onClick={() => setTrivia(t => ({ ...t, correct: i }))}
+                    className={`w-6 h-6 rounded-full text-[10px] font-black shrink-0 ${trivia.correct === i ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-500'}`}
+                    title="Mark as correct answer">
+                    {String.fromCharCode(65 + i)}
+                  </button>
+                  <input value={opt}
+                    onChange={e => setTrivia(t => ({ ...t, options: t.options.map((o, j) => j === i ? e.target.value : o) }))}
+                    placeholder={`Option ${String.fromCharCode(65 + i)}`}
+                    className="flex-1 border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none" />
+                </div>
+              ))}
+              <div className="flex items-center gap-2">
+                <select value={trivia.sponsor} onChange={e => setTrivia(t => ({ ...t, sponsor: e.target.value }))}
+                  className="flex-1 border border-gray-200 rounded-lg px-2 py-1.5 text-xs bg-white">
+                  <option value="">Sponsor logo: none (use brand)</option>
+                  {banners.map(b => <option key={b.id} value={b.url}>{b.name}</option>)}
+                </select>
+                <button onClick={() => setTrivia(t => ({ ...t, reveal: !t.reveal }))}
+                  className={`text-xs px-3 py-1.5 rounded-lg font-bold ${trivia.reveal ? 'bg-green-600 text-white' : 'border border-green-300 text-green-700 hover:bg-green-50'}`}>
+                  {trivia.reveal ? 'ANSWER SHOWN' : 'REVEAL ANSWER'}
+                </button>
+              </div>
+            </div>
+
+            {/* Hoop Portal — AR-style sponsor reveal on the backboard camera */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-3">
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-semibold text-gray-800">Hoop Portal</h2>
+                <button onClick={() => fire({ portal: !active.portal })}
+                  className={`text-xs px-3 py-1.5 rounded-lg font-bold ${active.portal ? 'bg-amber-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
+                  {active.portal ? (mode === 'preview' ? 'IN PVW' : 'ON AIR') : 'FIRE'}
+                </button>
+              </div>
+              <p className="text-[11px] text-gray-400">
+                On the backboard camera shot: align the glowing portal with the real rim
+                (X/Y/size) — the sponsor logo drops out of the net.
+              </p>
+              <select value={portalCfg.logo} onChange={e => setPortalCfg(c => ({ ...c, logo: e.target.value }))}
+                className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs bg-white">
+                <option value="">Logo: trivia sponsor / brand</option>
+                {banners.map(b => <option key={b.id} value={b.url}>{b.name}</option>)}
+              </select>
+              {([['x', 'X', 0, 100], ['y', 'Y', 0, 100], ['size', 'Size', 0.5, 2]] as [keyof typeof portalCfg, string, number, number][]).map(([k, label, min, max]) => (
+                <label key={k} className="flex items-center gap-2 text-xs text-gray-500">
+                  <span className="w-8">{label}</span>
+                  <input type="range" min={min} max={max} step={k === 'size' ? 0.05 : 1} value={portalCfg[k] as number}
+                    onChange={e => setPortalCfg(c => ({ ...c, [k]: parseFloat(e.target.value) }))} className="flex-1" />
+                  <span className="w-10 text-right tabular-nums">{k === 'size' ? `${(portalCfg[k] as number).toFixed(2)}×` : `${portalCfg[k]}%`}</span>
+                </label>
+              ))}
+            </div>
+
             {/* Leaders quick-fire */}
             {leaders.length > 0 && (
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
@@ -684,7 +792,7 @@ function ControlInner() {
                   {leaders.map(a => (
                     <button key={a.id} onClick={() => fire({ lowerId: active.lowerId === a.id ? null : a.id })}
                       className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-left ${active.lowerId === a.id ? 'bg-purple-600 text-white' : 'bg-gray-50 hover:bg-gray-100'}`}>
-                      {a.headshot && <img src={a.headshot} className="w-9 h-9 rounded-full object-cover bg-gray-200" alt="" />}
+                      <PlayerPhoto src={a.headshot} tone="light" className="w-9 h-9 rounded-full object-cover object-top bg-gray-200 shrink-0" />
                       <div className="flex-1 min-w-0">
                         <div className="text-sm font-semibold truncate">{a.name}</div>
                         <div className={`text-xs ${active.lowerId === a.id ? 'text-purple-200' : 'text-gray-500'}`}>{a.teamAbbr} · #{a.jersey}</div>
@@ -728,7 +836,7 @@ function ControlInner() {
                       className={`cursor-pointer ${active.lowerId === a.id ? 'bg-purple-50' : 'hover:bg-gray-50'}`}>
                       <td className="px-3 py-1.5">
                         <div className="flex items-center gap-2">
-                          {a.headshot ? <img src={a.headshot} className="w-7 h-7 rounded-full object-cover bg-gray-100" alt="" /> : <div className="w-7 h-7 rounded-full bg-gray-200" />}
+                          <PlayerPhoto src={a.headshot} tone="light" className="w-7 h-7 rounded-full object-cover object-top bg-gray-200 shrink-0" />
                           <span className="font-medium text-gray-800">{a.name}</span>
                           {a.starter && <span className="text-[10px] text-gray-400">S</span>}
                           {active.lowerId === a.id && <span className="text-[10px] font-bold text-purple-600">{mode === 'preview' ? 'IN PVW' : 'ON AIR'}</span>}
