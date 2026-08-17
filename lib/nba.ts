@@ -71,6 +71,127 @@ export function periodLabel(period: number, statusDetail?: string): string {
   return period <= 4 ? `Q${period}` : `OT${period - 4}`;
 }
 
+/* ESPN league slugs this CG can drive automatically */
+export const LEAGUES: { id: string; label: string }[] = [
+  { id: 'nba', label: 'NBA' },
+  { id: 'nba-development', label: 'G League' },
+  { id: 'mens-college-basketball', label: 'NCAA Men' },
+  { id: 'womens-college-basketball', label: 'NCAA Women' },
+  { id: 'wnba', label: 'WNBA' },
+];
+
+/* ── Manual game mode ──────────────────────────────────────
+   For teams outside any feed (local universities, city leagues): the operator
+   keys score, clock and player stats by hand and the same graphics render. */
+
+export interface ManualPlayer {
+  id: string;
+  name: string;
+  jersey: string;
+  pos: string;
+  starter: boolean;
+  photo: string;    // optional URL
+  pts: number; reb: number; ast: number;
+}
+
+export interface ManualTeam {
+  name: string;
+  abbr: string;
+  color: string;
+  logo: string;     // optional URL
+  score: number;
+  players: ManualPlayer[];
+}
+
+export interface ManualGame {
+  home: ManualTeam;
+  away: ManualTeam;
+  period: number;
+  periodMin: number;         // period length in minutes (12 NBA, 10 FIBA/NCAA-W…)
+  clockSec: number;          // seconds remaining when last updated
+  clockRunning: boolean;
+  clockUpdatedAt: string;    // ISO — reference point while running
+}
+
+export function manualClockRemaining(m: ManualGame, nowMs = Date.now()): number {
+  if (!m.clockRunning) return Math.max(0, m.clockSec);
+  const elapsed = (nowMs - new Date(m.clockUpdatedAt).getTime()) / 1000;
+  return Math.max(0, m.clockSec - elapsed);
+}
+
+export function fmtClockSec(sec: number): string {
+  const s = Math.max(0, Math.floor(sec));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+}
+
+/* Adapt a manual game to the same Summary shape the feed produces, so every
+   graphic (bug, lower thirds, full screens, leaders, callouts) just works. */
+export function manualToSummary(m: ManualGame, nowMs = Date.now()): Summary {
+  const team = (t: ManualTeam, homeAway: 'home' | 'away'): TeamBox => ({
+    id: homeAway,
+    abbr: t.abbr || (homeAway === 'home' ? 'HOME' : 'AWAY'),
+    name: t.name || t.abbr || '',
+    logo: t.logo || '',
+    color: t.color || '#1f2937',
+    homeAway,
+    score: String(t.score ?? 0),
+    stats: [
+      { label: 'Rebounds', value: String(t.players.reduce((a, p) => a + (p.reb || 0), 0)) },
+      { label: 'Assists', value: String(t.players.reduce((a, p) => a + (p.ast || 0), 0)) },
+    ],
+    athletes: (t.players || []).map(p => ({
+      id: p.id,
+      name: p.name,
+      shortName: p.name,
+      jersey: p.jersey || '',
+      pos: p.pos || '',
+      starter: !!p.starter,
+      headshot: p.photo || '',
+      teamAbbr: t.abbr || '',
+      teamColor: t.color || '#1f2937',
+      played: true,
+      stats: {
+        min: '', pts: String(p.pts || 0), fg: '', tp: '', ft: '',
+        reb: String(p.reb || 0), ast: String(p.ast || 0), to: '',
+        stl: '0', blk: '0', pf: '', plusMinus: '',
+      },
+    })),
+  });
+
+  return {
+    eventId: 'manual',
+    state: 'in',
+    statusDetail: 'LIVE',
+    clock: fmtClockSec(manualClockRemaining(m, nowMs)),
+    period: m.period || 1,
+    home: team(m.home, 'home'),
+    away: team(m.away, 'away'),
+  };
+}
+
+export function emptyManualGame(): ManualGame {
+  return {
+    home: { name: '', abbr: '', color: '#1d4ed8', logo: '', score: 0, players: [] },
+    away: { name: '', abbr: '', color: '#dc2626', logo: '', score: 0, players: [] },
+    period: 1,
+    periodMin: 10,
+    clockSec: 600,
+    clockRunning: false,
+    clockUpdatedAt: new Date().toISOString(),
+  };
+}
+
+/* Top five of a team for the matchup graphic: by points, starters as tiebreak */
+export function topFive(team: TeamBox): Athlete[] {
+  const played = team.athletes.filter(a => a.played);
+  const pool = played.length >= 5 ? played : team.athletes;
+  return [...pool]
+    .sort((a, b) =>
+      (parseInt(b.stats.pts || '0') - parseInt(a.stats.pts || '0')) ||
+      (Number(b.starter) - Number(a.starter)))
+    .slice(0, 5);
+}
+
 const hex = (c?: string) => (c ? (c.startsWith('#') ? c : `#${c}`) : '#1f2937');
 
 function normTeam(comp: any): GameTeam {

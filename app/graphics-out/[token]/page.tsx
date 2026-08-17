@@ -11,18 +11,22 @@ import { db } from '@/lib/firebase';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   normalizeSummary, gameLeaders, comparedTeamStats, periodLabel, detectCallouts,
+  manualToSummary, topFive, type ManualGame,
   type Summary, type Athlete, type Callout,
 } from '@/lib/nba';
 
 interface BusState {
   bug?: boolean;
   lowerId?: string | null;
-  full?: 'teamstats' | 'lineups' | 'leaders' | null;
+  full?: 'teamstats' | 'lineups' | 'leaders' | 'matchup' | null;
   banner?: string | null;               // URL of the currently-aired banner
 }
 
 interface GfxDoc extends BusState {
   eventId?: string;
+  league?: string;
+  sourceMode?: 'feed' | 'manual';       // manual: operator-keyed game data
+  manual?: ManualGame | null;
   preview?: BusState | null;            // staged look — aired via TAKE
   brand?: { logo?: string; name?: string } | null;
   showBrand?: boolean;
@@ -105,14 +109,34 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
     }
   }, [gfx.callout]);
 
-  /* Live game data (4 s poll) + auto callout detection */
+  /* Live game data + auto callout detection.
+     Feed mode: poll our NBA proxy every 4 s.
+     Manual mode: rebuild from the operator-keyed doc every 500 ms so the
+     running clock ticks locally between doc updates. */
   useEffect(() => {
+    if (gfx.sourceMode === 'manual') {
+      if (!gfx.manual) { setSummary(null); prevSummary.current = null; return; }
+      const tick = () => {
+        const next = manualToSummary(gfx.manual!);
+        if (gfx.autoCallouts !== false) {
+          const events = detectCallouts(prevSummary.current, next);
+          if (events.length) setQueue(q => [...q, ...events].slice(-6));
+        }
+        prevSummary.current = next;
+        setSummary(next);
+      };
+      tick();
+      const t = setInterval(tick, 500);
+      return () => clearInterval(t);
+    }
+
     const eventId = gfx.eventId;
     if (!eventId) { setSummary(null); prevSummary.current = null; return; }
     let alive = true;
+    const league = gfx.league || 'nba';
     const load = async () => {
       try {
-        const res = await fetch(`/api/nba/summary?event=${eventId}`);
+        const res = await fetch(`/api/nba/summary?event=${eventId}&league=${league}`);
         const json = await res.json();
         if (!alive) return;
         const next = normalizeSummary(json);
@@ -129,7 +153,7 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
     load();
     const t = setInterval(load, 4000);
     return () => { alive = false; clearInterval(t); };
-  }, [gfx.eventId, gfx.autoCallouts]);
+  }, [gfx.eventId, gfx.autoCallouts, gfx.sourceMode, gfx.manual, gfx.league]);
 
   /* Callout queue: show one at a time */
   const current = queue[0] || null;
@@ -235,7 +259,11 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
                 className="absolute bottom-28 left-8 flex items-end">
                 <div className="w-36 h-36 rounded-2xl overflow-hidden shadow-2xl relative"
                   style={{ background: `linear-gradient(160deg, ${custom ? awayColor : lower.teamColor}, #111)` }}>
-                  {lower.headshot && <img src={lower.headshot} className="absolute inset-0 w-full h-full object-cover object-top" alt="" />}
+                  {lower.headshot
+                    ? <img src={lower.headshot} className="absolute inset-0 w-full h-full object-cover object-top" alt="" />
+                    : <div className="absolute inset-0 flex items-center justify-center text-white text-5xl font-black opacity-90">
+                        {lower.name.split(' ').map(w => w[0]).slice(0, 2).join('')}
+                      </div>}
                 </div>
                 <div className="ml-[-10px] mb-2">
                   <div className="bg-zinc-900/95 text-white pl-6 pr-8 py-3 rounded-tr-2xl shadow-2xl">
@@ -274,7 +302,7 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
                     <div className="text-center">
                       <div className="text-sm font-bold text-yellow-400">{summary.state === 'in' ? `${periodLabel(summary.period)} · ${summary.clock}` : summary.statusDetail}</div>
                       <div className="text-[10px] uppercase tracking-widest text-zinc-400 mt-0.5">
-                        {bus.full === 'teamstats' ? 'Team Stats' : bus.full === 'lineups' ? 'Starting Lineups' : 'Top Performers'}
+                        {bus.full === 'teamstats' ? 'Team Stats' : bus.full === 'lineups' ? 'Starting Lineups' : bus.full === 'matchup' ? 'Matchup — Top 5' : 'Top Performers'}
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
@@ -287,6 +315,7 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
                   {bus.full === 'teamstats' && <TeamStats summary={summary} awayColor={awayColor} homeColor={homeColor} />}
                   {bus.full === 'lineups' && <Lineups summary={summary} awayColor={awayColor} homeColor={homeColor} />}
                   {bus.full === 'leaders' && <Leaders summary={summary} custom={custom} awayColor={awayColor} />}
+                  {bus.full === 'matchup' && <Matchup summary={summary} awayColor={awayColor} homeColor={homeColor} />}
 
                   <div className="px-8 py-2.5 bg-black/40 flex items-center justify-between">
                     <div className="flex items-center gap-2">
@@ -380,6 +409,50 @@ function Lineups({ summary, awayColor, homeColor }: { summary: Summary; awayColo
                   <div className="text-[10px] text-zinc-400">#{a.jersey} · {a.pos}</div>
                 </div>
               </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* Matchup: each team's top five, revealed one by one — away on top, home below */
+function Matchup({ summary, awayColor, homeColor }: { summary: Summary; awayColor: string; homeColor: string }) {
+  const rows = [
+    { team: summary.away, color: awayColor, five: topFive(summary.away), delay: 0 },
+    { team: summary.home, color: homeColor, five: topFive(summary.home), delay: 0.9 },
+  ];
+  return (
+    <div className="px-8 py-6 space-y-6">
+      {rows.map(({ team, color, five, delay }) => (
+        <div key={team.abbr}>
+          <div className="flex items-center gap-2 mb-3">
+            {team.logo && <img src={team.logo} className="w-6 h-6" alt="" />}
+            <span className="text-xs font-bold uppercase tracking-widest" style={{ color }}>{team.name}</span>
+          </div>
+          <div className="grid grid-cols-5 gap-3">
+            {five.map((a, i) => (
+              <motion.div key={a.id}
+                initial={{ y: 40, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                transition={{ delay: delay + i * 0.18, type: 'spring', stiffness: 220, damping: 22 }}
+                className="rounded-xl overflow-hidden bg-zinc-800/60">
+                <div className="h-24 relative" style={{ background: `linear-gradient(160deg, ${color}, #111)` }}>
+                  {a.headshot
+                    ? <img src={a.headshot} className="absolute inset-0 w-full h-full object-cover object-top" alt="" />
+                    : <div className="absolute inset-0 flex items-center justify-center text-white text-3xl font-black opacity-90">
+                        {a.name.split(' ').map(w => w[0]).slice(0, 2).join('')}
+                      </div>}
+                  <div className="absolute top-1.5 left-1.5 bg-black/60 text-[10px] font-bold px-1.5 py-0.5 rounded-full">#{a.jersey}</div>
+                </div>
+                <div className="px-2.5 py-2">
+                  <div className="text-xs font-bold truncate">{a.name}</div>
+                  <div className="text-[10px] text-zinc-400">
+                    {a.pos}{a.stats.pts !== '' && a.stats.pts !== '0' ? ` · ${a.stats.pts} PTS` : ''}
+                  </div>
+                </div>
+              </motion.div>
             ))}
           </div>
         </div>

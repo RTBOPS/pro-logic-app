@@ -9,11 +9,12 @@ import PageHeader from '@/components/PageHeader';
 import { UpgradeGate } from '@/components/UpgradeGate';
 import {
   MonitorPlay, Copy, ExternalLink, Loader2, RefreshCw, Eye, EyeOff, Search,
-  Upload, Trash2, Zap,
+  Upload, Trash2, Zap, Plus, Play, Pause,
 } from 'lucide-react';
 import {
   normalizeScoreboard, normalizeSummary, gameLeaders, periodLabel, buildCallout,
-  type Game, type Summary, type Athlete, type Callout,
+  LEAGUES, emptyManualGame, manualToSummary, manualClockRemaining, fmtClockSec,
+  type Game, type Summary, type Athlete, type Callout, type ManualGame, type ManualPlayer,
 } from '@/lib/nba';
 
 /* Live Graphics control panel — pick an NBA game, everything populates from
@@ -24,7 +25,7 @@ interface BannerItem { id: string; url: string; name: string }
 interface GfxState {
   bug: boolean;
   lowerId: string | null;
-  full: 'teamstats' | 'lineups' | 'leaders' | null;
+  full: 'teamstats' | 'lineups' | 'leaders' | 'matchup' | null;
   banner: string | null;
 }
 const GFX_OFF: GfxState = { bug: false, lowerId: null, full: null, banner: null };
@@ -48,6 +49,12 @@ function ControlInner() {
   const [mode, setMode] = useState<'preview' | 'direct'>('preview');
   const [pvw, setPvw] = useState<GfxState>(GFX_OFF);
 
+  /* Data source: live ESPN feed (any supported league) or operator-keyed manual game */
+  const [source, setSource] = useState<'feed' | 'manual'>('feed');
+  const [league, setLeague] = useState('nba');
+  const [manual, setManual] = useState<ManualGame>(emptyManualGame());
+  const manualTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   /* Branding & presentation settings */
   const [showBrand, setShowBrand] = useState(true);
   const [autoCallouts, setAutoCallouts] = useState(true);
@@ -68,6 +75,10 @@ function ControlInner() {
       if (!snap.exists()) return;
       const d = snap.data() as any;
       if (d.preview) setPvw({ ...GFX_OFF, ...d.preview });
+      if (d.sourceMode === 'manual') setSource('manual');
+      if (d.league) setLeague(d.league);
+      if (d.manual) setManual({ ...emptyManualGame(), ...d.manual });
+      if (d.eventId && d.sourceMode !== 'manual') setEventId(d.eventId);
       if (Array.isArray(d.banners)) setBanners(d.banners);
       if (d.showBrand === false) setShowBrand(false);
       if (d.autoCallouts === false) setAutoCallouts(false);
@@ -79,29 +90,36 @@ function ControlInner() {
     }).catch(() => {});
   }, []);
 
-  /* Scoreboard polling (15 s) */
+  /* Scoreboard polling (15 s) — feed mode */
   const loadGames = async (d: string) => {
     setLoadingGames(true);
     try {
-      const res = await fetch(`/api/nba/scoreboard${d ? `?dates=${d}` : ''}`);
+      const res = await fetch(`/api/nba/scoreboard?league=${league}${d ? `&dates=${d}` : ''}`);
       const json = await res.json();
       setGames(normalizeScoreboard(json));
     } catch { /* keep last list */ }
     finally { setLoadingGames(false); }
   };
   useEffect(() => {
+    if (source !== 'feed') return;
     loadGames(date);
     const t = setInterval(() => loadGames(date), 15000);
     return () => clearInterval(t);
-  }, [date]);
+  }, [date, league, source]);
 
-  /* Summary polling (5 s) for the selected game */
+  /* Summary: feed → poll (5 s); manual → rebuild locally (500 ms clock tick) */
   useEffect(() => {
+    if (source === 'manual') {
+      const tick = () => setSummary(manualToSummary(manual));
+      tick();
+      const t = setInterval(tick, 500);
+      return () => clearInterval(t);
+    }
     if (!eventId) { setSummary(null); return; }
     let alive = true;
     const load = async () => {
       try {
-        const res = await fetch(`/api/nba/summary?event=${eventId}`);
+        const res = await fetch(`/api/nba/summary?event=${eventId}&league=${league}`);
         const json = await res.json();
         if (alive) setSummary(normalizeSummary(json));
       } catch { /* keep last */ }
@@ -109,7 +127,7 @@ function ControlInner() {
     load();
     const t = setInterval(load, 5000);
     return () => { alive = false; clearInterval(t); };
-  }, [eventId]);
+  }, [eventId, source, manual, league]);
 
   /* Write to the public output doc (always carries branding/theme settings) */
   const pushDoc = async (fields: Record<string, any>, nextEventId = eventId) => {
@@ -119,6 +137,7 @@ function ControlInner() {
     try {
       await setDoc(doc(db, 'live_graphics', token), {
         uid, eventId: nextEventId,
+        sourceMode: source, league,
         brand: { logo: company?.logo_url || '', name: company?.name || '' },
         showBrand, autoCallouts,
         theme: { useTeamColors, c1, c2 },
@@ -149,7 +168,7 @@ function ControlInner() {
 
   /* Re-push settings when branding/theme changes (only once a game is loaded) */
   useEffect(() => {
-    if (eventId && token) pushDoc({});
+    if ((eventId || source === 'manual') && token) pushDoc({});
   }, [showBrand, autoCallouts, useTeamColors, c1, c2, banners]);
 
   /* Fire a play callout for the on-air player (or top scorer) */
@@ -183,7 +202,87 @@ function ControlInner() {
     setEventId(id);
     setGfx(GFX_OFF);
     setPvw(GFX_OFF);
-    pushDoc({ ...GFX_OFF, preview: GFX_OFF }, id);
+    pushDoc({ ...GFX_OFF, preview: GFX_OFF, sourceMode: 'feed' }, id);
+  };
+
+  const switchSource = (s: 'feed' | 'manual') => {
+    setSource(s);
+    pushDoc({ sourceMode: s, manual: s === 'manual' ? manual : (manual as any) });
+  };
+
+  /* ── Manual game ops ──
+     Text edits debounce; score/clock ops write immediately. */
+  const pushManual = (next: ManualGame, immediate = false) => {
+    setManual(next);
+    if (manualTimer.current) clearTimeout(manualTimer.current);
+    if (immediate) { pushDoc({ manual: next, sourceMode: 'manual' }); return; }
+    manualTimer.current = setTimeout(() => pushDoc({ manual: next, sourceMode: 'manual' }), 600);
+  };
+
+  const mTeam = (side: 'home' | 'away', patch: Partial<ManualGame['home']>, immediate = false) =>
+    pushManual({ ...manual, [side]: { ...manual[side], ...patch } }, immediate);
+
+  const mScore = (side: 'home' | 'away', delta: number) =>
+    mTeam(side, { score: Math.max(0, manual[side].score + delta) }, true);
+
+  const mAddPlayer = (side: 'home' | 'away') =>
+    mTeam(side, {
+      players: [...manual[side].players, {
+        id: Math.random().toString(36).slice(2, 10),
+        name: '', jersey: '', pos: '', starter: manual[side].players.length < 5,
+        photo: '', pts: 0, reb: 0, ast: 0,
+      }],
+    });
+
+  const mPlayer = (side: 'home' | 'away', id: string, patch: Partial<ManualPlayer>, immediate = false) =>
+    mTeam(side, { players: manual[side].players.map(p => p.id === id ? { ...p, ...patch } : p) }, immediate);
+
+  const mRemovePlayer = (side: 'home' | 'away', id: string) =>
+    mTeam(side, { players: manual[side].players.filter(p => p.id !== id) }, true);
+
+  /* Player scored: bump their points AND the team score (auto-callout fires off the diff) */
+  const mBucket = (side: 'home' | 'away', id: string, points: number) => {
+    const p = manual[side].players.find(x => x.id === id);
+    if (!p) return;
+    pushManual({
+      ...manual,
+      [side]: {
+        ...manual[side],
+        score: Math.max(0, manual[side].score + points),
+        players: manual[side].players.map(x => x.id === id ? { ...x, pts: Math.max(0, x.pts + points) } : x),
+      },
+    }, true);
+  };
+  const mStat = (side: 'home' | 'away', id: string, key: 'reb' | 'ast', delta: number) => {
+    const p = manual[side].players.find(x => x.id === id);
+    if (!p) return;
+    mPlayer(side, id, { [key]: Math.max(0, p[key] + delta) } as any, true);
+  };
+
+  /* Clock ops */
+  const clockRemaining = manualClockRemaining(manual);
+  const mClockStart = () =>
+    pushManual({ ...manual, clockRunning: true, clockSec: clockRemaining, clockUpdatedAt: new Date().toISOString() }, true);
+  const mClockPause = () =>
+    pushManual({ ...manual, clockRunning: false, clockSec: clockRemaining, clockUpdatedAt: new Date().toISOString() }, true);
+  const mClockSet = (mmss: string) => {
+    const [mm, ss] = mmss.split(':').map(n => parseInt(n, 10) || 0);
+    pushManual({ ...manual, clockRunning: false, clockSec: mm * 60 + (ss || 0), clockUpdatedAt: new Date().toISOString() }, true);
+  };
+  const mPeriod = (delta: number) =>
+    pushManual({ ...manual, period: Math.max(1, manual.period + delta) }, true);
+
+  /* Team logo upload (Storage) */
+  const uploadTeamLogo = async (side: 'home' | 'away', e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    const uid = auth.currentUser?.uid;
+    if (!file || !uid) return;
+    try {
+      const path = `graphics_banners/${uid}/logo_${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+      const snap = await uploadBytes(storageRef(storage, path), file);
+      const url = await getDownloadURL(snap.ref);
+      mTeam(side, { logo: url }, true);
+    } catch (err: any) { alert('Upload failed: ' + err.message); }
   };
 
   const outputUrl = typeof window !== 'undefined' && token
@@ -233,7 +332,7 @@ function ControlInner() {
       )}
 
       {/* ── PVW / PGM monitors + TAKE ── */}
-      {token && eventId && summary && (
+      {token && summary && (
         <div className="mb-6 bg-zinc-950 rounded-2xl p-4 flex flex-wrap items-center justify-center gap-5">
           <Monitor label="PREVIEW" color="text-yellow-400"
             src={`/graphics-out/${token}?mode=preview&bg=dark`} />
@@ -256,43 +355,172 @@ function ControlInner() {
         </div>
       )}
 
-      {/* Game picker */}
+      {/* Data source: feed (by league) or manual ingest */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 mb-6">
         <div className="flex flex-wrap items-center gap-3 mb-4">
-          <h2 className="text-sm font-semibold text-gray-800">Game</h2>
-          <button onClick={() => setDate('')}
-            className={`${fireBtn} ${!date ? 'bg-black text-white' : 'border border-gray-200 text-gray-600 hover:bg-gray-50'}`}>
-            Today
-          </button>
-          <input type="date" onChange={e => setDate(e.target.value.replace(/-/g, ''))}
-            className="border border-gray-200 rounded-lg px-2 py-1.5 text-xs" />
-          <button onClick={() => setDate(DEMO.date)}
-            className={`${fireBtn} ${date === DEMO.date ? 'bg-black text-white' : 'border border-gray-200 text-gray-600 hover:bg-gray-50'}`}>
-            {DEMO.label}
-          </button>
-        </div>
-        {games.length === 0 ? (
-          <p className="text-sm text-gray-400">{loadingGames ? 'Loading games…' : 'No games on this date.'}</p>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {games.map(g => (
-              <button key={g.id} onClick={() => selectGame(g.id)}
-                className={`text-left rounded-xl border p-3 transition-colors ${eventId === g.id ? 'border-black ring-1 ring-black bg-gray-50' : 'border-gray-200 hover:border-gray-300'}`}>
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 min-w-0">
-                    {g.away.logo && <img src={g.away.logo} className="w-6 h-6" alt="" />}
-                    <span className="text-sm font-semibold">{g.away.abbr} {g.away.score}</span>
-                    <span className="text-xs text-gray-400">@</span>
-                    <span className="text-sm font-semibold">{g.home.score} {g.home.abbr}</span>
-                    {g.home.logo && <img src={g.home.logo} className="w-6 h-6" alt="" />}
-                  </div>
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${
-                    g.state === 'in' ? 'bg-red-100 text-red-600' : g.state === 'post' ? 'bg-gray-100 text-gray-600' : 'bg-blue-50 text-blue-600'}`}>
-                    {g.state === 'in' ? `LIVE ${periodLabel(g.period)} ${g.clock}` : g.statusDetail}
-                  </span>
-                </div>
+          <div className="flex gap-1 bg-gray-100 rounded-xl p-1">
+            <button onClick={() => switchSource('feed')}
+              className={`px-3.5 py-1.5 rounded-lg text-sm ${source === 'feed' ? 'bg-white shadow-sm font-medium text-gray-900' : 'text-gray-500'}`}>
+              Live Feed
+            </button>
+            <button onClick={() => switchSource('manual')}
+              className={`px-3.5 py-1.5 rounded-lg text-sm ${source === 'manual' ? 'bg-white shadow-sm font-medium text-gray-900' : 'text-gray-500'}`}>
+              Manual / Local
+            </button>
+          </div>
+          {source === 'feed' && (
+            <>
+              <select value={league} onChange={e => { setLeague(e.target.value); setEventId(''); }}
+                className="border border-gray-200 rounded-lg px-2 py-1.5 text-xs bg-white">
+                {LEAGUES.map(l => <option key={l.id} value={l.id}>{l.label}</option>)}
+              </select>
+              <button onClick={() => setDate('')}
+                className={`${fireBtn} ${!date ? 'bg-black text-white' : 'border border-gray-200 text-gray-600 hover:bg-gray-50'}`}>
+                Today
               </button>
-            ))}
+              <input type="date" onChange={e => setDate(e.target.value.replace(/-/g, ''))}
+                className="border border-gray-200 rounded-lg px-2 py-1.5 text-xs" />
+              {league === 'nba' && (
+                <button onClick={() => setDate(DEMO.date)}
+                  className={`${fireBtn} ${date === DEMO.date ? 'bg-black text-white' : 'border border-gray-200 text-gray-600 hover:bg-gray-50'}`}>
+                  {DEMO.label}
+                </button>
+              )}
+            </>
+          )}
+        </div>
+
+        {source === 'feed' ? (
+          games.length === 0 ? (
+            <p className="text-sm text-gray-400">{loadingGames ? 'Loading games…' : 'No games on this date.'}</p>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {games.map(g => (
+                <button key={g.id} onClick={() => selectGame(g.id)}
+                  className={`text-left rounded-xl border p-3 transition-colors ${eventId === g.id ? 'border-black ring-1 ring-black bg-gray-50' : 'border-gray-200 hover:border-gray-300'}`}>
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      {g.away.logo && <img src={g.away.logo} className="w-6 h-6" alt="" />}
+                      <span className="text-sm font-semibold">{g.away.abbr} {g.away.score}</span>
+                      <span className="text-xs text-gray-400">@</span>
+                      <span className="text-sm font-semibold">{g.home.score} {g.home.abbr}</span>
+                      {g.home.logo && <img src={g.home.logo} className="w-6 h-6" alt="" />}
+                    </div>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${
+                      g.state === 'in' ? 'bg-red-100 text-red-600' : g.state === 'post' ? 'bg-gray-100 text-gray-600' : 'bg-blue-50 text-blue-600'}`}>
+                      {g.state === 'in' ? `LIVE ${periodLabel(g.period)} ${g.clock}` : g.statusDetail}
+                    </span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )
+        ) : (
+          /* ── MANUAL GAME EDITOR ── */
+          <div className="space-y-5">
+            {/* Clock & period console */}
+            <div className="bg-gray-900 text-white rounded-2xl p-4 flex flex-wrap items-center gap-4">
+              <div className="text-center">
+                <div className="text-3xl font-black font-mono text-yellow-400">{fmtClockSec(clockRemaining)}</div>
+                <div className="text-[10px] uppercase tracking-widest text-gray-400">Game clock</div>
+              </div>
+              <button onClick={manual.clockRunning ? mClockPause : mClockStart}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold ${manual.clockRunning ? 'bg-yellow-500 text-black' : 'bg-green-600 text-white'}`}>
+                {manual.clockRunning ? <><Pause size={15} /> Pause</> : <><Play size={15} /> Start</>}
+              </button>
+              <input placeholder="10:00" defaultValue={fmtClockSec(manual.clockSec)}
+                onKeyDown={e => { if (e.key === 'Enter') mClockSet((e.target as HTMLInputElement).value); }}
+                className="w-20 bg-white/10 border border-white/20 rounded-lg px-2 py-2 text-sm font-mono text-center"
+                title="Type mm:ss and press Enter" />
+              <div className="flex items-center gap-2">
+                <button onClick={() => mPeriod(-1)} className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 font-bold">−</button>
+                <div className="text-center min-w-[44px]">
+                  <div className="font-black text-lg">{periodLabel(manual.period)}</div>
+                  <div className="text-[9px] uppercase tracking-widest text-gray-400">Period</div>
+                </div>
+                <button onClick={() => mPeriod(1)} className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 font-bold">+</button>
+              </div>
+              <label className="flex items-center gap-1.5 text-xs text-gray-400">
+                Length
+                <input type="number" min={1} max={20} value={manual.periodMin}
+                  onChange={e => pushManual({ ...manual, periodMin: parseInt(e.target.value) || 10 }, true)}
+                  className="w-12 bg-white/10 border border-white/20 rounded-lg px-1.5 py-1 text-center" /> min
+              </label>
+              <button onClick={() => pushManual({ ...manual, period: manual.period + 1, clockRunning: false, clockSec: (manual.periodMin || 10) * 60, clockUpdatedAt: new Date().toISOString() }, true)}
+                className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-bold">
+                Next period ↺ reset clock
+              </button>
+            </div>
+
+            {/* Teams */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {(['away', 'home'] as const).map(side => {
+                const t = manual[side];
+                return (
+                  <div key={side} className="border border-gray-200 rounded-2xl overflow-hidden">
+                    <div className="px-4 py-3 flex flex-wrap items-center gap-2" style={{ background: `${t.color}14` }}>
+                      <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">{side}</span>
+                      <input value={t.name} onChange={e => mTeam(side, { name: e.target.value })} placeholder="Team name"
+                        className="border border-gray-200 rounded-lg px-2 py-1.5 text-sm flex-1 min-w-[120px] bg-white" />
+                      <input value={t.abbr} onChange={e => mTeam(side, { abbr: e.target.value.toUpperCase().slice(0, 4) })} placeholder="ABR"
+                        className="border border-gray-200 rounded-lg px-2 py-1.5 text-sm w-16 font-bold bg-white" />
+                      <input type="color" value={t.color} onChange={e => mTeam(side, { color: e.target.value }, true)}
+                        className="w-8 h-8 rounded cursor-pointer border border-gray-200" />
+                      <label className="cursor-pointer text-gray-400 hover:text-gray-700" title="Upload team logo">
+                        {t.logo ? <img src={t.logo} className="w-7 h-7 object-contain" alt="" /> : <Upload size={15} />}
+                        <input type="file" accept="image/*" className="hidden" onChange={e => uploadTeamLogo(side, e)} />
+                      </label>
+                    </div>
+                    {/* Score console */}
+                    <div className="px-4 py-3 flex items-center gap-2 border-b border-gray-100">
+                      <span className="text-3xl font-black tabular-nums w-16" style={{ color: t.color }}>{t.score}</span>
+                      {[1, 2, 3].map(n => (
+                        <button key={n} onClick={() => mScore(side, n)}
+                          className="px-3 py-2 rounded-lg bg-gray-900 text-white text-sm font-bold hover:bg-gray-700">+{n}</button>
+                      ))}
+                      <button onClick={() => mScore(side, -1)}
+                        className="px-3 py-2 rounded-lg border border-gray-200 text-gray-500 text-sm hover:bg-gray-50">−1</button>
+                      <span className="ml-auto text-[10px] text-gray-400">Team score only — use player rows to track stats</span>
+                    </div>
+                    {/* Roster */}
+                    <div className="divide-y divide-gray-50">
+                      {t.players.map(pl => (
+                        <div key={pl.id} className="px-3 py-2 flex flex-wrap items-center gap-1.5 group">
+                          <input value={pl.name} onChange={e => mPlayer(side, pl.id, { name: e.target.value })} placeholder="Player name"
+                            className="border border-transparent hover:border-gray-200 focus:border-blue-400 rounded px-1.5 py-1 text-xs flex-1 min-w-[110px] focus:outline-none" />
+                          <input value={pl.jersey} onChange={e => mPlayer(side, pl.id, { jersey: e.target.value.slice(0, 3) })} placeholder="#"
+                            className="border border-transparent hover:border-gray-200 rounded px-1 py-1 text-xs w-9 text-center focus:outline-none focus:border-blue-400" />
+                          <input value={pl.pos} onChange={e => mPlayer(side, pl.id, { pos: e.target.value.toUpperCase().slice(0, 2) })} placeholder="P"
+                            className="border border-transparent hover:border-gray-200 rounded px-1 py-1 text-xs w-9 text-center focus:outline-none focus:border-blue-400" />
+                          <button onClick={() => mPlayer(side, pl.id, { starter: !pl.starter }, true)}
+                            className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${pl.starter ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-400'}`}
+                            title="Starter">S</button>
+                          <span className="text-xs font-bold w-6 text-right tabular-nums">{pl.pts}</span>
+                          {[1, 2, 3].map(n => (
+                            <button key={n} onClick={() => mBucket(side, pl.id, n)}
+                              className="text-[10px] font-bold px-1.5 py-1 rounded bg-gray-100 hover:bg-green-100 hover:text-green-700">+{n}</button>
+                          ))}
+                          <button onClick={() => mStat(side, pl.id, 'reb', 1)}
+                            className="text-[10px] px-1.5 py-1 rounded bg-gray-100 hover:bg-blue-100 hover:text-blue-700">R{pl.reb}</button>
+                          <button onClick={() => mStat(side, pl.id, 'ast', 1)}
+                            className="text-[10px] px-1.5 py-1 rounded bg-gray-100 hover:bg-purple-100 hover:text-purple-700">A{pl.ast}</button>
+                          <button onClick={() => mRemovePlayer(side, pl.id)}
+                            className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100"><Trash2 size={12} /></button>
+                        </div>
+                      ))}
+                      <button onClick={() => mAddPlayer(side)}
+                        className="w-full px-4 py-2 text-xs text-gray-500 hover:bg-gray-50 flex items-center gap-1.5 justify-center">
+                        <Plus size={12} /> Add player
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <p className="text-[11px] text-gray-400">
+              The +1/+2/+3 buttons on a player add to their points AND the team score — and fire the
+              auto callouts (3-POINTER!, +2…) on air, same as the live feed. R/A bump rebounds and assists.
+            </p>
           </div>
         )}
       </div>
@@ -334,7 +562,8 @@ function ControlInner() {
                 ['teamstats', 'Team Stats — full screen'],
                 ['lineups', 'Starting Lineups — full screen'],
                 ['leaders', 'Top Performers / MVP — full screen'],
-              ] as ['teamstats' | 'lineups' | 'leaders', string][]).map(([kind, label]) => (
+                ['matchup', 'Matchup Top 5 vs Top 5 — full screen'],
+              ] as ['teamstats' | 'lineups' | 'leaders' | 'matchup', string][]).map(([kind, label]) => (
                 <button key={kind} onClick={() => fire({ full: active.full === kind ? null : kind })}
                   className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-medium ${active.full === kind ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
                   {label} {active.full === kind ? <Eye size={15} /> : <EyeOff size={15} />}
