@@ -40,6 +40,7 @@ export interface Athlete {
   headshot: string;
   teamAbbr: string;
   teamColor: string;
+  teamLogo: string;
   stats: AthleteStats;
   played: boolean;
 }
@@ -149,6 +150,7 @@ export function manualToSummary(m: ManualGame, nowMs = Date.now()): Summary {
       headshot: p.photo || '',
       teamAbbr: t.abbr || '',
       teamColor: t.color || '#1f2937',
+      teamLogo: t.logo || '',
       played: true,
       stats: {
         min: '', pts: String(p.pts || 0), fg: '', tp: '', ft: '',
@@ -274,6 +276,7 @@ export function normalizeSummary(json: any): Summary | null {
           headshot: ath.headshot?.href || '',
           teamAbbr: t.abbreviation || '',
           teamColor: hex(t.color),
+          teamLogo: t.logo || '',
           played: s.length > 0 && !a.didNotPlay,
           stats: {
             min: get(s, idx.min), pts: get(s, idx.pts), fg: get(s, idx.fg),

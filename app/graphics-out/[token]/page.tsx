@@ -275,11 +275,14 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
                   <PlayerPhoto src={lower.headshot} className="absolute inset-0 w-full h-full object-cover object-top" />
                 </div>
                 <div className="ml-[-10px] mb-2">
-                  <div className="bg-zinc-900/95 text-white pl-6 pr-8 py-3 rounded-tr-2xl shadow-2xl">
-                    <div className="text-2xl font-black leading-none">{lower.name}</div>
-                    <div className="text-xs font-semibold mt-1 text-zinc-400">
-                      {lower.teamAbbr} · #{lower.jersey} · {lower.pos}
+                  <div className="bg-zinc-900/95 text-white pl-6 pr-8 py-3 rounded-tr-2xl shadow-2xl flex items-center gap-4">
+                    <div>
+                      <div className="text-2xl font-black leading-none">{lower.name}</div>
+                      <div className="text-xs font-semibold mt-1 text-zinc-400">
+                        {lower.teamAbbr} · #{lower.jersey} · {lower.pos}
+                      </div>
                     </div>
+                    {lower.teamLogo && <img src={lower.teamLogo} className="w-11 h-11 object-contain drop-shadow shrink-0" alt="" />}
                   </div>
                   <div className="flex text-white shadow-2xl rounded-br-2xl overflow-hidden">
                     <StatChip label="PTS" value={lower.stats.pts} color={custom ? awayColor : lower.teamColor} big />
@@ -581,7 +584,10 @@ function Leaders({ summary, custom, awayColor }: { summary: Summary; custom: boo
             </div>
             <div className="p-4">
               <div className="font-black leading-tight">{a.name}</div>
-              <div className="text-[10px] font-semibold mb-3" style={{ color }}>{a.teamAbbr} · #{a.jersey} · {a.pos}</div>
+              <div className="flex items-center gap-1.5 mb-3">
+                {a.teamLogo && <img src={a.teamLogo} className="w-4 h-4 object-contain" alt="" />}
+                <span className="text-[10px] font-semibold" style={{ color }}>{a.teamAbbr} · #{a.jersey} · {a.pos}</span>
+              </div>
               <div className="flex gap-4 text-center">
                 {[['PTS', a.stats.pts], ['REB', a.stats.reb], ['AST', a.stats.ast]].map(([l, v]) => (
                   <div key={l}>
