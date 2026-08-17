@@ -10,7 +10,7 @@ import { useCompany } from '@/hooks/useCompany';
 import { useAuth } from '@/hooks/useAuth';
 import { Menu, X } from 'lucide-react';
 
-const PUBLIC_PATHS = ['/', '/auth', '/confirm', '/callsheet'];
+const PUBLIC_PATHS = ['/', '/auth', '/confirm', '/callsheet', '/graphics-out'];
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const path = usePathname();

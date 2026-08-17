@@ -83,6 +83,15 @@ service cloud.firestore {
         );
     }
 
+    // ── Live graphics control docs ──
+    // The output overlay (OBS browser source, no login) reads the operator's
+    // cues; only the owner writes them.
+    match /live_graphics/{token} {
+      allow read: if true;
+      allow create: if signedIn() && request.resource.data.uid == request.auth.uid;
+      allow update, delete: if signedIn() && resource.data.uid == request.auth.uid;
+    }
+
     // ── Shared call sheets ──
     // Public read so crew can view without login; only the owner writes them.
     match /shared_callsheets/{token} {

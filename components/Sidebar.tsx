@@ -7,7 +7,7 @@ import {
   BookImage, FileText, CreditCard, LogOut, User,
   Layout, Clapperboard, CheckSquare, CalendarDays,
   Truck, Building2, IdCard, UserCheck, Layers, ClipboardCheck, Mic,
-  ListOrdered, Shield, Tv,
+  ListOrdered, Shield, Tv, MonitorPlay,
 } from 'lucide-react';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
@@ -27,6 +27,7 @@ const nav = [
   { href: '/shoot-log', label: 'Shoot Log', icon: Clapperboard },
   { href: '/rundown', label: 'Run of Show', icon: ListOrdered },
   { href: '/broadcast', label: 'Broadcast Plan', icon: Tv },
+  { href: '/live-graphics', label: 'Live Graphics', icon: MonitorPlay },
   { href: '/safety', label: 'Safety', icon: Shield },
   { section: 'Audio' },
   { href: '/audio', label: 'Audio Planner', icon: Mic },
