@@ -29,8 +29,10 @@ interface GfxState {
   full: 'teamstats' | 'lineups' | 'leaders' | 'matchup' | 'trivia' | null;
   banner: string | null;
   portal: boolean;
+  talent: boolean;
+  mention: boolean;
 }
-const GFX_OFF: GfxState = { bug: false, lowerId: null, full: null, banner: null, portal: false };
+const GFX_OFF: GfxState = { bug: false, lowerId: null, full: null, banner: null, portal: false, talent: false, mention: false };
 
 const DEMO = { label: 'Demo: Finals 2024 — DAL @ BOS (G5)', date: '20240617' };
 
@@ -74,6 +76,10 @@ function ControlInner() {
 
   /* Hoop portal (AR-style sponsor reveal aligned to the backboard shot) */
   const [portalCfg, setPortalCfg] = useState({ x: 50, y: 30, size: 1, logo: '', video: '', content: 'logo' as 'logo' | 'trivia' });
+
+  /* Broadcast team & special mentions */
+  const [talentList, setTalentList] = useState<{ id: string; name: string; role: string; photo: string }[]>([]);
+  const [mentionCfg, setMentionCfg] = useState({ label: 'Special Guest', name: '', title: '', photo: '' });
   const [banners, setBanners] = useState<BannerItem[]>([]);
   const [uploading, setUploading] = useState(false);
   const bannerRef = useRef<HTMLInputElement>(null);
@@ -105,6 +111,8 @@ function ControlInner() {
       }
       if (d.trivia) setTrivia({ question: '', options: ['', '', ''], correct: 0, sponsor: '', reveal: false, ...d.trivia });
       if (d.portalCfg) setPortalCfg({ x: 50, y: 30, size: 1, logo: '', video: '', content: 'logo', ...d.portalCfg });
+      if (Array.isArray(d.talentCfg?.list)) setTalentList(d.talentCfg.list);
+      if (d.mentionCfg) setMentionCfg({ label: 'Special Guest', name: '', title: '', photo: '', ...d.mentionCfg });
     }).catch(() => {});
   }, []);
 
@@ -161,6 +169,8 @@ function ControlInner() {
         theme: { useTeamColors, c1, c2, logoScale, brandScale, motion: motionFx },
         trivia,
         portalCfg,
+        talentCfg: { list: talentList },
+        mentionCfg,
         banners,
         updatedAt: new Date().toISOString(),
         ...fields,
@@ -189,7 +199,7 @@ function ControlInner() {
   /* Re-push settings when branding/theme changes (only once a game is loaded) */
   useEffect(() => {
     if ((eventId || source === 'manual') && token) pushDoc({});
-  }, [showBrand, autoCallouts, useTeamColors, c1, c2, banners, logoScale, brandScale, motionFx, trivia, portalCfg]);
+  }, [showBrand, autoCallouts, useTeamColors, c1, c2, banners, logoScale, brandScale, motionFx, trivia, portalCfg, talentList, mentionCfg]);
 
   /* Fire a play callout for the on-air player (or top scorer) */
   const calloutTarget: Athlete | null = useMemo(() => {
@@ -231,6 +241,18 @@ function ControlInner() {
       setPortalCfg(c => ({ ...c, video: url }));
     } catch (err: any) { alert('Upload failed: ' + err.message); }
     finally { setUploading(false); }
+  };
+
+  /* Person photo upload (commentators / special guests) */
+  const uploadPersonPhoto = async (e: React.ChangeEvent<HTMLInputElement>, assign: (url: string) => void) => {
+    const file = e.target.files?.[0];
+    const uid = auth.currentUser?.uid;
+    if (!file || !uid) return;
+    try {
+      const path = `graphics_banners/${uid}/person_${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+      const snap = await uploadBytes(storageRef(storage, path), file);
+      assign(await getDownloadURL(snap.ref));
+    } catch (err: any) { alert('Upload failed: ' + err.message); }
   };
 
   const selectGame = (id: string) => {
@@ -821,6 +843,67 @@ function ControlInner() {
                   <span className="w-10 text-right tabular-nums">{k === 'size' ? `${(portalCfg[k] as number).toFixed(2)}×` : `${portalCfg[k]}%`}</span>
                 </label>
               ))}
+            </div>
+
+            {/* Broadcast Team (commentators) */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-3">
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-semibold text-gray-800">Broadcast Team</h2>
+                <button onClick={() => fire({ talent: !active.talent })} disabled={talentList.length === 0}
+                  className={`text-xs px-3 py-1.5 rounded-lg font-bold disabled:opacity-40 ${active.talent ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
+                  {active.talent ? (mode === 'preview' ? 'IN PVW' : 'ON AIR') : 'FIRE'}
+                </button>
+              </div>
+              {talentList.map(c => (
+                <div key={c.id} className="flex items-center gap-2 group">
+                  <label className="cursor-pointer shrink-0" title="Photo">
+                    {c.photo
+                      ? <img src={c.photo} className="w-8 h-8 rounded-full object-cover" alt="" />
+                      : <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-400"><Upload size={11} /></div>}
+                    <input type="file" accept="image/*" className="hidden"
+                      onChange={e => uploadPersonPhoto(e, url => setTalentList(l => l.map(x => x.id === c.id ? { ...x, photo: url } : x)))} />
+                  </label>
+                  <input value={c.name} onChange={e => setTalentList(l => l.map(x => x.id === c.id ? { ...x, name: e.target.value } : x))}
+                    placeholder="Name" className="flex-1 border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none" />
+                  <input value={c.role} onChange={e => setTalentList(l => l.map(x => x.id === c.id ? { ...x, role: e.target.value } : x))}
+                    placeholder="Play-by-play / Analyst" className="w-32 border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none" />
+                  <button onClick={() => setTalentList(l => l.filter(x => x.id !== c.id))}
+                    className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100"><Trash2 size={12} /></button>
+                </div>
+              ))}
+              <button onClick={() => setTalentList(l => [...l, { id: Math.random().toString(36).slice(2, 10), name: '', role: '', photo: '' }])}
+                className="w-full py-1.5 rounded-lg border border-dashed border-gray-200 text-xs text-gray-500 hover:bg-gray-50 flex items-center justify-center gap-1.5">
+                <Plus size={12} /> Add commentator
+              </button>
+            </div>
+
+            {/* Special Mention / VIP */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-3">
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-semibold text-gray-800">Special Mention</h2>
+                <button onClick={() => fire({ mention: !active.mention })} disabled={!mentionCfg.name}
+                  className={`text-xs px-3 py-1.5 rounded-lg font-bold disabled:opacity-40 ${active.mention ? 'bg-amber-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
+                  {active.mention ? (mode === 'preview' ? 'IN PVW' : 'ON AIR') : 'FIRE'}
+                </button>
+              </div>
+              <p className="text-[11px] text-gray-400">A celebrity walks in? Photo + name and it's on air in seconds.</p>
+              <div className="flex items-center gap-2">
+                <label className="cursor-pointer shrink-0" title="Photo">
+                  {mentionCfg.photo
+                    ? <img src={mentionCfg.photo} className="w-12 h-12 rounded-xl object-cover" alt="" />
+                    : <div className="w-12 h-12 rounded-xl bg-gray-200 flex items-center justify-center text-gray-400"><Upload size={14} /></div>}
+                  <input type="file" accept="image/*" className="hidden"
+                    onChange={e => uploadPersonPhoto(e, url => setMentionCfg(m => ({ ...m, photo: url })))} />
+                </label>
+                <div className="flex-1 space-y-1.5">
+                  <input value={mentionCfg.name} onChange={e => setMentionCfg(m => ({ ...m, name: e.target.value }))}
+                    placeholder="Guest name" className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none" />
+                  <input value={mentionCfg.title} onChange={e => setMentionCfg(m => ({ ...m, title: e.target.value }))}
+                    placeholder="Why they matter — '3x Grammy winner'" className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none" />
+                </div>
+              </div>
+              <input value={mentionCfg.label} onChange={e => setMentionCfg(m => ({ ...m, label: e.target.value }))}
+                placeholder="Ribbon label — Special Guest / In the Building" className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none" />
             </div>
 
             {/* Leaders quick-fire */}

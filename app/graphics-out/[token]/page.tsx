@@ -12,7 +12,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import PlayerPhoto from '@/components/PlayerPhoto';
 import {
   normalizeSummary, gameLeaders, comparedTeamStats, periodLabel, detectCallouts,
-  manualToSummary, topFive, DEFAULT_PORTAL_VIDEO, type ManualGame,
+  manualToSummary, topFive, DEFAULT_PORTAL_VIDEO, DEFAULT_PORTAL_VIDEO_HEVC, type ManualGame,
   type Summary, type Athlete, type Callout,
 } from '@/lib/nba';
 
@@ -22,6 +22,8 @@ interface BusState {
   full?: 'teamstats' | 'lineups' | 'leaders' | 'matchup' | 'trivia' | null;
   banner?: string | null;               // URL of the currently-aired banner
   portal?: boolean;                     // hoop-portal sponsor reveal
+  talent?: boolean;                     // broadcast team graphic
+  mention?: boolean;                    // special guest / VIP mention
 }
 
 interface GfxDoc extends BusState {
@@ -37,6 +39,8 @@ interface GfxDoc extends BusState {
   theme?: { useTeamColors?: boolean; c1?: string; c2?: string; logoScale?: number; brandScale?: number; motion?: boolean } | null;
   trivia?: { question?: string; options?: string[]; correct?: number; sponsor?: string; reveal?: boolean } | null;
   portalCfg?: { x?: number; y?: number; size?: number; logo?: string; video?: string; content?: 'logo' | 'trivia' } | null;
+  talentCfg?: { list?: { id: string; name: string; role: string; photo: string }[] } | null;
+  mentionCfg?: { label?: string; name?: string; title?: string; photo?: string } | null;
 }
 
 const CALLOUT_MS = 4500;
@@ -189,6 +193,16 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
   return (
     <div className="fixed inset-0 overflow-hidden font-sans"
       style={{ background: bg, cursor: cursorHidden ? 'none' : 'default' }}>
+      {/* Warm the default portal FX so firing it is instant */}
+      <video muted playsInline preload="auto" className="hidden">
+        <source src={DEFAULT_PORTAL_VIDEO} type="video/webm" />
+        <source src={DEFAULT_PORTAL_VIDEO_HEVC} type="video/quicktime" />
+      </video>
+      <style>{`
+        @keyframes plg-cell-flash { 0% { filter: brightness(2.6) saturate(0.4); } 100% { filter: brightness(1) saturate(1); } }
+        @keyframes plg-rise { from { opacity: 0; transform: translateY(46px) scale(0.92); } to { opacity: 1; transform: translateY(0) scale(1); } }
+        @keyframes plg-slide-r { from { opacity: 0; transform: translateX(70px); } to { opacity: 1; transform: translateX(0); } }
+      `}</style>
       {summary && (
         <>
           {/* ── SCORE BUG ── */}
@@ -366,9 +380,19 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
 
                   {/* The portal itself: fire FX video (alpha) or the CSS golden ring */}
                   {video ? (
-                    <video src={video} autoPlay loop muted playsInline
+                    <video autoPlay loop muted playsInline preload="auto"
+                      ref={el => { if (el && el.paused) el.play().catch(() => {}); }}
                       className="relative z-10 pointer-events-none"
-                      style={{ width: 700 * size, maxWidth: 'none' }} />
+                      style={{ width: 700 * size, maxWidth: 'none' }}>
+                      {video === DEFAULT_PORTAL_VIDEO ? (
+                        <>
+                          <source src={DEFAULT_PORTAL_VIDEO} type="video/webm" />
+                          <source src={DEFAULT_PORTAL_VIDEO_HEVC} type="video/quicktime" />
+                        </>
+                      ) : (
+                        <source src={video} />
+                      )}
+                    </video>
                   ) : (
                     <>
                       <div className="absolute left-1/2 -translate-x-1/2 pointer-events-none"
@@ -391,6 +415,46 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
               </div>
             );
           })()}
+
+          {/* ── BROADCAST TEAM (commentators) ── */}
+          {bus.talent && (gfx.talentCfg?.list || []).length > 0 && (
+            <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex items-end gap-4">
+              {(gfx.talentCfg?.list || []).map((c, i) => (
+                <div key={c.id}
+                  className="w-52 rounded-2xl overflow-hidden shadow-2xl bg-zinc-900/95 text-white"
+                  style={{ animation: `plg-rise 0.6s cubic-bezier(0.34, 1.3, 0.64, 1) ${i * 0.18}s both` }}>
+                  <div className="h-40 relative" style={{ background: `linear-gradient(160deg, ${awayColor}, #111)` }}>
+                    <PlayerPhoto src={c.photo} className="absolute inset-0 w-full h-full object-cover object-top" />
+                  </div>
+                  <div className="px-3 py-2.5 border-t-2" style={{ borderColor: awayColor }}>
+                    <div className="font-black leading-tight truncate">{c.name}</div>
+                    <div className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">{c.role}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* ── SPECIAL MENTION / VIP ── */}
+          {bus.mention && gfx.mentionCfg?.name && (
+            <div className="absolute right-10 bottom-28 w-80"
+              style={{ animation: 'plg-slide-r 0.55s cubic-bezier(0.34, 1.3, 0.64, 1) both' }}>
+              <div className="rounded-2xl overflow-hidden shadow-2xl bg-zinc-900/95 text-white">
+                <div className="px-4 py-2 text-[10px] font-black uppercase tracking-[0.25em] text-black"
+                  style={{ background: 'linear-gradient(90deg, #fbbf24, #f59e0b)' }}>
+                  ★ {gfx.mentionCfg.label || 'Special Guest'}
+                </div>
+                <div className="h-64 relative" style={{ background: `linear-gradient(160deg, ${homeColor}, #111)` }}>
+                  <PlayerPhoto src={gfx.mentionCfg.photo} className="absolute inset-0 w-full h-full object-cover object-top" />
+                  {brand?.logo && <img src={brand.logo} className="absolute top-2 right-2 h-6 max-w-[70px] object-contain bg-white/90 rounded px-1" alt="" />}
+                </div>
+                <div className="px-4 py-3">
+                  <div className="text-xl font-black leading-tight">{gfx.mentionCfg.name}</div>
+                  {gfx.mentionCfg.title && <div className="text-xs text-zinc-400 mt-0.5">{gfx.mentionCfg.title}</div>}
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* ── FULL SCREENS ── */}
           <AnimatePresence>
@@ -458,8 +522,8 @@ function Score({ value, big = false }: { value: string; big?: boolean }) {
 
 function TeamCell({ team, color, scale = 1, float = false, reverse = false }: { team: Summary['home']; color: string; scale?: number; float?: boolean; reverse?: boolean }) {
   return (
-    <div className={`flex items-center gap-3 px-4 py-2.5 ${reverse ? 'flex-row-reverse' : ''}`}
-      style={{ background: `linear-gradient(${reverse ? '270deg' : '90deg'}, ${color}, #18181b 140%)` }}>
+    <div key={team.score} className={`flex items-center gap-3 px-4 py-2.5 ${reverse ? 'flex-row-reverse' : ''}`}
+      style={{ background: `linear-gradient(${reverse ? '270deg' : '90deg'}, ${color}, #18181b 140%)`, animation: 'plg-cell-flash 0.9s ease-out' }}>
       {team.logo && (
         <motion.img src={team.logo} className="drop-shadow" alt=""
           style={{ width: 36 * scale, height: 36 * scale }}
