@@ -68,6 +68,13 @@ function ControlInner() {
   const [logoScale, setLogoScale] = useState(1);      // team logos on bug & headers
   const [brandScale, setBrandScale] = useState(1);    // company logo chip
   const [motionFx, setMotionFx] = useState(false);    // breathing logos + shine sweep
+  const [bugPos, setBugPos] = useState<'left' | 'center' | 'right'>('left');
+  const [monSize, setMonSize] = useState(352);
+  useEffect(() => {
+    const s = parseInt(localStorage.getItem('plg_mon_size') || '352', 10);
+    if (s) setMonSize(s);
+  }, []);
+  const pickMonSize = (w: number) => { setMonSize(w); localStorage.setItem('plg_mon_size', String(w)); };
 
   /* Sponsored trivia */
   const [trivia, setTrivia] = useState({
@@ -108,6 +115,7 @@ function ControlInner() {
         if (d.theme.logoScale) setLogoScale(d.theme.logoScale);
         if (d.theme.brandScale) setBrandScale(d.theme.brandScale);
         if (d.theme.motion) setMotionFx(true);
+        if (d.theme.bugPos) setBugPos(d.theme.bugPos);
       }
       if (d.trivia) setTrivia({ question: '', options: ['', '', ''], correct: 0, sponsor: '', reveal: false, ...d.trivia });
       if (d.portalCfg) setPortalCfg({ x: 50, y: 30, size: 1, logo: '', video: '', content: 'logo', ...d.portalCfg });
@@ -166,7 +174,7 @@ function ControlInner() {
         sourceMode: source, league,
         brand: { logo: company?.logo_url || '', name: company?.name || '' },
         showBrand, autoCallouts,
-        theme: { useTeamColors, c1, c2, logoScale, brandScale, motion: motionFx },
+        theme: { useTeamColors, c1, c2, logoScale, brandScale, motion: motionFx, bugPos },
         trivia,
         portalCfg,
         talentCfg: { list: talentList },
@@ -199,7 +207,7 @@ function ControlInner() {
   /* Re-push settings when branding/theme changes (only once a game is loaded) */
   useEffect(() => {
     if ((eventId || source === 'manual') && token) pushDoc({});
-  }, [showBrand, autoCallouts, useTeamColors, c1, c2, banners, logoScale, brandScale, motionFx, trivia, portalCfg, talentList, mentionCfg]);
+  }, [showBrand, autoCallouts, useTeamColors, c1, c2, banners, logoScale, brandScale, motionFx, trivia, portalCfg, talentList, mentionCfg, bugPos]);
 
   /* Fire a play callout for the on-air player (or top scorer) */
   const calloutTarget: Athlete | null = useMemo(() => {
@@ -391,7 +399,7 @@ function ControlInner() {
       {/* ── PVW / PGM monitors + TAKE ── */}
       {token && summary && (
         <div className="mb-6 bg-zinc-950 rounded-2xl p-4 flex flex-wrap items-center justify-center gap-5">
-          <Monitor label="PREVIEW" color="text-yellow-400"
+          <Monitor label="PREVIEW" color="text-yellow-400" width={monSize}
             src={`/graphics-out/${token}?mode=preview&bg=dark`} />
           <div className="flex flex-col items-center gap-2">
             <button onClick={take}
@@ -406,8 +414,16 @@ function ControlInner() {
               className={`w-24 py-1.5 rounded-lg text-[10px] font-bold ${mode === 'preview' ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-600/40' : 'bg-red-500/20 text-red-400 border border-red-600/40'}`}>
               {mode === 'preview' ? 'PVW → TAKE' : 'CUT DIRECT'}
             </button>
+            <div className="flex gap-1">
+              {([['S', 352], ['M', 512], ['L', 700]] as [string, number][]).map(([l, w]) => (
+                <button key={l} onClick={() => pickMonSize(w)}
+                  className={`w-7 py-1 rounded text-[10px] font-bold ${monSize === w ? 'bg-zinc-600 text-white' : 'bg-zinc-800 text-zinc-500 hover:text-zinc-300'}`}>
+                  {l}
+                </button>
+              ))}
+            </div>
           </div>
-          <Monitor label="PROGRAM" color="text-red-500"
+          <Monitor label="PROGRAM" color="text-red-500" width={monSize}
             src={`/graphics-out/${token}?bg=dark`} />
         </div>
       )}
@@ -615,6 +631,17 @@ function ControlInner() {
                 className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-medium ${active.bug ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
                 Score Bug (auto clock + score) {active.bug ? <Eye size={15} /> : <EyeOff size={15} />}
               </button>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] text-gray-400 uppercase tracking-wide">Bug position</span>
+                <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5 ml-auto">
+                  {(['left', 'center', 'right'] as const).map(p => (
+                    <button key={p} onClick={() => setBugPos(p)}
+                      className={`px-2.5 py-1 rounded-md text-[10px] font-bold uppercase ${bugPos === p ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500'}`}>
+                      {p === 'left' ? '◀' : p === 'center' ? '■' : '▶'}
+                    </button>
+                  ))}
+                </div>
+              </div>
               {([
                 ['teamstats', 'Team Stats — full screen'],
                 ['lineups', 'Starting Lineups — full screen'],
@@ -856,13 +883,6 @@ function ControlInner() {
               </div>
               {talentList.map(c => (
                 <div key={c.id} className="flex items-center gap-2 group">
-                  <label className="cursor-pointer shrink-0" title="Photo">
-                    {c.photo
-                      ? <img src={c.photo} className="w-8 h-8 rounded-full object-cover" alt="" />
-                      : <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-400"><Upload size={11} /></div>}
-                    <input type="file" accept="image/*" className="hidden"
-                      onChange={e => uploadPersonPhoto(e, url => setTalentList(l => l.map(x => x.id === c.id ? { ...x, photo: url } : x)))} />
-                  </label>
                   <input value={c.name} onChange={e => setTalentList(l => l.map(x => x.id === c.id ? { ...x, name: e.target.value } : x))}
                     placeholder="Name" className="flex-1 border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none" />
                   <input value={c.role} onChange={e => setTalentList(l => l.map(x => x.id === c.id ? { ...x, role: e.target.value } : x))}
@@ -887,21 +907,10 @@ function ControlInner() {
                 </button>
               </div>
               <p className="text-[11px] text-gray-400">A celebrity walks in? Photo + name and it's on air in seconds.</p>
-              <div className="flex items-center gap-2">
-                <label className="cursor-pointer shrink-0" title="Photo">
-                  {mentionCfg.photo
-                    ? <img src={mentionCfg.photo} className="w-12 h-12 rounded-xl object-cover" alt="" />
-                    : <div className="w-12 h-12 rounded-xl bg-gray-200 flex items-center justify-center text-gray-400"><Upload size={14} /></div>}
-                  <input type="file" accept="image/*" className="hidden"
-                    onChange={e => uploadPersonPhoto(e, url => setMentionCfg(m => ({ ...m, photo: url })))} />
-                </label>
-                <div className="flex-1 space-y-1.5">
-                  <input value={mentionCfg.name} onChange={e => setMentionCfg(m => ({ ...m, name: e.target.value }))}
-                    placeholder="Guest name" className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none" />
-                  <input value={mentionCfg.title} onChange={e => setMentionCfg(m => ({ ...m, title: e.target.value }))}
-                    placeholder="Why they matter — '3x Grammy winner'" className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none" />
-                </div>
-              </div>
+              <input value={mentionCfg.name} onChange={e => setMentionCfg(m => ({ ...m, name: e.target.value }))}
+                placeholder="Guest name" className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none" />
+              <input value={mentionCfg.title} onChange={e => setMentionCfg(m => ({ ...m, title: e.target.value }))}
+                placeholder="Why they matter — '3x Grammy winner'" className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none" />
               <input value={mentionCfg.label} onChange={e => setMentionCfg(m => ({ ...m, label: e.target.value }))}
                 placeholder="Ribbon label — Special Guest / In the Building" className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none" />
             </div>
@@ -984,15 +993,25 @@ function ControlInner() {
   );
 }
 
-/* Scaled 1920×1080 monitor of an output bus */
-function Monitor({ src, label, color }: { src: string; label: string; color: string }) {
+/* Scaled 1920×1080 monitor of an output bus — resizable, pops out to its own
+   window (drag it to a second display, press F there for fullscreen) */
+function Monitor({ src, label, color, width = 352 }: { src: string; label: string; color: string; width?: number }) {
+  const h = Math.round(width * 9 / 16);
   return (
     <div>
-      <div className={`text-[10px] font-black tracking-[0.2em] mb-1.5 ${color}`}>{label}</div>
-      <div className="relative w-[352px] h-[198px] overflow-hidden rounded-xl bg-black border border-zinc-800">
+      <div className="flex items-center justify-between mb-1.5">
+        <span className={`text-[10px] font-black tracking-[0.2em] ${color}`}>{label}</span>
+        <button
+          onClick={() => window.open(src, `plg-${label}`, `width=1280,height=720`)}
+          title="Open in its own window — drag to another screen, press F for fullscreen"
+          className="text-zinc-500 hover:text-white">
+          <ExternalLink size={12} />
+        </button>
+      </div>
+      <div className="relative overflow-hidden rounded-xl bg-black border border-zinc-800" style={{ width, height: h }}>
         <iframe src={src} title={label}
           className="absolute top-0 left-0 border-0 pointer-events-none"
-          style={{ width: 1920, height: 1080, transform: 'scale(0.18333)', transformOrigin: 'top left' }} />
+          style={{ width: 1920, height: 1080, transform: `scale(${width / 1920})`, transformOrigin: 'top left' }} />
       </div>
     </div>
   );

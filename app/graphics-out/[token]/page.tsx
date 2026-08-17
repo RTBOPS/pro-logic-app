@@ -8,7 +8,6 @@
 import { useState, useEffect, useMemo, useRef, use } from 'react';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { AnimatePresence, motion } from 'framer-motion';
 import PlayerPhoto from '@/components/PlayerPhoto';
 import {
   normalizeSummary, gameLeaders, comparedTeamStats, periodLabel, detectCallouts,
@@ -36,7 +35,7 @@ interface GfxDoc extends BusState {
   showBrand?: boolean;
   autoCallouts?: boolean;
   callout?: Callout | null;             // manual fire from the control panel
-  theme?: { useTeamColors?: boolean; c1?: string; c2?: string; logoScale?: number; brandScale?: number; motion?: boolean } | null;
+  theme?: { useTeamColors?: boolean; c1?: string; c2?: string; logoScale?: number; brandScale?: number; motion?: boolean; bugPos?: 'left' | 'center' | 'right' } | null;
   trivia?: { question?: string; options?: string[]; correct?: number; sponsor?: string; reveal?: boolean } | null;
   portalCfg?: { x?: number; y?: number; size?: number; logo?: string; video?: string; content?: 'logo' | 'trivia' } | null;
   talentCfg?: { list?: { id: string; name: string; role: string; photo: string }[] } | null;
@@ -202,46 +201,46 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
         @keyframes plg-cell-flash { 0% { filter: brightness(2.6) saturate(0.4); } 100% { filter: brightness(1) saturate(1); } }
         @keyframes plg-rise { from { opacity: 0; transform: translateY(46px) scale(0.92); } to { opacity: 1; transform: translateY(0) scale(1); } }
         @keyframes plg-slide-r { from { opacity: 0; transform: translateX(70px); } to { opacity: 1; transform: translateX(0); } }
+        @keyframes plg-score-pop { 0% { transform: scale(1.45); color: #fde047; } 100% { transform: scale(1); color: #ffffff; } }
+        @keyframes plg-pop { from { opacity: 0; transform: translateY(16px) scale(0.9); } to { opacity: 1; transform: translateY(0) scale(1); } }
+        @keyframes plg-lower-in { from { opacity: 0; transform: translateX(-420px); } to { opacity: 1; transform: translateX(0); } }
+        @keyframes plg-full-in { from { opacity: 0; transform: scale(0.955); } to { opacity: 1; transform: scale(1); } }
+        @keyframes plg-shine { 0% { transform: translateX(-130%); } 26% { transform: translateX(430%); } 100% { transform: translateX(430%); } }
+        @keyframes plg-float-logo { 0%, 100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-2.5px) scale(1.05); } }
+        @keyframes plg-correct-pop { 0% { transform: scale(1); } 40% { transform: scale(1.06); } 100% { transform: scale(1); } }
       `}</style>
       {summary && (
         <>
-          {/* ── SCORE BUG ── */}
-          <AnimatePresence>
-            {bus.bug && (
-              <motion.div
-                initial={{ y: 90, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 90, opacity: 0 }}
-                transition={{ type: 'spring', stiffness: 260, damping: 26 }}
-                className="absolute bottom-8 left-8"
-                style={{ fontVariantNumeric: 'tabular-nums' }}>
+          {/* ── SCORE BUG (pure CSS — rAF-proof) ── */}
+          {bus.bug && (() => {
+            const pos = gfx.theme?.bugPos || 'left';
+            const posCls = pos === 'center' ? 'left-1/2 -translate-x-1/2 items-center'
+              : pos === 'right' ? 'right-8 items-end' : 'left-8 items-start';
+            return (
+              <div className={`absolute bottom-8 flex flex-col gap-2 ${posCls}`}
+                style={{ fontVariantNumeric: 'tabular-nums', animation: 'plg-rise 0.5s cubic-bezier(0.34, 1.3, 0.64, 1) both' }}>
 
                 {/* Callout pill above the bug */}
-                <AnimatePresence mode="popLayout">
-                  {busMode === 'program' && current && (
-                    <motion.div key={current.id}
-                      initial={{ y: 24, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: -14, opacity: 0 }}
-                      transition={{ type: 'spring', stiffness: 300, damping: 24 }}
-                      className="mb-2 inline-flex items-center gap-3 rounded-xl overflow-hidden shadow-2xl text-white">
-                      <div className="px-4 py-2 font-black text-lg tracking-wide"
-                        style={{ background: calloutColor(current) }}>
-                        {current.title}
+                {busMode === 'program' && current && (
+                  <div key={current.id} className="inline-flex items-stretch rounded-xl overflow-hidden shadow-2xl text-white"
+                    style={{ animation: 'plg-pop 0.4s cubic-bezier(0.34, 1.3, 0.64, 1) both' }}>
+                    <div className="px-4 py-2 font-black text-lg tracking-wide flex items-center"
+                      style={{ background: calloutColor(current) }}>
+                      {current.title}
+                    </div>
+                    {current.sub && (
+                      <div className="pr-4 pl-3 text-sm font-semibold bg-zinc-900/95 flex items-center">
+                        {current.sub}
                       </div>
-                      {current.sub && (
-                        <div className="pr-4 py-2 -ml-1 text-sm font-semibold bg-zinc-900/95 pl-3 self-stretch flex items-center">
-                          {current.sub}
-                        </div>
-                      )}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+                    )}
+                  </div>
+                )}
 
                 <div className="relative flex items-stretch rounded-xl overflow-hidden shadow-2xl text-white">
                   {motionOn && (
-                    <motion.div
-                      animate={{ x: ['-130%', '430%'] }}
-                      transition={{ repeat: Infinity, duration: 1.8, repeatDelay: 4.5, ease: 'easeInOut' }}
-                      className="absolute inset-y-0 w-1/3 bg-gradient-to-r from-transparent via-white/25 to-transparent pointer-events-none z-10" />
+                    <div className="absolute inset-y-0 w-1/3 bg-gradient-to-r from-transparent via-white/25 to-transparent pointer-events-none z-10"
+                      style={{ animation: 'plg-shine 6.4s ease-in-out infinite' }} />
                   )}
-                  {/* Company brand chip */}
                   {brand && (
                     <div className="bg-white px-3 flex items-center">
                       <img src={brand.logo} className="object-contain" style={{ height: 32 * brandScale, maxWidth: 72 * brandScale }} alt={brand.name || ''} />
@@ -260,54 +259,45 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
                   </div>
                   <TeamCell team={summary.home} color={homeColor} scale={logoScale} float={motionOn} reverse />
                 </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+              </div>
+            );
+          })()}
 
-          {/* ── CUSTOM BANNER ── */}
-          <AnimatePresence>
-            {bus.banner && (
-              <motion.div key={bus.banner}
-                initial={{ y: 60, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 60, opacity: 0 }}
-                transition={{ type: 'spring', stiffness: 240, damping: 26 }}
-                className="absolute bottom-8 left-1/2 -translate-x-1/2">
-                <img src={bus.banner || undefined} className="max-h-28 max-w-[860px] object-contain rounded-xl shadow-2xl" alt="" />
-              </motion.div>
-            )}
-          </AnimatePresence>
+          {/* ── CUSTOM BANNER (pure CSS) ── */}
+          {bus.banner && (
+            <div key={bus.banner} className="absolute bottom-8 left-1/2 -translate-x-1/2"
+              style={{ animation: 'plg-rise 0.5s cubic-bezier(0.34, 1.3, 0.64, 1) both' }}>
+              <img src={bus.banner} className="max-h-28 max-w-[860px] object-contain rounded-xl shadow-2xl" alt="" />
+            </div>
+          )}
 
-          {/* ── PLAYER LOWER THIRD ── */}
-          <AnimatePresence>
-            {lower && (
-              <motion.div
-                key={lower.id}
-                initial={{ x: -420, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -420, opacity: 0 }}
-                transition={{ type: 'spring', stiffness: 240, damping: 26 }}
-                className="absolute bottom-28 left-8 flex items-end">
-                <div className="w-36 h-36 rounded-2xl overflow-hidden shadow-2xl relative"
-                  style={{ background: `linear-gradient(160deg, ${custom ? awayColor : lower.teamColor}, #111)` }}>
-                  <PlayerPhoto src={lower.headshot} className="absolute inset-0 w-full h-full object-cover object-top" />
-                </div>
-                <div className="ml-[-10px] mb-2">
-                  <div className="bg-zinc-900/95 text-white pl-6 pr-8 py-3 rounded-tr-2xl shadow-2xl flex items-center gap-4">
-                    <div>
-                      <div className="text-2xl font-black leading-none">{lower.name}</div>
-                      <div className="text-xs font-semibold mt-1 text-zinc-400">
-                        {lower.teamAbbr} · #{lower.jersey} · {lower.pos}
-                      </div>
+          {/* ── PLAYER LOWER THIRD (pure CSS) ── */}
+          {lower && (
+            <div key={lower.id} className="absolute bottom-28 left-8 flex items-end"
+              style={{ animation: 'plg-lower-in 0.5s cubic-bezier(0.3, 1.15, 0.6, 1) both' }}>
+              <div className="w-36 h-36 rounded-2xl overflow-hidden shadow-2xl relative"
+                style={{ background: `linear-gradient(160deg, ${custom ? awayColor : lower.teamColor}, #111)` }}>
+                <PlayerPhoto src={lower.headshot} className="absolute inset-0 w-full h-full object-cover object-top" />
+              </div>
+              <div className="ml-[-10px] mb-2">
+                <div className="bg-zinc-900/95 text-white pl-6 pr-8 py-3 rounded-tr-2xl shadow-2xl flex items-center gap-4">
+                  <div>
+                    <div className="text-2xl font-black leading-none">{lower.name}</div>
+                    <div className="text-xs font-semibold mt-1 text-zinc-400">
+                      {lower.teamAbbr} · #{lower.jersey} · {lower.pos}
                     </div>
-                    {lower.teamLogo && <img src={lower.teamLogo} className="w-11 h-11 object-contain drop-shadow shrink-0" alt="" />}
                   </div>
-                  <div className="flex text-white shadow-2xl rounded-br-2xl overflow-hidden">
-                    <StatChip label="PTS" value={lower.stats.pts} color={custom ? awayColor : lower.teamColor} big />
-                    <StatChip label="REB" value={lower.stats.reb} />
-                    <StatChip label="AST" value={lower.stats.ast} />
-                    <StatChip label="FG" value={lower.stats.fg} />
-                  </div>
+                  {lower.teamLogo && <img src={lower.teamLogo} className="w-11 h-11 object-contain drop-shadow shrink-0" alt="" />}
                 </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+                <div className="flex text-white shadow-2xl rounded-br-2xl overflow-hidden">
+                  <StatChip label="PTS" value={lower.stats.pts} color={custom ? awayColor : lower.teamColor} big />
+                  <StatChip label="REB" value={lower.stats.reb} />
+                  <StatChip label="AST" value={lower.stats.ast} />
+                  <StatChip label="FG" value={lower.stats.fg} />
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* ── HOOP PORTAL (AR-style sponsor/trivia reveal on the backboard cam)
               Pure CSS animations: VP9-alpha decode can starve the JS rAF loop on
@@ -416,107 +406,108 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
             );
           })()}
 
-          {/* ── BROADCAST TEAM (commentators) ── */}
+          {/* ── BROADCAST TEAM (text ribbon, unified style) ── */}
           {bus.talent && (gfx.talentCfg?.list || []).length > 0 && (
-            <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex items-end gap-4">
-              {(gfx.talentCfg?.list || []).map((c, i) => (
-                <div key={c.id}
-                  className="w-52 rounded-2xl overflow-hidden shadow-2xl bg-zinc-900/95 text-white"
-                  style={{ animation: `plg-rise 0.6s cubic-bezier(0.34, 1.3, 0.64, 1) ${i * 0.18}s both` }}>
-                  <div className="h-40 relative" style={{ background: `linear-gradient(160deg, ${awayColor}, #111)` }}>
-                    <PlayerPhoto src={c.photo} className="absolute inset-0 w-full h-full object-cover object-top" />
+            <div className="absolute left-1/2 -translate-x-1/2"
+              style={{
+                bottom: bus.bug && (gfx.theme?.bugPos || 'left') === 'center' ? '8.5rem' : '2rem',
+                animation: 'plg-rise 0.55s cubic-bezier(0.34, 1.3, 0.64, 1) both',
+              }}>
+              <div className="flex items-stretch rounded-xl overflow-hidden shadow-2xl text-white">
+                <div className="px-4 flex items-center text-[10px] font-black uppercase tracking-[0.2em] text-black whitespace-nowrap"
+                  style={{ background: 'linear-gradient(135deg, #fbbf24, #f59e0b)' }}>
+                  Broadcast Team
+                </div>
+                {(gfx.talentCfg?.list || []).map((c, i) => (
+                  <div key={c.id}
+                    className={`bg-zinc-900/95 px-5 py-2.5 ${i > 0 ? 'border-l border-white/10' : ''}`}
+                    style={{ animation: `plg-rise 0.5s cubic-bezier(0.34, 1.3, 0.64, 1) ${0.15 + i * 0.15}s both` }}>
+                    <div className="font-black leading-tight whitespace-nowrap">{c.name}</div>
+                    <div className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 whitespace-nowrap">{c.role}</div>
                   </div>
-                  <div className="px-3 py-2.5 border-t-2" style={{ borderColor: awayColor }}>
-                    <div className="font-black leading-tight truncate">{c.name}</div>
-                    <div className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">{c.role}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* ── SPECIAL MENTION / VIP ── */}
-          {bus.mention && gfx.mentionCfg?.name && (
-            <div className="absolute right-10 bottom-28 w-80"
-              style={{ animation: 'plg-slide-r 0.55s cubic-bezier(0.34, 1.3, 0.64, 1) both' }}>
-              <div className="rounded-2xl overflow-hidden shadow-2xl bg-zinc-900/95 text-white">
-                <div className="px-4 py-2 text-[10px] font-black uppercase tracking-[0.25em] text-black"
-                  style={{ background: 'linear-gradient(90deg, #fbbf24, #f59e0b)' }}>
-                  ★ {gfx.mentionCfg.label || 'Special Guest'}
-                </div>
-                <div className="h-64 relative" style={{ background: `linear-gradient(160deg, ${homeColor}, #111)` }}>
-                  <PlayerPhoto src={gfx.mentionCfg.photo} className="absolute inset-0 w-full h-full object-cover object-top" />
-                  {brand?.logo && <img src={brand.logo} className="absolute top-2 right-2 h-6 max-w-[70px] object-contain bg-white/90 rounded px-1" alt="" />}
-                </div>
-                <div className="px-4 py-3">
-                  <div className="text-xl font-black leading-tight">{gfx.mentionCfg.name}</div>
-                  {gfx.mentionCfg.title && <div className="text-xs text-zinc-400 mt-0.5">{gfx.mentionCfg.title}</div>}
-                </div>
+                ))}
               </div>
             </div>
           )}
 
-          {/* ── FULL SCREENS ── */}
-          <AnimatePresence>
-            {bus.full && (
-              <motion.div
-                key={bus.full}
-                initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.96 }}
-                transition={{ duration: 0.25 }}
-                className="absolute inset-0 flex items-center justify-center">
-                <div className="w-[900px] max-w-[92vw] bg-zinc-900/95 text-white rounded-3xl shadow-2xl overflow-hidden">
-                  <div className="flex items-center justify-between px-8 py-4"
-                    style={{ background: `linear-gradient(90deg, ${awayColor}cc, #18181b 45%, #18181b 55%, ${homeColor}cc)` }}>
-                    <div className="flex items-center gap-3">
-                      {summary.away.logo && <img src={summary.away.logo} style={{ width: 40 * logoScale, height: 40 * logoScale }} alt="" />}
-                      <span className="text-2xl font-black">{summary.away.abbr}</span>
-                      <Score value={summary.away.score} />
-                    </div>
-                    <div className="text-center">
-                      <div className="text-sm font-bold text-yellow-400">{summary.state === 'in' ? `${periodLabel(summary.period)} · ${summary.clock}` : summary.statusDetail}</div>
-                      <div className="text-[10px] uppercase tracking-widest text-zinc-400 mt-0.5">
-                        {bus.full === 'teamstats' ? 'Team Stats' : bus.full === 'lineups' ? 'Starting Lineups' : bus.full === 'matchup' ? 'Matchup — Top 5' : bus.full === 'trivia' ? 'Trivia' : 'Top Performers'}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <Score value={summary.home.score} />
-                      <span className="text-2xl font-black">{summary.home.abbr}</span>
-                      {summary.home.logo && <img src={summary.home.logo} style={{ width: 40 * logoScale, height: 40 * logoScale }} alt="" />}
+          {/* ── SPECIAL MENTION / VIP (text ribbon, unified style) ── */}
+          {bus.mention && gfx.mentionCfg?.name && (
+            <div className="absolute right-8 bottom-28"
+              style={{ animation: 'plg-slide-r 0.55s cubic-bezier(0.34, 1.3, 0.64, 1) both' }}>
+              <div className="flex items-stretch rounded-xl overflow-hidden shadow-2xl text-white">
+                <div className="px-4 flex items-center text-[10px] font-black uppercase tracking-[0.2em] text-black whitespace-nowrap"
+                  style={{ background: 'linear-gradient(135deg, #fbbf24, #f59e0b)' }}>
+                  ★ {gfx.mentionCfg.label || 'Special Guest'}
+                </div>
+                <div className="bg-zinc-900/95 px-5 py-2.5">
+                  <div className="text-lg font-black leading-tight whitespace-nowrap">{gfx.mentionCfg.name}</div>
+                  {gfx.mentionCfg.title && (
+                    <div className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 whitespace-nowrap">{gfx.mentionCfg.title}</div>
+                  )}
+                </div>
+                {brand?.logo && (
+                  <div className="bg-white px-3 flex items-center">
+                    <img src={brand.logo} className="h-6 max-w-[64px] object-contain" alt="" />
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ── FULL SCREENS (pure CSS) ── */}
+          {bus.full && (
+            <div key={bus.full} className="absolute inset-0 flex items-center justify-center"
+              style={{ animation: 'plg-full-in 0.3s ease-out both' }}>
+              <div className="w-[900px] max-w-[92vw] bg-zinc-900/95 text-white rounded-3xl shadow-2xl overflow-hidden">
+                <div className="flex items-center justify-between px-8 py-4"
+                  style={{ background: `linear-gradient(90deg, ${awayColor}cc, #18181b 45%, #18181b 55%, ${homeColor}cc)` }}>
+                  <div className="flex items-center gap-3">
+                    {summary.away.logo && <img src={summary.away.logo} style={{ width: 40 * logoScale, height: 40 * logoScale }} alt="" />}
+                    <span className="text-2xl font-black">{summary.away.abbr}</span>
+                    <Score value={summary.away.score} />
+                  </div>
+                  <div className="text-center">
+                    <div className="text-sm font-bold text-yellow-400">{summary.state === 'in' ? `${periodLabel(summary.period)} · ${summary.clock}` : summary.statusDetail}</div>
+                    <div className="text-[10px] uppercase tracking-widest text-zinc-400 mt-0.5">
+                      {bus.full === 'teamstats' ? 'Team Stats' : bus.full === 'lineups' ? 'Starting Lineups' : bus.full === 'matchup' ? 'Matchup — Top 5' : bus.full === 'trivia' ? 'Trivia' : 'Top Performers'}
                     </div>
                   </div>
-
-                  {bus.full === 'teamstats' && <TeamStats summary={summary} awayColor={awayColor} homeColor={homeColor} />}
-                  {bus.full === 'lineups' && <Lineups summary={summary} awayColor={awayColor} homeColor={homeColor} />}
-                  {bus.full === 'leaders' && <Leaders summary={summary} custom={custom} awayColor={awayColor} />}
-                  {bus.full === 'matchup' && <Matchup summary={summary} awayColor={awayColor} homeColor={homeColor} />}
-                  {bus.full === 'trivia' && <Trivia trivia={gfx.trivia || {}} sponsorFallback={brand?.logo || ''} accent={awayColor} />}
-
-                  <div className="px-8 py-2.5 bg-black/40 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      {brand && <img src={brand.logo} className="h-5 max-w-[90px] object-contain brightness-0 invert opacity-80" alt="" />}
-                      {brand?.name && <span className="text-[10px] font-semibold text-zinc-400">{brand.name}</span>}
-                    </div>
-                    <span className="text-[10px] uppercase tracking-widest text-zinc-500">PRO-LOGIC Studio · Live Graphics</span>
+                  <div className="flex items-center gap-3">
+                    <Score value={summary.home.score} />
+                    <span className="text-2xl font-black">{summary.home.abbr}</span>
+                    {summary.home.logo && <img src={summary.home.logo} style={{ width: 40 * logoScale, height: 40 * logoScale }} alt="" />}
                   </div>
                 </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+
+                {bus.full === 'teamstats' && <TeamStats summary={summary} awayColor={awayColor} homeColor={homeColor} />}
+                {bus.full === 'lineups' && <Lineups summary={summary} awayColor={awayColor} homeColor={homeColor} />}
+                {bus.full === 'leaders' && <Leaders summary={summary} custom={custom} awayColor={awayColor} />}
+                {bus.full === 'matchup' && <Matchup summary={summary} awayColor={awayColor} homeColor={homeColor} />}
+                {bus.full === 'trivia' && <Trivia trivia={gfx.trivia || {}} sponsorFallback={brand?.logo || ''} accent={awayColor} />}
+
+                <div className="px-8 py-2.5 bg-black/40 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    {brand && <img src={brand.logo} className="h-5 max-w-[90px] object-contain brightness-0 invert opacity-80" alt="" />}
+                    {brand?.name && <span className="text-[10px] font-semibold text-zinc-400">{brand.name}</span>}
+                  </div>
+                  <span className="text-[10px] uppercase tracking-widest text-zinc-500">PRO-LOGIC Studio · Live Graphics</span>
+                </div>
+              </div>
+            </div>
+          )}
         </>
       )}
     </div>
   );
 }
 
-/* Score number with a pulse when it changes */
-function Score({ value, big = false }: { value: string; big?: boolean }) {
+/* Score number with a pulse when it changes (pure CSS) */
+function Score({ value }: { value: string; big?: boolean }) {
   return (
-    <motion.span key={value} initial={{ scale: 1.45, color: '#fde047' }} animate={{ scale: 1, color: '#ffffff' }}
-      transition={{ duration: 0.6, ease: 'easeOut' }}
-      className={`font-black inline-block ${big ? 'text-3xl' : 'text-3xl'}`}
-      style={{ fontVariantNumeric: 'tabular-nums' }}>
+    <span key={value} className="font-black inline-block text-3xl"
+      style={{ fontVariantNumeric: 'tabular-nums', animation: 'plg-score-pop 0.6s ease-out both' }}>
       {value}
-    </motion.span>
+    </span>
   );
 }
 
@@ -525,10 +516,8 @@ function TeamCell({ team, color, scale = 1, float = false, reverse = false }: { 
     <div key={team.score} className={`flex items-center gap-3 px-4 py-2.5 ${reverse ? 'flex-row-reverse' : ''}`}
       style={{ background: `linear-gradient(${reverse ? '270deg' : '90deg'}, ${color}, #18181b 140%)`, animation: 'plg-cell-flash 0.9s ease-out' }}>
       {team.logo && (
-        <motion.img src={team.logo} className="drop-shadow" alt=""
-          style={{ width: 36 * scale, height: 36 * scale }}
-          animate={float ? { y: [0, -2.5, 0], scale: [1, 1.05, 1] } : { y: 0, scale: 1 }}
-          transition={float ? { repeat: Infinity, duration: 3, ease: 'easeInOut' } : undefined} />
+        <img src={team.logo} className="drop-shadow" alt=""
+          style={{ width: 36 * scale, height: 36 * scale, animation: float ? 'plg-float-logo 3s ease-in-out infinite' : undefined }} />
       )}
       <span className="font-black text-xl tracking-wide">{team.abbr}</span>
       <Score value={team.score} />
@@ -618,9 +607,8 @@ function Trivia({ trivia, sponsorFallback, accent }: {
           const isCorrect = trivia.reveal && i === (trivia.correct ?? 0);
           const dimmed = trivia.reveal && !isCorrect;
           return (
-            <motion.div key={i}
-              animate={isCorrect ? { scale: [1, 1.06, 1] } : { scale: 1 }}
-              transition={isCorrect ? { duration: 0.5 } : undefined}
+            <div key={`${i}-${isCorrect}`}
+              style={isCorrect ? { animation: 'plg-correct-pop 0.5s ease-out both' } : undefined}
               className={`rounded-2xl px-5 py-4 flex items-center gap-3 border-2 transition-colors duration-500 ${
                 isCorrect ? 'bg-green-500/20 border-green-400' : dimmed ? 'bg-zinc-800/40 border-transparent opacity-40' : 'bg-zinc-800/70 border-transparent'}`}>
               <span className="w-8 h-8 rounded-full flex items-center justify-center font-black text-sm shrink-0"
@@ -629,7 +617,7 @@ function Trivia({ trivia, sponsorFallback, accent }: {
               </span>
               <span className="text-lg font-bold leading-tight">{opt || '—'}</span>
               {isCorrect && <span className="ml-auto text-green-400 text-2xl font-black">✓</span>}
-            </motion.div>
+            </div>
           );
         })}
       </div>
@@ -653,10 +641,8 @@ function Matchup({ summary, awayColor, homeColor }: { summary: Summary; awayColo
           </div>
           <div className="grid grid-cols-5 gap-3">
             {five.map((a, i) => (
-              <motion.div key={a.id}
-                initial={{ y: 40, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                transition={{ delay: delay + i * 0.18, type: 'spring', stiffness: 220, damping: 22 }}
+              <div key={a.id}
+                style={{ animation: `plg-rise 0.55s cubic-bezier(0.34, 1.3, 0.64, 1) ${delay + i * 0.18}s both` }}
                 className="rounded-xl overflow-hidden bg-zinc-800/60">
                 <div className="h-24 relative" style={{ background: `linear-gradient(160deg, ${color}, #111)` }}>
                   <PlayerPhoto src={a.headshot} className="absolute inset-0 w-full h-full object-cover object-top" />
@@ -668,7 +654,7 @@ function Matchup({ summary, awayColor, homeColor }: { summary: Summary; awayColo
                     {a.pos}{a.stats.pts !== '' && a.stats.pts !== '0' ? ` · ${a.stats.pts} PTS` : ''}
                   </div>
                 </div>
-              </motion.div>
+              </div>
             ))}
           </div>
         </div>
