@@ -14,17 +14,21 @@ import {
   type Summary, type Athlete, type Callout,
 } from '@/lib/nba';
 
-interface GfxDoc {
-  eventId?: string;
+interface BusState {
   bug?: boolean;
   lowerId?: string | null;
   full?: 'teamstats' | 'lineups' | 'leaders' | null;
+  banner?: string | null;               // URL of the currently-aired banner
+}
+
+interface GfxDoc extends BusState {
+  eventId?: string;
+  preview?: BusState | null;            // staged look — aired via TAKE
   brand?: { logo?: string; name?: string } | null;
   showBrand?: boolean;
   autoCallouts?: boolean;
   callout?: Callout | null;             // manual fire from the control panel
   theme?: { useTeamColors?: boolean; c1?: string; c2?: string } | null;
-  banner?: string | null;               // URL of the currently-aired banner
 }
 
 const CALLOUT_MS = 4500;
@@ -38,10 +42,51 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
   const prevSummary = useRef<Summary | null>(null);
   const lastManual = useRef<string>('');
 
+  const [busMode, setBusMode] = useState<'program' | 'preview'>('program');
+  const [cursorHidden, setCursorHidden] = useState(false);
+
   useEffect(() => {
-    const p = new URLSearchParams(window.location.search).get('bg');
+    const q = new URLSearchParams(window.location.search);
+    const p = q.get('bg');
     if (p === 'green') setBg('#00ff00');
     else if (p === 'dark') setBg('linear-gradient(140deg,#111827,#1f2937)');
+    if (q.get('mode') === 'preview') setBusMode('preview');
+  }, []);
+
+  /* Clean HDMI/screen output: F or double-click → fullscreen, cursor
+     auto-hides after 3 s idle, and a wake lock keeps the display on. */
+  useEffect(() => {
+    const goFullscreen = () => {
+      if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+      else document.documentElement.requestFullscreen().catch(() => {});
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'f' || e.key === 'F') goFullscreen(); };
+    let idle: ReturnType<typeof setTimeout>;
+    const onMove = () => {
+      setCursorHidden(false);
+      clearTimeout(idle);
+      idle = setTimeout(() => setCursorHidden(true), 3000);
+    };
+    document.addEventListener('keydown', onKey);
+    document.addEventListener('dblclick', goFullscreen);
+    document.addEventListener('mousemove', onMove);
+    onMove();
+
+    let lock: any = null;
+    const acquire = () => (navigator as any).wakeLock?.request('screen')
+      .then((l: any) => { lock = l; }).catch(() => {});
+    acquire();
+    const onVis = () => { if (document.visibilityState === 'visible') acquire(); };
+    document.addEventListener('visibilitychange', onVis);
+
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.removeEventListener('dblclick', goFullscreen);
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('visibilitychange', onVis);
+      clearTimeout(idle);
+      lock?.release?.().catch?.(() => {});
+    };
   }, []);
 
   /* Operator cues (real-time) */
@@ -94,13 +139,16 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
     return () => clearTimeout(t);
   }, [current?.id]);
 
+  /* Which bus this window shows: program (default) or the staged preview */
+  const bus: BusState = busMode === 'preview' ? (gfx.preview || {}) : gfx;
+
   const lower: Athlete | null = useMemo(() => {
-    if (!summary || !gfx.lowerId) return null;
-    return [...summary.home.athletes, ...summary.away.athletes].find(a => a.id === gfx.lowerId) || null;
-  }, [summary, gfx.lowerId]);
+    if (!summary || !bus.lowerId) return null;
+    return [...summary.home.athletes, ...summary.away.athletes].find(a => a.id === bus.lowerId) || null;
+  }, [summary, bus.lowerId]);
 
   /* Theme: official team colors by default, operator overrides at will */
-  const custom = gfx.theme && gfx.theme.useTeamColors === false;
+  const custom = !!(gfx.theme && gfx.theme.useTeamColors === false);
   const awayColor = custom && gfx.theme?.c1 ? gfx.theme.c1 : summary?.away.color || '#1f2937';
   const homeColor = custom && gfx.theme?.c2 ? gfx.theme.c2 : summary?.home.color || '#1f2937';
   const calloutColor = (c: Callout) => (custom ? awayColor : c.color) || '#7c3aed';
@@ -108,12 +156,13 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
   const brand = gfx.showBrand !== false && gfx.brand?.logo ? gfx.brand : null;
 
   return (
-    <div className="fixed inset-0 overflow-hidden font-sans" style={{ background: bg }}>
+    <div className="fixed inset-0 overflow-hidden font-sans"
+      style={{ background: bg, cursor: cursorHidden ? 'none' : 'default' }}>
       {summary && (
         <>
           {/* ── SCORE BUG ── */}
           <AnimatePresence>
-            {gfx.bug && (
+            {bus.bug && (
               <motion.div
                 initial={{ y: 90, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 90, opacity: 0 }}
                 transition={{ type: 'spring', stiffness: 260, damping: 26 }}
@@ -122,7 +171,7 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
 
                 {/* Callout pill above the bug */}
                 <AnimatePresence mode="popLayout">
-                  {current && (
+                  {busMode === 'program' && current && (
                     <motion.div key={current.id}
                       initial={{ y: 24, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: -14, opacity: 0 }}
                       transition={{ type: 'spring', stiffness: 300, damping: 24 }}
@@ -166,12 +215,12 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
 
           {/* ── CUSTOM BANNER ── */}
           <AnimatePresence>
-            {gfx.banner && (
-              <motion.div key={gfx.banner}
+            {bus.banner && (
+              <motion.div key={bus.banner}
                 initial={{ y: 60, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 60, opacity: 0 }}
                 transition={{ type: 'spring', stiffness: 240, damping: 26 }}
                 className="absolute bottom-8 left-1/2 -translate-x-1/2">
-                <img src={gfx.banner} className="max-h-28 max-w-[860px] object-contain rounded-xl shadow-2xl" alt="" />
+                <img src={bus.banner || undefined} className="max-h-28 max-w-[860px] object-contain rounded-xl shadow-2xl" alt="" />
               </motion.div>
             )}
           </AnimatePresence>
@@ -208,9 +257,9 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
 
           {/* ── FULL SCREENS ── */}
           <AnimatePresence>
-            {gfx.full && (
+            {bus.full && (
               <motion.div
-                key={gfx.full}
+                key={bus.full}
                 initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.96 }}
                 transition={{ duration: 0.25 }}
                 className="absolute inset-0 flex items-center justify-center">
@@ -225,7 +274,7 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
                     <div className="text-center">
                       <div className="text-sm font-bold text-yellow-400">{summary.state === 'in' ? `${periodLabel(summary.period)} · ${summary.clock}` : summary.statusDetail}</div>
                       <div className="text-[10px] uppercase tracking-widest text-zinc-400 mt-0.5">
-                        {gfx.full === 'teamstats' ? 'Team Stats' : gfx.full === 'lineups' ? 'Starting Lineups' : 'Top Performers'}
+                        {bus.full === 'teamstats' ? 'Team Stats' : bus.full === 'lineups' ? 'Starting Lineups' : 'Top Performers'}
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
@@ -235,9 +284,9 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
                     </div>
                   </div>
 
-                  {gfx.full === 'teamstats' && <TeamStats summary={summary} awayColor={awayColor} homeColor={homeColor} />}
-                  {gfx.full === 'lineups' && <Lineups summary={summary} awayColor={awayColor} homeColor={homeColor} />}
-                  {gfx.full === 'leaders' && <Leaders summary={summary} custom={custom} awayColor={awayColor} />}
+                  {bus.full === 'teamstats' && <TeamStats summary={summary} awayColor={awayColor} homeColor={homeColor} />}
+                  {bus.full === 'lineups' && <Lineups summary={summary} awayColor={awayColor} homeColor={homeColor} />}
+                  {bus.full === 'leaders' && <Leaders summary={summary} custom={custom} awayColor={awayColor} />}
 
                   <div className="px-8 py-2.5 bg-black/40 flex items-center justify-between">
                     <div className="flex items-center gap-2">

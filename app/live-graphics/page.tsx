@@ -44,6 +44,10 @@ function ControlInner() {
   const pushing = useRef(false);
   const company = useCompany();
 
+  /* Preview/Program: stage in PVW, put on air with TAKE (or CUT direct) */
+  const [mode, setMode] = useState<'preview' | 'direct'>('preview');
+  const [pvw, setPvw] = useState<GfxState>(GFX_OFF);
+
   /* Branding & presentation settings */
   const [showBrand, setShowBrand] = useState(true);
   const [autoCallouts, setAutoCallouts] = useState(true);
@@ -63,6 +67,7 @@ function ControlInner() {
     getDoc(doc(db, 'live_graphics', t)).then(snap => {
       if (!snap.exists()) return;
       const d = snap.data() as any;
+      if (d.preview) setPvw({ ...GFX_OFF, ...d.preview });
       if (Array.isArray(d.banners)) setBanners(d.banners);
       if (d.showBrand === false) setShowBrand(false);
       if (d.autoCallouts === false) setAutoCallouts(false);
@@ -106,41 +111,57 @@ function ControlInner() {
     return () => { alive = false; clearInterval(t); };
   }, [eventId]);
 
-  /* Push graphics state to the public output doc */
-  const push = async (next: GfxState, nextEventId = eventId, extra: Record<string, any> = {}) => {
-    setGfx(next);
+  /* Write to the public output doc (always carries branding/theme settings) */
+  const pushDoc = async (fields: Record<string, any>, nextEventId = eventId) => {
     const uid = auth.currentUser?.uid;
     if (!uid || !token) return;
     pushing.current = true;
     try {
       await setDoc(doc(db, 'live_graphics', token), {
-        uid, eventId: nextEventId, ...next,
+        uid, eventId: nextEventId,
         brand: { logo: company?.logo_url || '', name: company?.name || '' },
         showBrand, autoCallouts,
         theme: { useTeamColors, c1, c2 },
         banners,
         updatedAt: new Date().toISOString(),
-        ...extra,
+        ...fields,
       }, { merge: true });
     } catch (e) { console.error('gfx push failed', e); }
     finally { pushing.current = false; }
   };
 
+  /* The bus the buttons operate on: PVW when previewing, PGM when cutting direct */
+  const active = mode === 'preview' ? pvw : gfx;
+  const fire = (patch: Partial<GfxState>) => {
+    if (mode === 'preview') {
+      const next = { ...pvw, ...patch };
+      setPvw(next);
+      pushDoc({ preview: next });
+    } else {
+      const next = { ...gfx, ...patch };
+      setGfx(next);
+      pushDoc({ ...next });
+    }
+  };
+  const take = () => { setGfx(pvw); pushDoc({ ...pvw }); };
+  const clearPvw = () => { setPvw(GFX_OFF); pushDoc({ preview: GFX_OFF }); };
+  const clearProgram = () => { setGfx(GFX_OFF); pushDoc({ ...GFX_OFF }); };
+
   /* Re-push settings when branding/theme changes (only once a game is loaded) */
   useEffect(() => {
-    if (eventId && token) push(gfx);
+    if (eventId && token) pushDoc({});
   }, [showBrand, autoCallouts, useTeamColors, c1, c2, banners]);
 
   /* Fire a play callout for the on-air player (or top scorer) */
   const calloutTarget: Athlete | null = useMemo(() => {
     if (!summary) return null;
     const all = [...summary.home.athletes, ...summary.away.athletes];
-    return all.find(a => a.id === gfx.lowerId) || gameLeaders(summary, 1)[0] || null;
-  }, [summary, gfx.lowerId]);
+    return all.find(a => a.id === (active.lowerId || gfx.lowerId)) || gameLeaders(summary, 1)[0] || null;
+  }, [summary, active.lowerId, gfx.lowerId]);
 
   const fireCallout = (kind: Callout['kind']) => {
     if (!calloutTarget) return;
-    push(gfx, eventId, { callout: buildCallout(calloutTarget, kind) });
+    pushDoc({ callout: buildCallout(calloutTarget, kind) });
   };
 
   /* Banner upload to Storage */
@@ -160,7 +181,9 @@ function ControlInner() {
 
   const selectGame = (id: string) => {
     setEventId(id);
-    push(GFX_OFF, id);
+    setGfx(GFX_OFF);
+    setPvw(GFX_OFF);
+    pushDoc({ ...GFX_OFF, preview: GFX_OFF }, id);
   };
 
   const outputUrl = typeof window !== 'undefined' && token
@@ -201,8 +224,35 @@ function ControlInner() {
           </button>
           <a href={`${outputUrl}?bg=dark`} target="_blank" rel="noreferrer"
             className="flex items-center gap-1.5 border border-white/20 px-3 py-1.5 rounded-lg text-xs hover:bg-white/10">
-            <ExternalLink size={12} /> Preview
+            <ExternalLink size={12} /> Open output
           </a>
+          <div className="w-full text-[11px] text-gray-500">
+            HDMI / screen out: open the output on the external display and press <span className="text-gray-300 font-semibold">F</span> (or double-click) for a clean fullscreen feed — cursor auto-hides and the screen stays awake. For a bulletproof feed use Chrome kiosk mode instead of Safari.
+          </div>
+        </div>
+      )}
+
+      {/* ── PVW / PGM monitors + TAKE ── */}
+      {token && eventId && summary && (
+        <div className="mb-6 bg-zinc-950 rounded-2xl p-4 flex flex-wrap items-center justify-center gap-5">
+          <Monitor label="PREVIEW" color="text-yellow-400"
+            src={`/graphics-out/${token}?mode=preview&bg=dark`} />
+          <div className="flex flex-col items-center gap-2">
+            <button onClick={take}
+              className="w-24 py-4 rounded-2xl bg-red-600 hover:bg-red-500 text-white font-black text-lg tracking-widest shadow-lg">
+              TAKE
+            </button>
+            <button onClick={clearPvw}
+              className="w-24 py-1.5 rounded-lg border border-zinc-700 text-zinc-400 text-[10px] font-bold hover:bg-zinc-800">
+              CLEAR PVW
+            </button>
+            <button onClick={() => setMode(m => m === 'preview' ? 'direct' : 'preview')}
+              className={`w-24 py-1.5 rounded-lg text-[10px] font-bold ${mode === 'preview' ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-600/40' : 'bg-red-500/20 text-red-400 border border-red-600/40'}`}>
+              {mode === 'preview' ? 'PVW → TAKE' : 'CUT DIRECT'}
+            </button>
+          </div>
+          <Monitor label="PROGRAM" color="text-red-500"
+            src={`/graphics-out/${token}?bg=dark`} />
         </div>
       )}
 
@@ -276,29 +326,29 @@ function ControlInner() {
             {/* Graphics triggers */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-3">
               <h2 className="text-sm font-semibold text-gray-800">Fire graphics</h2>
-              <button onClick={() => push({ ...gfx, bug: !gfx.bug })}
-                className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-medium ${gfx.bug ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
-                Score Bug (auto clock + score) {gfx.bug ? <Eye size={15} /> : <EyeOff size={15} />}
+              <button onClick={() => fire({ bug: !active.bug })}
+                className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-medium ${active.bug ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
+                Score Bug (auto clock + score) {active.bug ? <Eye size={15} /> : <EyeOff size={15} />}
               </button>
               {([
                 ['teamstats', 'Team Stats — full screen'],
                 ['lineups', 'Starting Lineups — full screen'],
                 ['leaders', 'Top Performers / MVP — full screen'],
               ] as ['teamstats' | 'lineups' | 'leaders', string][]).map(([kind, label]) => (
-                <button key={kind} onClick={() => push({ ...gfx, full: gfx.full === kind ? null : kind })}
-                  className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-medium ${gfx.full === kind ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
-                  {label} {gfx.full === kind ? <Eye size={15} /> : <EyeOff size={15} />}
+                <button key={kind} onClick={() => fire({ full: active.full === kind ? null : kind })}
+                  className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-medium ${active.full === kind ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
+                  {label} {active.full === kind ? <Eye size={15} /> : <EyeOff size={15} />}
                 </button>
               ))}
-              {gfx.lowerId && (
-                <button onClick={() => push({ ...gfx, lowerId: null })}
+              {active.lowerId && (
+                <button onClick={() => fire({ lowerId: null })}
                   className="w-full px-4 py-2.5 rounded-xl text-sm font-medium bg-purple-600 text-white">
                   Hide player lower third
                 </button>
               )}
-              <button onClick={() => push(GFX_OFF)}
-                className="w-full px-4 py-2 rounded-xl text-xs text-gray-500 border border-gray-200 hover:bg-gray-50">
-                CLEAR ALL
+              <button onClick={clearProgram}
+                className="w-full px-4 py-2 rounded-xl text-xs text-red-500 border border-red-200 hover:bg-red-50">
+                CLEAR PROGRAM
               </button>
             </div>
 
@@ -379,15 +429,15 @@ function ControlInner() {
                 ) : (
                   <div className="space-y-1.5">
                     {banners.map(b => (
-                      <div key={b.id} className={`flex items-center gap-2 rounded-lg px-2 py-1.5 ${gfx.banner === b.url ? 'bg-green-50 border border-green-200' : 'bg-gray-50'}`}>
+                      <div key={b.id} className={`flex items-center gap-2 rounded-lg px-2 py-1.5 ${active.banner === b.url ? 'bg-green-50 border border-green-200' : 'bg-gray-50'}`}>
                         <img src={b.url} className="h-6 w-14 object-contain shrink-0" alt="" />
                         <span className="text-xs text-gray-600 truncate flex-1">{b.name}</span>
-                        <button onClick={() => push({ ...gfx, banner: gfx.banner === b.url ? null : b.url })}
-                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${gfx.banner === b.url ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`}>
-                          {gfx.banner === b.url ? 'ON AIR' : 'AIR'}
+                        <button onClick={() => fire({ banner: active.banner === b.url ? null : b.url })}
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${active.banner === b.url ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`}>
+                          {active.banner === b.url ? (mode === 'preview' ? 'IN PVW' : 'ON AIR') : (mode === 'preview' ? 'PVW' : 'AIR')}
                         </button>
                         <button onClick={() => {
-                          if (gfx.banner === b.url) push({ ...gfx, banner: null });
+                          if (gfx.banner === b.url || pvw.banner === b.url) fire({ banner: null });
                           setBanners(list => list.filter(x => x.id !== b.id));
                         }} className="text-gray-300 hover:text-red-500"><Trash2 size={12} /></button>
                       </div>
@@ -403,12 +453,12 @@ function ControlInner() {
                 <h2 className="text-sm font-semibold text-gray-800 mb-3">Top scorers — one-tap lower third</h2>
                 <div className="space-y-2">
                   {leaders.map(a => (
-                    <button key={a.id} onClick={() => push({ ...gfx, lowerId: gfx.lowerId === a.id ? null : a.id })}
-                      className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-left ${gfx.lowerId === a.id ? 'bg-purple-600 text-white' : 'bg-gray-50 hover:bg-gray-100'}`}>
+                    <button key={a.id} onClick={() => fire({ lowerId: active.lowerId === a.id ? null : a.id })}
+                      className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-left ${active.lowerId === a.id ? 'bg-purple-600 text-white' : 'bg-gray-50 hover:bg-gray-100'}`}>
                       {a.headshot && <img src={a.headshot} className="w-9 h-9 rounded-full object-cover bg-gray-200" alt="" />}
                       <div className="flex-1 min-w-0">
                         <div className="text-sm font-semibold truncate">{a.name}</div>
-                        <div className={`text-xs ${gfx.lowerId === a.id ? 'text-purple-200' : 'text-gray-500'}`}>{a.teamAbbr} · #{a.jersey}</div>
+                        <div className={`text-xs ${active.lowerId === a.id ? 'text-purple-200' : 'text-gray-500'}`}>{a.teamAbbr} · #{a.jersey}</div>
                       </div>
                       <div className="text-sm font-bold shrink-0">{a.stats.pts} PTS</div>
                     </button>
@@ -445,14 +495,14 @@ function ControlInner() {
                 </thead>
                 <tbody className="divide-y divide-gray-50">
                   {filteredAthletes.map(a => (
-                    <tr key={a.id} onClick={() => push({ ...gfx, lowerId: gfx.lowerId === a.id ? null : a.id })}
-                      className={`cursor-pointer ${gfx.lowerId === a.id ? 'bg-purple-50' : 'hover:bg-gray-50'}`}>
+                    <tr key={a.id} onClick={() => fire({ lowerId: active.lowerId === a.id ? null : a.id })}
+                      className={`cursor-pointer ${active.lowerId === a.id ? 'bg-purple-50' : 'hover:bg-gray-50'}`}>
                       <td className="px-3 py-1.5">
                         <div className="flex items-center gap-2">
                           {a.headshot ? <img src={a.headshot} className="w-7 h-7 rounded-full object-cover bg-gray-100" alt="" /> : <div className="w-7 h-7 rounded-full bg-gray-200" />}
                           <span className="font-medium text-gray-800">{a.name}</span>
                           {a.starter && <span className="text-[10px] text-gray-400">S</span>}
-                          {gfx.lowerId === a.id && <span className="text-[10px] font-bold text-purple-600">ON AIR</span>}
+                          {active.lowerId === a.id && <span className="text-[10px] font-bold text-purple-600">{mode === 'preview' ? 'IN PVW' : 'ON AIR'}</span>}
                         </div>
                       </td>
                       <td className="px-2 py-1.5 font-semibold" style={{ color: a.teamColor }}>{a.teamAbbr}</td>
@@ -471,6 +521,20 @@ function ControlInner() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/* Scaled 1920×1080 monitor of an output bus */
+function Monitor({ src, label, color }: { src: string; label: string; color: string }) {
+  return (
+    <div>
+      <div className={`text-[10px] font-black tracking-[0.2em] mb-1.5 ${color}`}>{label}</div>
+      <div className="relative w-[352px] h-[198px] overflow-hidden rounded-xl bg-black border border-zinc-800">
+        <iframe src={src} title={label}
+          className="absolute top-0 left-0 border-0 pointer-events-none"
+          style={{ width: 1920, height: 1080, transform: 'scale(0.18333)', transformOrigin: 'top left' }} />
+      </div>
     </div>
   );
 }
