@@ -8,7 +8,7 @@ import {
   Film, Users, Package, MapPin, FileText, ClipboardList,
   CheckSquare, Layers, BarChart3, Zap, Globe,
   ArrowRight, Star, ChevronRight,
-  ClipboardCheck, IdCard, BookImage, Loader2, CreditCard,
+  ClipboardCheck, IdCard, BookImage, Loader2, CreditCard, Mic,
 } from 'lucide-react';
 
 const FEATURES = [
@@ -24,6 +24,7 @@ const FEATURES = [
   { icon: ClipboardCheck, title: 'Equipment Forms',  desc: 'Digital check-out, return inspection, maintenance, and retirement forms with mobile finger signatures.',           color: 'bg-cyan-500/10 text-cyan-400' },
   { icon: BarChart3,     title: 'Gantt Chart',       desc: 'Visual timeline across your entire production schedule. See every task, dependency, and deadline at once.',        color: 'bg-emerald-500/10 text-emerald-400' },
   { icon: ClipboardList, title: 'Shoot Log',         desc: 'On-set take journal: scene, shot, lens, aperture, ISO, shutter speed, sound roll — all logged in real time.',     color: 'bg-violet-500/10 text-violet-400' },
+  { icon: Mic,           title: 'Audio Planner',     desc: 'Live-show input lists with recommended mics, gain structure, phantom power, RF frequency coordination, and monitor mixes. Paste a technical rider — get the patch list.', color: 'bg-rose-500/10 text-rose-400' },
 ];
 
 const PLANS = [
@@ -34,7 +35,7 @@ const PLANS = [
   },
   {
     name: 'Pro', price: '$29', period: '/month', planKey: 'pro',
-    features: ['Unlimited productions', 'Unlimited crew & inventory', 'All PDF documents', 'Storyboard + Blueprint', 'Equipment forms & ID cards', 'Priority support'],
+    features: ['Unlimited productions', 'Unlimited crew & inventory', 'All PDF documents', 'Audio planner (input list & RF)', 'Storyboard + Blueprint', 'Equipment forms & ID cards', 'Priority support'],
     cta: 'Subscribe — $29/mo', highlight: true, badge: 'Most Popular',
   },
   {

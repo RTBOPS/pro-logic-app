@@ -34,6 +34,7 @@ const PLANS = [
       'Unlimited productions',
       'Unlimited crew & inventory',
       'All PDF documents',
+      'Audio planner (input list, RF & monitors)',
       'Storyboard creator',
       'Location blueprints',
       'Equipment database access',

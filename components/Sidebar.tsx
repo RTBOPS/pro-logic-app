@@ -6,7 +6,7 @@ import {
   Film, Users, Package, MapPin, LayoutDashboard,
   BookImage, FileText, CreditCard, LogOut, User,
   Layout, Clapperboard, CheckSquare, CalendarDays,
-  Truck, Building2, IdCard, UserCheck, Layers, ClipboardCheck,
+  Truck, Building2, IdCard, UserCheck, Layers, ClipboardCheck, Mic,
 } from 'lucide-react';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
@@ -24,6 +24,8 @@ const nav = [
   { href: '/stripboard', label: 'Stripboard', icon: BookImage },
   { href: '/blueprint', label: 'Blueprint', icon: Layout },
   { href: '/shoot-log', label: 'Shoot Log', icon: Clapperboard },
+  { section: 'Audio' },
+  { href: '/audio', label: 'Audio Planner', icon: Mic },
   { section: 'Team' },
   { href: '/crew', label: 'Crew & Cast', icon: Users },
   { href: '/crew/id-cards', label: 'ID Cards', icon: IdCard },
@@ -113,7 +115,8 @@ export default function Sidebar() {
         })}
       </nav>
 
-      <div className="border-t border-zinc-700 px-4 py-3 space-y-1.5">
+      <div className="border-t border-zinc-700 px-4 pt-3 pb-12 space-y-1.5"
+        style={{ paddingBottom: 'calc(3rem + env(safe-area-inset-bottom))' }}>
         <Link href="/pricing" className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-zinc-800">
           <CreditCard size={13} className="text-zinc-300" />
           <span className="text-xs text-zinc-300">Plan</span>
