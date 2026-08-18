@@ -412,6 +412,7 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
               style={{
                 bottom: bus.bug && (gfx.theme?.bugPos || 'left') === 'center' ? '8.5rem' : '2rem',
                 animation: 'plg-rise 0.55s cubic-bezier(0.34, 1.3, 0.64, 1) both',
+                zIndex: 5,
               }}>
               <div className="flex items-stretch rounded-xl overflow-hidden shadow-2xl text-white">
                 <div className="px-4 flex items-center text-[10px] font-black uppercase tracking-[0.2em] text-black whitespace-nowrap"
@@ -430,10 +431,18 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
             </div>
           )}
 
-          {/* ── SPECIAL MENTION / VIP (text ribbon, unified style) ── */}
-          {bus.mention && gfx.mentionCfg?.name && (
-            <div className="absolute right-8 bottom-28"
-              style={{ animation: 'plg-slide-r 0.55s cubic-bezier(0.34, 1.3, 0.64, 1) both' }}>
+          {/* ── SPECIAL MENTION / VIP (text ribbon, centered above the stack) ── */}
+          {bus.mention && gfx.mentionCfg?.name && (() => {
+            const bugCentered = bus.bug && (gfx.theme?.bugPos || 'left') === 'center';
+            const base = bugCentered ? 8.5 : 2;
+            const talentOn = bus.talent && (gfx.talentCfg?.list || []).length > 0;
+            return (
+            <div className="absolute left-1/2 -translate-x-1/2"
+              style={{
+                bottom: `${talentOn ? base + 4.6 : base}rem`,
+                animation: 'plg-rise 0.55s cubic-bezier(0.34, 1.3, 0.64, 1) both',
+                zIndex: 5,
+              }}>
               <div className="flex items-stretch rounded-xl overflow-hidden shadow-2xl text-white">
                 <div className="px-4 flex items-center text-[10px] font-black uppercase tracking-[0.2em] text-black whitespace-nowrap"
                   style={{ background: 'linear-gradient(135deg, #fbbf24, #f59e0b)' }}>
@@ -452,7 +461,8 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
                 )}
               </div>
             </div>
-          )}
+            );
+          })()}
 
           {/* ── FULL SCREENS (pure CSS) ── */}
           {bus.full && (

@@ -57,6 +57,9 @@ function ControlInner() {
   const [source, setSource] = useState<'feed' | 'manual'>('feed');
   const [league, setLeague] = useState('nba');
   const [manual, setManual] = useState<ManualGame>(emptyManualGame());
+  const [clockMM, setClockMM] = useState('10');
+  const [clockSS, setClockSS] = useState('00');
+  const [lenStr, setLenStr] = useState('10');
   const manualTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   /* Branding & presentation settings */
@@ -103,7 +106,13 @@ function ControlInner() {
       if (d.preview) setPvw({ ...GFX_OFF, ...d.preview });
       if (d.sourceMode === 'manual') setSource('manual');
       if (d.league) setLeague(d.league);
-      if (d.manual) setManual({ ...emptyManualGame(), ...d.manual });
+      if (d.manual) {
+        const m = { ...emptyManualGame(), ...d.manual };
+        setManual(m);
+        setLenStr(String(m.periodMin || 10));
+        setClockMM(String(Math.floor((m.clockSec || 600) / 60)));
+        setClockSS(String(Math.floor((m.clockSec || 600) % 60)).padStart(2, '0'));
+      }
       if (d.eventId && d.sourceMode !== 'manual') setEventId(d.eventId);
       if (Array.isArray(d.banners)) setBanners(d.banners);
       if (d.showBrand === false) setShowBrand(false);
@@ -330,9 +339,17 @@ function ControlInner() {
     pushManual({ ...manual, clockRunning: true, clockSec: clockRemaining, clockUpdatedAt: new Date().toISOString() }, true);
   const mClockPause = () =>
     pushManual({ ...manual, clockRunning: false, clockSec: clockRemaining, clockUpdatedAt: new Date().toISOString() }, true);
-  const mClockSet = (mmss: string) => {
-    const [mm, ss] = mmss.split(':').map(n => parseInt(n, 10) || 0);
-    pushManual({ ...manual, clockRunning: false, clockSec: mm * 60 + (ss || 0), clockUpdatedAt: new Date().toISOString() }, true);
+  const mClockSet = () => {
+    const mm = parseInt(clockMM, 10) || 0;
+    const ss = Math.min(59, parseInt(clockSS, 10) || 0);
+    pushManual({ ...manual, clockRunning: false, clockSec: mm * 60 + ss, clockUpdatedAt: new Date().toISOString() }, true);
+  };
+  const mClockNudge = (delta: number) =>
+    pushManual({ ...manual, clockSec: Math.max(0, clockRemaining + delta), clockUpdatedAt: new Date().toISOString() }, true);
+  const mSetLength = () => {
+    const v = Math.min(30, Math.max(1, parseInt(lenStr, 10) || 10));
+    setLenStr(String(v));
+    pushManual({ ...manual, periodMin: v }, true);
   };
   const mPeriod = (delta: number) =>
     pushManual({ ...manual, period: Math.max(1, manual.period + delta) }, true);
@@ -501,10 +518,23 @@ function ControlInner() {
                 className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold ${manual.clockRunning ? 'bg-yellow-500 text-black' : 'bg-green-600 text-white'}`}>
                 {manual.clockRunning ? <><Pause size={15} /> Pause</> : <><Play size={15} /> Start</>}
               </button>
-              <input placeholder="10:00" defaultValue={fmtClockSec(manual.clockSec)}
-                onKeyDown={e => { if (e.key === 'Enter') mClockSet((e.target as HTMLInputElement).value); }}
-                className="w-20 bg-white/10 border border-white/20 rounded-lg px-2 py-2 text-sm font-mono text-center"
-                title="Type mm:ss and press Enter" />
+              <div className="flex items-center gap-1">
+                <input value={clockMM} onChange={e => setClockMM(e.target.value.replace(/\D/g, '').slice(0, 2))}
+                  inputMode="numeric" className="w-12 bg-white/10 border border-white/20 rounded-lg px-1 py-2 text-sm font-mono text-center" />
+                <span className="font-mono text-lg">:</span>
+                <input value={clockSS} onChange={e => setClockSS(e.target.value.replace(/\D/g, '').slice(0, 2))}
+                  inputMode="numeric" className="w-12 bg-white/10 border border-white/20 rounded-lg px-1 py-2 text-sm font-mono text-center" />
+                <button onClick={mClockSet}
+                  className="px-3 py-2 rounded-lg bg-white text-black text-xs font-black hover:bg-gray-200">SET</button>
+              </div>
+              <div className="flex items-center gap-1">
+                {[-10, -1, 1, 10].map(d => (
+                  <button key={d} onClick={() => mClockNudge(d)}
+                    className="px-2 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-[11px] font-bold">
+                    {d > 0 ? `+${d}` : d}s
+                  </button>
+                ))}
+              </div>
               <div className="flex items-center gap-2">
                 <button onClick={() => mPeriod(-1)} className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 font-bold">−</button>
                 <div className="text-center min-w-[44px]">
@@ -515,8 +545,10 @@ function ControlInner() {
               </div>
               <label className="flex items-center gap-1.5 text-xs text-gray-400">
                 Length
-                <input type="number" min={1} max={20} value={manual.periodMin}
-                  onChange={e => pushManual({ ...manual, periodMin: parseInt(e.target.value) || 10 }, true)}
+                <input value={lenStr} inputMode="numeric"
+                  onChange={e => setLenStr(e.target.value.replace(/\D/g, '').slice(0, 2))}
+                  onBlur={mSetLength}
+                  onKeyDown={e => { if (e.key === 'Enter') mSetLength(); }}
                   className="w-12 bg-white/10 border border-white/20 rounded-lg px-1.5 py-1 text-center" /> min
               </label>
               <button onClick={() => pushManual({ ...manual, period: manual.period + 1, clockRunning: false, clockSec: (manual.periodMin || 10) * 60, clockUpdatedAt: new Date().toISOString() }, true)}
