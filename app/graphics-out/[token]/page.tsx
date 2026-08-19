@@ -10,7 +10,7 @@ import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import PlayerPhoto from '@/components/PlayerPhoto';
 import {
-  normalizeSummary, gameLeaders, comparedTeamStats, periodLabel, detectCallouts,
+  normalizeSummary, gameLeaders, comparedTeamStats, periodLabel,
   manualToSummary, topFive, applyPhotoOverrides, DEFAULT_PORTAL_VIDEO, DEFAULT_PORTAL_VIDEO_HEVC, type ManualGame,
   type Summary, type Athlete, type Callout,
 } from '@/lib/nba';
@@ -58,7 +58,6 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
   const [summary, setSummary] = useState<Summary | null>(null);
   const [bg, setBg] = useState('transparent');
   const [queue, setQueue] = useState<Callout[]>([]);
-  const prevSummary = useRef<Summary | null>(null);
   const lastManual = useRef<string>('');
 
   const [busMode, setBusMode] = useState<'program' | 'preview'>('program');
@@ -136,23 +135,15 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
      running clock ticks locally between doc updates. */
   useEffect(() => {
     if (gfx.sourceMode === 'manual') {
-      if (!gfx.manual) { setSummary(null); prevSummary.current = null; return; }
-      const tick = () => {
-        const next = manualToSummary(gfx.manual!);
-        if (gfx.autoCallouts !== false) {
-          const events = detectCallouts(prevSummary.current, next);
-          if (events.length) setQueue(q => [...q, ...events].slice(-6));
-        }
-        prevSummary.current = next;
-        setSummary(next);
-      };
+      if (!gfx.manual) { setSummary(null); return; }
+      const tick = () => setSummary(manualToSummary(gfx.manual!));
       tick();
       const t = setInterval(tick, 500);
       return () => clearInterval(t);
     }
 
     const eventId = gfx.eventId;
-    if (!eventId) { setSummary(null); prevSummary.current = null; return; }
+    if (!eventId) { setSummary(null); return; }
     let alive = true;
     const league = gfx.league || 'nba';
     const load = async () => {
@@ -161,14 +152,7 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
         const json = await res.json();
         if (!alive) return;
         const next = applyPhotoOverrides(normalizeSummary(json), gfx.photoOverrides);
-        if (next) {
-          if (gfx.autoCallouts !== false && next.state === 'in') {
-            const events = detectCallouts(prevSummary.current, next);
-            if (events.length) setQueue(q => [...q, ...events].slice(-6));
-          }
-          prevSummary.current = next;
-          setSummary(next);
-        }
+        if (next) setSummary(next);
       } catch { /* keep last */ }
     };
     load();

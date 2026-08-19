@@ -14,7 +14,7 @@ import {
   Palette, HelpCircle, Flame, Mic, Star, Calendar, ClipboardList,
 } from 'lucide-react';
 import {
-  normalizeScoreboard, normalizeSummary, normalizeTeams, gameLeaders, periodLabel, buildCallout,
+  normalizeScoreboard, normalizeSummary, normalizeTeams, gameLeaders, periodLabel, buildCallout, detectCallouts,
   LEAGUES, emptyManualGame, manualToSummary, manualClockRemaining, fmtClockSec,
   type Game, type Summary, type Athlete, type Callout, type ManualGame, type ManualPlayer, type LeagueTeam,
 } from '@/lib/nba';
@@ -110,6 +110,20 @@ function ControlInner() {
   const [coachCfg, setCoachCfg] = useState({ away: '', home: '' });
   const [subIn, setSubIn] = useState('');
   const [calloutWho, setCalloutWho] = useState('auto');   // auto | generic | athleteId
+  const [suggestions, setSuggestions] = useState<(Callout & { ts: number })[]>([]);
+  const prevSumRef = useRef<Summary | null>(null);
+  const suggest = (s: Summary | null) => {
+    if (!s) return;
+    if (autoCallouts && s.state === 'in') {
+      const evts = detectCallouts(prevSumRef.current, s);
+      if (evts.length) setSuggestions(prev => [...evts.map(e => ({ ...e, ts: Date.now() })), ...prev].slice(0, 6));
+    }
+    prevSumRef.current = s;
+  };
+  useEffect(() => {
+    const t = setInterval(() => setSuggestions(prev => prev.filter(x => Date.now() - x.ts < 45000)), 5000);
+    return () => clearInterval(t);
+  }, []);
   const [subOut, setSubOut] = useState('');
   const [banners, setBanners] = useState<BannerItem[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -182,7 +196,11 @@ function ControlInner() {
   /* Summary: feed → poll (5 s); manual → rebuild locally (500 ms clock tick) */
   useEffect(() => {
     if (source === 'manual') {
-      const tick = () => setSummary(manualToSummary(manual));
+      const tick = () => {
+        const s = manualToSummary(manual);
+        suggest(s);
+        setSummary(s);
+      };
       tick();
       const t = setInterval(tick, 500);
       return () => clearInterval(t);
@@ -193,7 +211,11 @@ function ControlInner() {
       try {
         const res = await fetch(`/api/nba/summary?event=${eventId}&league=${league}`);
         const json = await res.json();
-        if (alive) setSummary(normalizeSummary(json));
+        if (alive) {
+          const s = normalizeSummary(json);
+          suggest(s);
+          setSummary(s);
+        }
       } catch { /* keep last */ }
     };
     load();
@@ -859,12 +881,29 @@ function ControlInner() {
                 <h2 className="text-sm font-semibold text-gray-800">Play callouts</h2>
                 <button onClick={() => setAutoCallouts(v => !v)}
                   className={`text-xs px-2.5 py-1 rounded-full font-medium ${autoCallouts ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-                  <Zap size={10} className="inline mr-1" />Auto {autoCallouts ? 'ON' : 'OFF'}
+                  <Zap size={10} className="inline mr-1" />Detect {autoCallouts ? 'ON' : 'OFF'}
                 </button>
               </div>
               <p className="text-xs text-gray-400">
-                Auto detects threes, buckets, assists and double-doubles from the live feed.
+                Detected plays appear below as suggestions — nothing airs until you tap it.
               </p>
+              {suggestions.length > 0 && (
+                <div className="space-y-1.5">
+                  {suggestions.map(sg => (
+                    <div key={sg.id} className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => { pushDoc({ callout: { ...sg, id: Math.random().toString(36).slice(2, 10) } }); setSuggestions(prev => prev.filter(x => x.id !== sg.id)); }}
+                        className="flex-1 flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-amber-50 border border-amber-200 hover:bg-amber-100 text-left">
+                        <span className="text-[10px] font-black px-1.5 py-0.5 rounded" style={{ background: sg.color || '#f59e0b', color: '#fff' }}>{sg.title}</span>
+                        <span className="text-xs text-gray-700 truncate">{sg.sub || ''}</span>
+                        <span className="ml-auto text-[10px] font-black text-amber-600">AIR ▸</span>
+                      </button>
+                      <button onClick={() => setSuggestions(prev => prev.filter(x => x.id !== sg.id))}
+                        className="text-gray-300 hover:text-red-500 text-sm px-1">✕</button>
+                    </div>
+                  ))}
+                </div>
+              )}
               <div className="flex items-center gap-2">
                 <span className="text-[10px] text-gray-400 uppercase tracking-wide shrink-0">Manual target</span>
                 <select value={calloutWho} onChange={e => setCalloutWho(e.target.value)}
