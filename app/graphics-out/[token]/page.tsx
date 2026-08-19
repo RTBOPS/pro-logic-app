@@ -333,7 +333,7 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
       {summary && (
         <>
           {/* ── SCORE BUG (pure CSS — rAF-proof) ── */}
-          {bus.bug && (() => {
+          {bus.bug && !bus.full && (() => {
             const pos = gfx.theme?.bugPos || 'left';
             const bugStyle = gfx.theme?.bugStyle || 'classic';
             const posCls = pos === 'center' ? 'left-1/2 -translate-x-1/2 items-center'
@@ -415,10 +415,8 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
                     </div>
                     {badges.length > 0 && (
                       <div className="plg-panel border-t border-white/15 flex items-center justify-center py-1">
-                        {/* White chip so dark sponsor logos stay readable on dark skins */}
-                        <div className="bg-white rounded-md px-2.5 flex items-center">
-                          <BadgeRoll logos={badges} scale={brandScale * 0.75} secs={badgeSecs} />
-                        </div>
+                        {/* Broadcast-style sponsor strip: every logo as a white silhouette */}
+                        <BadgeRoll logos={badges} scale={brandScale * 0.75} secs={badgeSecs} mono />
                       </div>
                     )}
                   </div>
@@ -981,12 +979,13 @@ function Logo3D({ src: url, size }: { src: string; size: number }) {
 
 /* Rotating badge chip: rolls UP through company logo, league logo and any
    extra badges — pure CSS keyframes (generated per list), seamless loop. */
-function BadgeRoll({ logos, scale, secs = 4.5 }: { logos: string[]; scale: number; secs?: number }) {
+function BadgeRoll({ logos, scale, secs = 4.5, mono = false }: { logos: string[]; scale: number; secs?: number; mono?: boolean }) {
+  const monoStyle = mono ? { filter: 'brightness(0) invert(1)' } : undefined;
   const itemH = Math.round(34 * scale);
   const w = Math.round(78 * scale);
   if (logos.length === 0) return null;
   if (logos.length === 1) {
-    return <img src={logos[0]} className="object-contain" style={{ width: w, height: itemH - 4 }} alt="" />;
+    return <img src={logos[0]} className="object-contain" style={{ width: w, height: itemH - 4, ...monoStyle }} alt="" />;
   }
   const N = logos.length;
   const name = `plgroll${N}x${itemH}`;
@@ -1002,7 +1001,7 @@ function BadgeRoll({ logos, scale, secs = 4.5 }: { logos: string[]; scale: numbe
       <div style={{ animation: `${name} ${N * secs}s cubic-bezier(0.5, 0, 0.2, 1) infinite` }}>
         {[...logos, logos[0]].map((l, i) => (
           <div key={i} style={{ height: itemH, width: w }} className="flex items-center justify-center">
-            <img src={l} className="object-contain" style={{ width: w - 4, height: itemH - 4 }} alt="" />
+            <img src={l} className="object-contain" style={{ width: w - 4, height: itemH - 4, ...monoStyle }} alt="" />
           </div>
         ))}
       </div>
