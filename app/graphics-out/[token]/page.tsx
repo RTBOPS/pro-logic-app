@@ -748,6 +748,9 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
                     <Score value={summary.away.score} />
                   </div>
                   <div className="text-center">
+                    {gfx.leagueBadge && (
+                      <img src={gfx.leagueBadge} className="h-7 mx-auto mb-1 object-contain" alt="" />
+                    )}
                     <div className="text-sm font-bold text-yellow-400">{summary.state === 'in' ? `${periodLabel(summary.period)} · ${summary.clock}` : summary.statusDetail}</div>
                     <div className="text-[10px] uppercase tracking-widest text-zinc-400 mt-0.5">
                       {bus.full === 'teamstats' ? 'Team Stats' : bus.full === 'lineups' ? 'Starting Lineups' : bus.full === 'matchup' ? 'Matchup — Top 5' : bus.full === 'trivia' ? 'Trivia' : bus.full === 'nextgame' ? 'Up Next' : 'Top Performers'}
@@ -820,8 +823,8 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
                     {brand?.name && <span className="text-[10px] font-semibold text-zinc-400">{brand.name}</span>}
                   </div>
                   <div className="flex items-center gap-2">
-                    {gfx.leagueBadge && <img src={gfx.leagueBadge} className="h-5 object-contain" alt="" />}
-                    <span className="text-[10px] uppercase tracking-widest text-zinc-500">PRO-LOGIC Studio · Live Graphics</span>
+                    <img src="/logo-white.svg" className="h-4 object-contain opacity-70" alt="" />
+                    <span className="text-[10px] uppercase tracking-widest text-zinc-500">Live Graphics</span>
                   </div>
                 </div>
               </div>
