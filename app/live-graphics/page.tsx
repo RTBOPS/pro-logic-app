@@ -11,6 +11,7 @@ import { UpgradeGate } from '@/components/UpgradeGate';
 import {
   MonitorPlay, Copy, ExternalLink, Loader2, RefreshCw, Eye, EyeOff, Search,
   Upload, Trash2, Zap, Plus, Play, Pause,
+  Palette, HelpCircle, Flame, Mic, Star, Calendar, ClipboardList,
 } from 'lucide-react';
 import {
   normalizeScoreboard, normalizeSummary, gameLeaders, periodLabel, buildCallout,
@@ -707,14 +708,14 @@ function ControlInner() {
                 <div className="flex items-center gap-2">
                   {summary.away.logo && <img src={summary.away.logo} className="w-8 h-8" alt="" />}
                   <span className="font-bold text-lg">{summary.away.abbr}</span>
-                  <span className="font-black text-2xl">{summary.away.score}</span>
+                  <span className="font-black text-xl md:text-2xl">{summary.away.score}</span>
                 </div>
                 <div className="text-center">
                   <div className="text-yellow-400 font-mono font-bold">{summary.state === 'in' ? `${periodLabel(summary.period)} ${summary.clock}` : ''}</div>
                   <div className="text-xs text-gray-400">{summary.statusDetail}</div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="font-black text-2xl">{summary.home.score}</span>
+                  <span className="font-black text-xl md:text-2xl">{summary.home.score}</span>
                   <span className="font-bold text-lg">{summary.home.abbr}</span>
                   {summary.home.logo && <img src={summary.home.logo} className="w-8 h-8" alt="" />}
                 </div>
@@ -726,7 +727,7 @@ function ControlInner() {
               <h2 className="text-sm font-semibold text-gray-800">Fire graphics</h2>
               <button onClick={() => fire({ bug: !active.bug })}
                 className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-medium ${active.bug ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
-                Score Bug (auto clock + score) {active.bug ? <Eye size={15} /> : <EyeOff size={15} />}
+                Score Bug {active.bug ? <Eye size={15} /> : <EyeOff size={15} />}
               </button>
               <div className="flex items-center gap-1.5">
                 <span className="text-[10px] text-gray-400 uppercase tracking-wide">League badge</span>
@@ -750,10 +751,10 @@ function ControlInner() {
                 </div>
               </div>
               {([
-                ['teamstats', 'Team Stats — full screen'],
-                ['lineups', 'Starting Lineups — full screen'],
-                ['leaders', 'Top Performers / MVP — full screen'],
-                ['matchup', 'Matchup Top 5 vs Top 5 — full screen'],
+                ['teamstats', 'Team Stats'],
+                ['lineups', 'Lineups'],
+                ['leaders', 'Top Performers'],
+                ['matchup', 'Matchup Top 5'],
               ] as ['teamstats' | 'lineups' | 'leaders' | 'matchup', string][]).map(([kind, label]) => (
                 <button key={kind} onClick={() => fire({ full: active.full === kind ? null : kind })}
                   className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-medium ${active.full === kind ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
@@ -763,18 +764,18 @@ function ControlInner() {
               {active.ftId && (
                 <button onClick={() => fire({ ftId: null })}
                   className="w-full px-4 py-2.5 rounded-xl text-sm font-medium bg-amber-500 text-white">
-                  Hide Free Throw spotlight
+                  Hide Free Throw
                 </button>
               )}
               {active.lowerId && (
                 <button onClick={() => fire({ lowerId: null })}
                   className="w-full px-4 py-2.5 rounded-xl text-sm font-medium bg-purple-600 text-white">
-                  Hide player lower third
+                  Hide Lower Third
                 </button>
               )}
               <div className="border-t border-gray-100 pt-3 space-y-2">
                 <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Substitution</span>
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 flex-wrap">
                   <select value={subIn} onChange={e => setSubIn(e.target.value)}
                     className="flex-1 border border-green-200 bg-green-50 rounded-lg px-1.5 py-1.5 text-xs">
                     <option value="">▲ IN…</option>
@@ -933,20 +934,20 @@ function ControlInner() {
       )}
 
       {/* ── Pre-game setup dock ── */}
-      <div className="fixed bottom-0 left-0 right-0 z-40 bg-zinc-950/95 backdrop-blur border-t border-zinc-800">
+      <div className="fixed bottom-0 left-0 md:left-16 right-0 z-40 bg-zinc-950/95 backdrop-blur border-t border-zinc-800">
         <div className="max-w-3xl mx-auto flex items-center justify-center gap-1.5 px-3 py-2.5 overflow-x-auto">
           {([
-            ['branding', '🎨', 'Branding'],
-            ['trivia', '❓', 'Trivia'],
-            ['portal', '🔥', 'Hoop Portal'],
-            ['team', '🎙', 'Broadcast Team'],
-            ['mention', '⭐', 'Special Mention'],
-            ['nextgame', '📅', 'Next Game'],
-            ['coaches', '📋', 'Coaches'],
-          ] as [typeof dock, string, string][]).map(([id, icon, label]) => (
-            <button key={id as string} onClick={() => setDock(d => d === id ? null : id)}
+            ['branding', Palette, 'Branding'],
+            ['trivia', HelpCircle, 'Trivia'],
+            ['portal', Flame, 'Portal'],
+            ['team', Mic, 'Team'],
+            ['mention', Star, 'Mention'],
+            ['nextgame', Calendar, 'Next Game'],
+            ['coaches', ClipboardList, 'Coaches'],
+          ] as [typeof dock, any, string][]).map(([id, Icon, label]) => (
+            <button key={id as string} onClick={() => setDock(d => d === id ? null : id)} title={label}
               className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold whitespace-nowrap ${dock === id ? 'bg-white text-black' : 'text-zinc-300 hover:bg-zinc-800'}`}>
-              <span>{icon}</span> {label}
+              <Icon size={15} /> <span className="hidden sm:inline">{label}</span>
             </button>
           ))}
         </div>

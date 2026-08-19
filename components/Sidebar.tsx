@@ -1,13 +1,14 @@
 'use client';
 
 import Link from 'next/link';
+import { useState, useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   Film, Users, Package, MapPin, LayoutDashboard,
   BookImage, FileText, CreditCard, LogOut, User,
   Layout, Clapperboard, CheckSquare, CalendarDays,
   Truck, Building2, IdCard, UserCheck, Layers, ClipboardCheck, Mic,
-  ListOrdered, Shield, Tv, MonitorPlay,
+  ListOrdered, Shield, Tv, MonitorPlay, ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
@@ -53,8 +54,20 @@ const PLAN_BADGE: Record<string, string> = {
   studio: 'bg-purple-600 text-white',
 };
 
-export default function Sidebar() {
+export default function Sidebar({ forceExpanded = false }: { forceExpanded?: boolean }) {
   const path = usePathname();
+  const [collapsedPref, setCollapsedPref] = useState(false);
+  useEffect(() => {
+    // Auto-shrink on the CG page (it needs the room); otherwise honor the saved preference
+    if (path.startsWith('/live-graphics')) setCollapsedPref(true);
+    else setCollapsedPref(localStorage.getItem('plg_sidebar_collapsed') === '1');
+  }, [path]);
+  const collapsed = forceExpanded ? false : collapsedPref;
+  const toggle = () => {
+    const next = !collapsedPref;
+    setCollapsedPref(next);
+    localStorage.setItem('plg_sidebar_collapsed', next ? '1' : '0');
+  };
   const router = useRouter();
   const { profile } = useAuth();
   const company = useCompany();
@@ -66,14 +79,18 @@ export default function Sidebar() {
   };
 
   return (
-    <aside className="w-64 md:w-52 h-screen text-white flex flex-col shrink-0 overflow-y-auto"
+    <aside className={`${collapsed ? 'w-16' : 'w-64 md:w-52'} h-screen text-white flex flex-col shrink-0 overflow-y-auto transition-all`}
       style={{ backgroundColor: company?.primary_color || '#18181b' }}>
-      <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between gap-2">
-        {/* Pro-Logic logo — always left */}
-        <img src="/logo-white.svg" alt="Pro-Logic" style={{ height: '28px', objectFit: 'contain', maxWidth: '90px' }} />
-        {/* Company logo — right side */}
-        {company?.logo_url && (
-          <img src={company.logo_url} alt={company.name} style={{ height: '28px', objectFit: 'contain', maxWidth: '80px', borderRadius: '4px' }} />
+      <div className={`px-3 py-3 border-b border-white/10 flex items-center gap-2 ${collapsed ? 'justify-center' : 'justify-between'}`}>
+        {!collapsed && <img src="/logo-white.svg" alt="Pro-Logic" style={{ height: '28px', objectFit: 'contain', maxWidth: '90px' }} />}
+        {!collapsed && company?.logo_url && (
+          <img src={company.logo_url} alt={company.name} style={{ height: '28px', objectFit: 'contain', maxWidth: '64px', borderRadius: '4px' }} />
+        )}
+        {!forceExpanded && (
+          <button onClick={toggle} title={collapsed ? 'Expand menu' : 'Collapse menu'}
+            className="text-zinc-400 hover:text-white shrink-0 p-1 rounded hover:bg-white/10">
+            {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+          </button>
         )}
       </div>
 
@@ -100,6 +117,7 @@ export default function Sidebar() {
       <nav className="flex-1 py-2">
         {nav.map((item, i) => {
           if ('section' in item) {
+            if (collapsed) return <div key={i} className="mx-3 my-2 border-t border-white/10" />;
             return (
               <div key={i} className="px-4 pt-4 pb-1">
                 <span className="text-xs font-semibold text-zinc-500 uppercase tracking-widest">{item.section}</span>
@@ -109,37 +127,37 @@ export default function Sidebar() {
           const { href, label, icon: Icon } = item as any;
           const active = href === '/' ? path === '/' : path.startsWith(href);
           return (
-            <Link key={href} href={href}
-              className={`flex items-center gap-2.5 px-4 py-2 text-sm transition-colors ${
+            <Link key={href} href={href} title={label}
+              className={`flex items-center gap-2.5 py-2 text-sm transition-colors ${collapsed ? 'justify-center px-0' : 'px-4'} ${
                 active ? 'bg-zinc-700 text-white font-medium' : 'text-zinc-300 hover:text-white hover:bg-zinc-800'
               }`}>
-              <Icon size={15} />
-              {label}
+              <Icon size={collapsed ? 17 : 15} />
+              {!collapsed && label}
             </Link>
           );
         })}
       </nav>
 
-      <div className="border-t border-zinc-700 px-4 pt-3 pb-12 space-y-1.5"
+      <div className={`border-t border-zinc-700 pt-3 pb-12 space-y-1.5 ${collapsed ? 'px-2' : 'px-4'}`}
         style={{ paddingBottom: 'calc(3rem + env(safe-area-inset-bottom))' }}>
-        <Link href="/pricing" className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-zinc-800">
+        <Link href="/pricing" title="Plan" className={`flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-zinc-800 ${collapsed ? 'justify-center' : ''}`}>
           <CreditCard size={13} className="text-zinc-300" />
-          <span className="text-xs text-zinc-300">Plan</span>
-          {profile?.plan && (
+          {!collapsed && <span className="text-xs text-zinc-300">Plan</span>}
+          {!collapsed && profile?.plan && (
             <span className={`ml-auto text-xs px-2 py-0.5 rounded-full font-medium capitalize ${PLAN_BADGE[profile.plan]}`}>
               {profile.plan}
             </span>
           )}
         </Link>
-        {profile && (
+        {profile && !collapsed && (
           <div className="flex items-center gap-2 px-2 py-1">
             <User size={13} className="text-zinc-300 shrink-0" />
             <span className="text-xs text-zinc-300 truncate">{profile.displayName}</span>
           </div>
         )}
-        <button onClick={handleLogout} className="flex items-center gap-2 px-2 py-1.5 w-full rounded-lg hover:bg-zinc-800 text-left">
+        <button onClick={handleLogout} title="Sign out" className={`flex items-center gap-2 px-2 py-1.5 w-full rounded-lg hover:bg-zinc-800 text-left ${collapsed ? 'justify-center' : ''}`}>
           <LogOut size={13} className="text-zinc-300" />
-          <span className="text-xs text-zinc-300">Sign out</span>
+          {!collapsed && <span className="text-xs text-zinc-300">Sign out</span>}
         </button>
       </div>
     </aside>
