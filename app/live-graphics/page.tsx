@@ -14,7 +14,7 @@ import {
   Palette, HelpCircle, Flame, Mic, Star, Calendar, ClipboardList,
 } from 'lucide-react';
 import {
-  normalizeScoreboard, normalizeSummary, normalizeTeams, gameLeaders, periodLabel, buildCallout, detectCallouts,
+  normalizeScoreboard, normalizeSummary, normalizeTeams, gameLeaders, periodLabel, buildCallout, detectCallouts, advanceManualPeriod,
   LEAGUES, emptyManualGame, manualToSummary, manualClockRemaining, fmtClockSec,
   type Game, type Summary, type Athlete, type Callout, type ManualGame, type ManualPlayer, type LeagueTeam,
 } from '@/lib/nba';
@@ -27,7 +27,7 @@ interface BannerItem { id: string; url: string; name: string }
 interface GfxState {
   bug: boolean;
   lowerId: string | null;
-  full: 'teamstats' | 'lineups' | 'leaders' | 'matchup' | 'trivia' | 'nextgame' | null;
+  full: 'teamstats' | 'lineups' | 'leaders' | 'matchup' | 'linescore' | 'trivia' | 'nextgame' | null;
   banner: string | null;
   portal: boolean;
   talent: boolean;
@@ -480,7 +480,7 @@ function ControlInner() {
     pushManual({ ...manual, periodMin: v }, true);
   };
   const mPeriod = (delta: number) =>
-    pushManual({ ...manual, period: Math.max(1, manual.period + delta) }, true);
+    pushManual(advanceManualPeriod(manual, Math.max(1, manual.period + delta)), true);
 
   /* Team logo upload (Storage) */
   const uploadTeamLogo = async (side: 'home' | 'away', e: React.ChangeEvent<HTMLInputElement>) => {
@@ -692,7 +692,7 @@ function ControlInner() {
                   onKeyDown={e => { if (e.key === 'Enter') mSetLength(); }}
                   className="w-12 bg-white/10 border border-white/20 rounded-lg px-1.5 py-1 text-center" /> min
               </label>
-              <button onClick={() => pushManual({ ...manual, period: manual.period + 1, clockRunning: false, clockSec: (manual.periodMin || 10) * 60, clockUpdatedAt: new Date().toISOString() }, true)}
+              <button onClick={() => pushManual({ ...advanceManualPeriod(manual, manual.period + 1), clockRunning: false, clockSec: (manual.periodMin || 10) * 60, clockUpdatedAt: new Date().toISOString() }, true)}
                 className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-bold">
                 Next period ↺ reset clock
               </button>
@@ -875,7 +875,8 @@ function ControlInner() {
                 ['lineups', 'Lineups'],
                 ['leaders', 'Top Performers'],
                 ['matchup', 'Matchup Top 5'],
-              ] as ['teamstats' | 'lineups' | 'leaders' | 'matchup', string][]).map(([kind, label]) => (
+                ['linescore', 'Quarter Break'],
+              ] as ['teamstats' | 'lineups' | 'leaders' | 'matchup' | 'linescore', string][]).map(([kind, label]) => (
                 <button key={kind} onClick={() => fire({ full: active.full === kind ? null : kind })}
                   className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-medium ${active.full === kind ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
                   {label} {active.full === kind ? <Eye size={15} /> : <EyeOff size={15} />}

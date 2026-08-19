@@ -18,7 +18,7 @@ import {
 interface BusState {
   bug?: boolean;
   lowerId?: string | null;
-  full?: 'teamstats' | 'lineups' | 'leaders' | 'matchup' | 'trivia' | 'nextgame' | null;
+  full?: 'teamstats' | 'lineups' | 'leaders' | 'matchup' | 'linescore' | 'trivia' | 'nextgame' | null;
   banner?: string | null;               // URL of the currently-aired banner
   portal?: boolean;                     // hoop-portal sponsor reveal
   talent?: boolean;                     // broadcast team graphic
@@ -867,7 +867,7 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
                     )}
                     <div className="text-sm font-bold text-yellow-400">{summary.state === 'in' ? `${periodLabel(summary.period)} · ${summary.clock}` : summary.statusDetail}</div>
                     <div className="text-[10px] uppercase tracking-widest text-zinc-400 mt-0.5">
-                      {bus.full === 'teamstats' ? 'Team Stats' : bus.full === 'lineups' ? 'Starting Lineups' : bus.full === 'matchup' ? 'Matchup — Top 5' : bus.full === 'trivia' ? 'Trivia' : bus.full === 'nextgame' ? 'Up Next' : 'Top Performers'}
+                      {bus.full === 'teamstats' ? 'Team Stats' : bus.full === 'lineups' ? 'Starting Lineups' : bus.full === 'matchup' ? 'Matchup — Top 5' : bus.full === 'linescore' ? (summary.state === 'post' ? 'Final Stats' : 'Quarter Break') : bus.full === 'trivia' ? 'Trivia' : bus.full === 'nextgame' ? 'Up Next' : 'Top Performers'}
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
@@ -881,6 +881,7 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
                 {bus.full === 'lineups' && <Lineups summary={summary} awayColor={awayColor} homeColor={homeColor} />}
                 {bus.full === 'leaders' && <Leaders summary={summary} custom={custom} awayColor={awayColor} />}
                 {bus.full === 'matchup' && <Matchup summary={summary} awayColor={awayColor} homeColor={homeColor} />}
+                {bus.full === 'linescore' && <QuarterBreak summary={summary} awayColor={awayColor} homeColor={homeColor} nextGame={gfx.nextGameCfg || null} />}
                 {bus.full === 'trivia' && <Trivia trivia={gfx.trivia || {}} sponsorFallback={brand?.logo || ''} accent={awayColor} />}
                 {bus.full === 'nextgame' && (() => {
                   const ng = gfx.nextGameCfg || {};
@@ -1039,6 +1040,98 @@ function StatChip({ label, value, color, big = false }: { label: string; value: 
       style={big ? { ['--tc' as any]: color || '#7c3aed', ['--dir' as any]: '135deg' } : undefined}>
       <div className="text-lg font-black leading-none">{value || '0'}</div>
       <div className="text-[9px] font-bold text-white/70 tracking-widest">{label}</div>
+    </div>
+  );
+}
+
+/* Quarter-break board: linescore that fills in period by period, team stat
+   leaders, and the upcoming game — fired when going to commercials. */
+function QuarterBreak({ summary, awayColor, homeColor, nextGame }: {
+  summary: Summary; awayColor: string; homeColor: string;
+  nextGame: { awayName?: string; awayLogo?: string; homeName?: string; homeLogo?: string; date?: string; time?: string; venue?: string } | null;
+}) {
+  const nP = Math.max(4, summary.period, summary.away.linescores?.length || 0, summary.home.linescores?.length || 0);
+  const cols = Array.from({ length: nP }, (_, i) => i);
+  const colLabel = (i: number) => (i < 4 ? String(i + 1) : nP > 5 ? `OT${i - 3}` : 'OT');
+  const topBy = (t: Summary['home'], key: 'pts' | 'reb' | 'ast') =>
+    [...t.athletes].filter(a => a.played)
+      .sort((a, b) => parseInt(b.stats[key] || '0') - parseInt(a.stats[key] || '0'))[0];
+  const ng = nextGame && (nextGame.awayName || nextGame.homeName) ? nextGame : null;
+  const fmtDate = (d?: string) => {
+    if (!d) return '';
+    const dt = new Date(d + 'T12:00:00');
+    return isNaN(dt.getTime()) ? d : dt.toLocaleDateString('en-US', { weekday: 'short', month: 'numeric', day: 'numeric' });
+  };
+  const fmtTime = (t?: string) => {
+    if (!t) return '';
+    const m = t.match(/^(\d{1,2}):(\d{2})$/);
+    if (!m) return t;
+    const h = parseInt(m[1], 10);
+    return `${h % 12 || 12}:${m[2]} ${h < 12 ? 'AM' : 'PM'}`;
+  };
+  const CATS: ['pts' | 'reb' | 'ast', string][] = [['pts', 'Points'], ['reb', 'Rebounds'], ['ast', 'Assists']];
+  return (
+    <div className="px-8 py-6 flex gap-6">
+      <div className="flex-1 min-w-0">
+        <div className="rounded-xl overflow-hidden border border-white/10"
+          style={{ fontVariantNumeric: 'tabular-nums' }}>
+          <div className="flex text-[10px] font-bold uppercase tracking-widest text-zinc-400 bg-white/5">
+            <div className="w-36 px-4 py-2">Team</div>
+            {cols.map(i => <div key={i} className="flex-1 text-center py-2">{colLabel(i)}</div>)}
+            <div className="w-16 text-center py-2 text-yellow-400">T</div>
+          </div>
+          {([summary.away, summary.home] as const).map((t, r) => (
+            <div key={t.id} className="flex items-center border-t border-white/10 text-lg font-black"
+              style={{ boxShadow: `inset 5px 0 0 ${r === 0 ? awayColor : homeColor}` }}>
+              <div className="w-36 px-4 py-2.5 flex items-center gap-2.5">
+                {t.logo && <img src={t.logo} className="w-7 h-7 object-contain" alt="" />}
+                <span>{t.abbr}</span>
+              </div>
+              {cols.map(i => (
+                <div key={i} className="flex-1 text-center py-2.5"
+                  style={{ animation: t.linescores?.[i] ? 'plg-score-pop 0.6s ease-out both' : undefined }}>
+                  {t.linescores?.[i] || '–'}
+                </div>
+              ))}
+              <div className="w-16 text-center py-2.5 text-yellow-400 text-xl">{t.score}</div>
+            </div>
+          ))}
+        </div>
+        <div className="grid grid-cols-2 gap-4 mt-5">
+          {([summary.away, summary.home] as const).map((t, r) => (
+            <div key={t.id} className="rounded-xl border border-white/10 overflow-hidden">
+              <div className="px-4 py-1.5 text-[10px] font-black uppercase tracking-widest text-white"
+                style={{ background: `linear-gradient(90deg, ${r === 0 ? awayColor : homeColor}cc, transparent 130%)` }}>
+                {t.abbr} Stat Leaders
+              </div>
+              {CATS.map(([k, label]) => {
+                const a = topBy(t, k);
+                return (
+                  <div key={k} className="flex items-baseline justify-between gap-3 px-4 py-1.5 border-t border-white/10">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">{label}</span>
+                    <span className="text-sm font-black truncate">{a ? `${a.shortName} — ${a.stats[k] || '0'}` : '—'}</span>
+                  </div>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      </div>
+      {ng && (
+        <div className="w-52 shrink-0 border-l border-white/10 pl-5 flex flex-col justify-center gap-2.5">
+          <div className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Upcoming</div>
+          {(ng.awayLogo || ng.homeLogo) && (
+            <div className="flex items-center gap-2.5">
+              {ng.awayLogo && <img src={ng.awayLogo} className="w-10 h-10 object-contain drop-shadow" alt="" />}
+              <span className="text-xs font-black text-zinc-400">VS</span>
+              {ng.homeLogo && <img src={ng.homeLogo} className="w-10 h-10 object-contain drop-shadow" alt="" />}
+            </div>
+          )}
+          <div className="text-sm font-black leading-snug">{[ng.awayName, ng.homeName].filter(Boolean).join(' vs ')}</div>
+          <div className="text-xs font-bold text-yellow-400">{[fmtDate(ng.date), fmtTime(ng.time)].filter(Boolean).join(' · ')}</div>
+          {ng.venue && <div className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">{ng.venue}</div>}
+        </div>
+      )}
     </div>
   );
 }

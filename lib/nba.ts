@@ -53,6 +53,7 @@ export interface TeamBox {
   color: string;
   homeAway: 'home' | 'away';
   score: string;
+  linescores?: string[];     // points per period (fills in as the game advances)
   stats: { label: string; value: string }[];
   athletes: Athlete[];
 }
@@ -119,6 +120,7 @@ export interface ManualGame {
   clockSec: number;          // seconds remaining when last updated
   clockRunning: boolean;
   clockUpdatedAt: string;    // ISO — reference point while running
+  lines?: { away: number[]; home: number[] };   // captured points per period
 }
 
 export function manualClockRemaining(m: ManualGame, nowMs = Date.now()): number {
@@ -143,6 +145,7 @@ export function manualToSummary(m: ManualGame, nowMs = Date.now()): Summary {
     color: t.color || '#1f2937',
     homeAway,
     score: String(t.score ?? 0),
+    linescores: (m.lines?.[homeAway] || []).map(v => String(v)),
     stats: [
       { label: 'Rebounds', value: String(t.players.reduce((a, p) => a + (p.reb || 0), 0)) },
       { label: 'Assists', value: String(t.players.reduce((a, p) => a + (p.ast || 0), 0)) },
@@ -176,6 +179,20 @@ export function manualToSummary(m: ManualGame, nowMs = Date.now()): Summary {
     home: team(m.home, 'home'),
     away: team(m.away, 'away'),
   };
+}
+
+/* Moving to a later period locks in what each team scored during the period
+   that just ended (total so far minus already-captured quarters). */
+export function advanceManualPeriod(m: ManualGame, newPeriod: number): ManualGame {
+  const lines = { away: [...(m.lines?.away || [])], home: [...(m.lines?.home || [])] };
+  if (newPeriod > m.period) {
+    (['away', 'home'] as const).forEach(k => {
+      for (let i = 0; i < m.period - 1; i++) if (lines[k][i] == null) lines[k][i] = 0;
+      const recorded = lines[k].reduce((a, b) => a + (b || 0), 0);
+      lines[k][m.period - 1] = Math.max(0, (m[k].score || 0) - recorded);
+    });
+  }
+  return { ...m, period: newPeriod, lines };
 }
 
 export function emptyManualGame(): ManualGame {
@@ -255,8 +272,11 @@ export function normalizeSummary(json: any): Summary | null {
   if (!comp) return null;
   const st = comp.status || {};
   const scores: Record<string, string> = {};
+  const lines: Record<string, string[]> = {};
   (comp.competitors || []).forEach((c: any) => {
-    scores[String(c.team?.id ?? c.id)] = String(c.score ?? '');
+    const id = String(c.team?.id ?? c.id);
+    scores[id] = String(c.score ?? '');
+    lines[id] = (c.linescores || []).map((l: any) => String(l.displayValue ?? l.value ?? ''));
   });
 
   const teamsRaw = json?.boxscore?.teams || [];
@@ -302,6 +322,7 @@ export function normalizeSummary(json: any): Summary | null {
       color: hex(t.color),
       homeAway: (tRaw?.homeAway || 'home') as 'home' | 'away',
       score: scores[String(t.id)] || '',
+      linescores: lines[String(t.id)] || [],
       stats: (tRaw?.statistics || []).map((s: any) => ({
         label: s.label || s.abbreviation || '',
         value: s.displayValue || '',
