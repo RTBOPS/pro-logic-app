@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { auth, db, storage } from '@/lib/firebase';
@@ -26,14 +26,16 @@ interface BannerItem { id: string; url: string; name: string }
 interface GfxState {
   bug: boolean;
   lowerId: string | null;
-  full: 'teamstats' | 'lineups' | 'leaders' | 'matchup' | 'trivia' | null;
+  full: 'teamstats' | 'lineups' | 'leaders' | 'matchup' | 'trivia' | 'nextgame' | null;
   banner: string | null;
   portal: boolean;
   talent: boolean;
   mention: boolean;
   ftId: string | null;
+  sub: { inId: string; outId: string } | null;
+  coach: 'away' | 'home' | null;
 }
-const GFX_OFF: GfxState = { bug: false, lowerId: null, full: null, banner: null, portal: false, talent: false, mention: false, ftId: null };
+const GFX_OFF: GfxState = { bug: false, lowerId: null, full: null, banner: null, portal: false, talent: false, mention: false, ftId: null, sub: null, coach: null };
 
 const DEMO = { label: 'Demo: Finals 2024 — DAL @ BOS (G5)', date: '20240617' };
 
@@ -94,6 +96,12 @@ function ControlInner() {
   const [mentionCfg, setMentionCfg] = useState({ label: 'Special Guest', name: '', title: '', photo: '' });
   const [photoOverrides, setPhotoOverrides] = useState<Record<string, string>>({});
   const [leagueBadge, setLeagueBadge] = useState('auto');   // auto | none | url
+  const [extraBadges, setExtraBadges] = useState<string[]>([]);   // sponsor logos in the badge roll
+  const [dock, setDock] = useState<null | 'branding' | 'trivia' | 'portal' | 'team' | 'mention' | 'nextgame' | 'coaches'>(null);
+  const [nextGameCfg, setNextGameCfg] = useState({ awayName: '', awayLogo: '', homeName: '', homeLogo: '', date: '', time: '', venue: '' });
+  const [coachCfg, setCoachCfg] = useState({ away: '', home: '' });
+  const [subIn, setSubIn] = useState('');
+  const [subOut, setSubOut] = useState('');
   const [banners, setBanners] = useState<BannerItem[]>([]);
   const [uploading, setUploading] = useState(false);
   const bannerRef = useRef<HTMLInputElement>(null);
@@ -137,6 +145,9 @@ function ControlInner() {
       if (d.mentionCfg) setMentionCfg({ label: 'Special Guest', name: '', title: '', photo: '', ...d.mentionCfg });
       if (d.photoOverrides) setPhotoOverrides(d.photoOverrides);
       if (d.leagueBadgeMode) setLeagueBadge(d.leagueBadgeMode);
+      if (Array.isArray(d.extraBadges)) setExtraBadges(d.extraBadges);
+      if (d.nextGameCfg) setNextGameCfg({ awayName: '', awayLogo: '', homeName: '', homeLogo: '', date: '', time: '', venue: '', ...d.nextGameCfg });
+      if (d.coachCfg) setCoachCfg({ away: '', home: '', ...d.coachCfg });
     }).catch(() => {});
   }, []);
 
@@ -197,6 +208,9 @@ function ControlInner() {
         mentionCfg,
         photoOverrides,
         leagueBadgeMode: leagueBadge,
+        extraBadges,
+        nextGameCfg,
+        coachCfg,
         leagueBadge: leagueBadge === 'none' ? '' : leagueBadge === 'auto'
           ? (source === 'feed' ? (LEAGUES.find(l => l.id === league)?.logo || '') : '')
           : leagueBadge,
@@ -228,7 +242,7 @@ function ControlInner() {
   /* Re-push settings when branding/theme changes (only once a game is loaded) */
   useEffect(() => {
     if ((eventId || source === 'manual') && token) pushDoc({});
-  }, [showBrand, autoCallouts, useTeamColors, c1, c2, banners, logoScale, brandScale, motionFx, trivia, portalCfg, talentList, mentionCfg, bugPos, skin, photoOverrides, leagueBadge, league, source]);
+  }, [showBrand, autoCallouts, useTeamColors, c1, c2, banners, logoScale, brandScale, motionFx, trivia, portalCfg, talentList, mentionCfg, bugPos, skin, photoOverrides, leagueBadge, league, source, extraBadges, nextGameCfg, coachCfg]);
 
   /* Fire a play callout for the on-air player (or top scorer) */
   const calloutTarget: Athlete | null = useMemo(() => {
@@ -431,7 +445,7 @@ function ControlInner() {
   const fireBtn = 'px-3 py-1.5 rounded-lg text-xs font-medium transition-colors';
 
   return (
-    <div className="p-4 md:p-8">
+    <div className="p-4 md:p-8 pb-24">
       <PageHeader title="Live Graphics" subtitle="NBA broadcast graphics driven by the live game feed — capture the output page in OBS / vMix / ATEM">
         <button onClick={() => loadGames(date)} className="flex items-center gap-2 border border-gray-200 text-gray-700 px-3 py-2 rounded-xl text-sm hover:bg-gray-50">
           <RefreshCw size={14} className={loadingGames ? 'animate-spin' : ''} /> Refresh
@@ -645,9 +659,9 @@ function ControlInner() {
                             className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${pl.starter ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-400'}`}
                             title="Starter">S</button>
                           <PlayerPhoto src={pl.photo} tone="light" className="w-6 h-6 rounded-full object-cover object-top bg-gray-200 shrink-0" />
-                          <button onClick={() => googleMugshot(pl.name, t.name || t.abbr)} title="Buscar foto en Google Images"
+                          <button onClick={() => googleMugshot(pl.name, t.name || t.abbr)} title="Find photo on Google Images"
                             className="px-1 py-0.5 rounded bg-gray-100 hover:bg-blue-100 text-[10px]">🔍</button>
-                          <button onClick={() => pasteMugshot(url => mPlayer(side, pl.id, { photo: url }, true))} title="Pegar imagen del portapapeles"
+                          <button onClick={() => pasteMugshot(url => mPlayer(side, pl.id, { photo: url }, true))} title="Paste image from clipboard"
                             className="px-1 py-0.5 rounded bg-gray-100 hover:bg-green-100 text-[10px]">📋</button>
                           <button onClick={() => fire({ ftId: active.ftId === pl.id ? null : pl.id })} title="Free throw — at the line"
                             className={`px-1 py-0.5 rounded text-[10px] ${active.ftId === pl.id ? 'bg-amber-400' : 'bg-gray-100 hover:bg-amber-100'}`}>🎯</button>
@@ -718,7 +732,7 @@ function ControlInner() {
                 <span className="text-[10px] text-gray-400 uppercase tracking-wide">League badge</span>
                 <select value={leagueBadge} onChange={e => setLeagueBadge(e.target.value)}
                   className="ml-auto border border-gray-200 rounded-lg px-2 py-1 text-[11px] bg-white">
-                  <option value="auto">Auto (liga del feed)</option>
+                  <option value="auto">Auto (feed league)</option>
                   <option value="none">None</option>
                   {LEAGUES.filter(l => l.logo).map(l => <option key={l.id} value={l.logo}>{l.label}</option>)}
                   {banners.map(b => <option key={b.id} value={b.url}>{b.name}</option>)}
@@ -758,6 +772,37 @@ function ControlInner() {
                   Hide player lower third
                 </button>
               )}
+              <div className="border-t border-gray-100 pt-3 space-y-2">
+                <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Substitution</span>
+                <div className="flex items-center gap-1.5">
+                  <select value={subIn} onChange={e => setSubIn(e.target.value)}
+                    className="flex-1 border border-green-200 bg-green-50 rounded-lg px-1.5 py-1.5 text-xs">
+                    <option value="">▲ IN…</option>
+                    {allAthletes.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                  </select>
+                  <select value={subOut} onChange={e => setSubOut(e.target.value)}
+                    className="flex-1 border border-red-200 bg-red-50 rounded-lg px-1.5 py-1.5 text-xs">
+                    <option value="">▼ OUT…</option>
+                    {allAthletes.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                  </select>
+                  <button onClick={() => fire({ sub: active.sub ? null : (subIn && subOut ? { inId: subIn, outId: subOut } : null) })}
+                    disabled={!active.sub && (!subIn || !subOut)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold disabled:opacity-40 ${active.sub ? 'bg-green-600 text-white' : 'bg-gray-900 text-white hover:bg-gray-700'}`}>
+                    {active.sub ? 'HIDE' : 'FIRE'}
+                  </button>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-gray-400 w-20">Head coach</span>
+                  <button onClick={() => fire({ coach: active.coach === 'away' ? null : 'away' })}
+                    className={`flex-1 px-2 py-1.5 rounded-lg text-xs font-bold ${active.coach === 'away' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
+                    {summary?.away.abbr || 'Away'}
+                  </button>
+                  <button onClick={() => fire({ coach: active.coach === 'home' ? null : 'home' })}
+                    className={`flex-1 px-2 py-1.5 rounded-lg text-xs font-bold ${active.coach === 'home' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
+                    {summary?.home.abbr || 'Home'}
+                  </button>
+                </div>
+              </div>
               <button onClick={clearProgram}
                 className="w-full px-4 py-2 rounded-xl text-xs text-red-500 border border-red-200 hover:bg-red-50">
                 CLEAR PROGRAM
@@ -790,6 +835,133 @@ function ControlInner() {
               </div>
             </div>
 
+            {/* Leaders quick-fire */}
+            {leaders.length > 0 && (
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+                <h2 className="text-sm font-semibold text-gray-800 mb-3">Top scorers — one-tap lower third</h2>
+                <div className="space-y-2">
+                  {leaders.map(a => (
+                    <button key={a.id} onClick={() => fire({ lowerId: active.lowerId === a.id ? null : a.id })}
+                      className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-left ${active.lowerId === a.id ? 'bg-purple-600 text-white' : 'bg-gray-50 hover:bg-gray-100'}`}>
+                      <PlayerPhoto src={photoOverrides[a.id] || a.headshot} tone="light" className="w-9 h-9 rounded-full object-cover object-top bg-gray-200 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-semibold truncate">{a.name}</div>
+                        <div className={`text-xs ${active.lowerId === a.id ? 'text-purple-200' : 'text-gray-500'}`}>{a.teamAbbr} · #{a.jersey}</div>
+                      </div>
+                      <div className="text-sm font-bold shrink-0">{a.stats.pts} PTS</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* ── Player roster (fire lower thirds) ── */}
+          <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="px-5 py-3 border-b bg-gray-50 flex items-center gap-3">
+              <h2 className="text-sm font-semibold text-gray-800">Players — click to fire lower third</h2>
+              <div className="relative ml-auto">
+                <Search size={13} className="absolute left-2.5 top-2 text-gray-400" />
+                <input value={playerQuery} onChange={e => setPlayerQuery(e.target.value)} placeholder="Search player"
+                  className="border border-gray-200 rounded-lg pl-7 pr-2 py-1 text-xs w-44 focus:outline-none" />
+              </div>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead className="bg-gray-50 text-gray-500 uppercase sticky top-0">
+                  <tr>
+                    <th className="px-3 py-2 text-left">Player</th>
+                    <th className="px-2 py-2 text-left w-12">Team</th>
+                    <th className="px-2 py-2 text-right w-10">MIN</th>
+                    <th className="px-2 py-2 text-right w-10">PTS</th>
+                    <th className="px-2 py-2 text-right w-10">REB</th>
+                    <th className="px-2 py-2 text-right w-10">AST</th>
+                    <th className="px-2 py-2 text-right w-14">FG</th>
+                    <th className="px-2 py-2 text-right w-14">3PT</th>
+                    <th className="px-2 py-2 text-right w-12">+/−</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {[summary.away, summary.home].map(team => (
+                    <React.Fragment key={team.abbr}>
+                      <tr>
+                        <td colSpan={9} className="px-3 py-2 text-xs font-black uppercase tracking-widest text-white"
+                          style={{ background: team.color }}>
+                          {team.logo && <img src={team.logo} className="inline w-5 h-5 mr-2 align-middle" alt="" />}
+                          {team.name} · {team.abbr}
+                        </td>
+                      </tr>
+                      {team.athletes.filter(a => a.played && (!playerQuery || a.name.toLowerCase().includes(playerQuery.toLowerCase()))).map(a => (
+                    <tr key={a.id} onClick={() => fire({ lowerId: active.lowerId === a.id ? null : a.id })}
+                      className={`cursor-pointer ${active.lowerId === a.id ? 'bg-purple-50' : 'hover:bg-gray-50'}`}>
+                      <td className="px-3 py-1.5">
+                        <div className="flex items-center gap-2 group/mug">
+                          <PlayerPhoto src={photoOverrides[a.id] || a.headshot} tone="light" className="w-7 h-7 rounded-full object-cover object-top bg-gray-200 shrink-0" />
+                          <span className="font-medium text-gray-800">{a.name}</span>
+                          {a.starter && <span className="text-[10px] text-gray-400">S</span>}
+                          {active.lowerId === a.id && <span className="text-[10px] font-bold text-purple-600">{mode === 'preview' ? 'IN PVW' : 'ON AIR'}</span>}
+                          <span className="ml-auto flex items-center gap-1 opacity-0 group-hover/mug:opacity-100" onClick={e => e.stopPropagation()}>
+                            <button onClick={() => fire({ ftId: active.ftId === a.id ? null : a.id })} title="Free throw — at the line"
+                              className={`px-1.5 py-0.5 rounded text-[10px] ${active.ftId === a.id ? 'bg-amber-400' : 'bg-gray-100 hover:bg-amber-100'}`}>🎯</button>
+                            <button onClick={() => googleMugshot(a.name, a.teamAbbr)} title="Find photo on Google Images"
+                              className="px-1.5 py-0.5 rounded bg-gray-100 hover:bg-blue-100 text-[10px]">🔍</button>
+                            <button onClick={() => pasteMugshot(overrideFor(a))} title="Paste image from clipboard"
+                              className="px-1.5 py-0.5 rounded bg-gray-100 hover:bg-green-100 text-[10px]">📋</button>
+                            <label title="Upload file" className="px-1.5 py-0.5 rounded bg-gray-100 hover:bg-gray-200 text-[10px] cursor-pointer">⬆
+                              <input type="file" accept="image/*" className="hidden" onChange={e => uploadMugshot(e, overrideFor(a))} />
+                            </label>
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-2 py-1.5 font-semibold" style={{ color: a.teamColor }}>{a.teamAbbr}</td>
+                      <td className="px-2 py-1.5 text-right text-gray-500">{a.stats.min}</td>
+                      <td className="px-2 py-1.5 text-right font-bold">{a.stats.pts}</td>
+                      <td className="px-2 py-1.5 text-right">{a.stats.reb}</td>
+                      <td className="px-2 py-1.5 text-right">{a.stats.ast}</td>
+                      <td className="px-2 py-1.5 text-right text-gray-500">{a.stats.fg}</td>
+                      <td className="px-2 py-1.5 text-right text-gray-500">{a.stats.tp}</td>
+                      <td className="px-2 py-1.5 text-right text-gray-500">{a.stats.plusMinus}</td>
+                    </tr>
+                      ))}
+                    </React.Fragment>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Pre-game setup dock ── */}
+      <div className="fixed bottom-0 left-0 right-0 z-40 bg-zinc-950/95 backdrop-blur border-t border-zinc-800">
+        <div className="max-w-3xl mx-auto flex items-center justify-center gap-1.5 px-3 py-2.5 overflow-x-auto">
+          {([
+            ['branding', '🎨', 'Branding'],
+            ['trivia', '❓', 'Trivia'],
+            ['portal', '🔥', 'Hoop Portal'],
+            ['team', '🎙', 'Broadcast Team'],
+            ['mention', '⭐', 'Special Mention'],
+            ['nextgame', '📅', 'Next Game'],
+            ['coaches', '📋', 'Coaches'],
+          ] as [typeof dock, string, string][]).map(([id, icon, label]) => (
+            <button key={id as string} onClick={() => setDock(d => d === id ? null : id)}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold whitespace-nowrap ${dock === id ? 'bg-white text-black' : 'text-zinc-300 hover:bg-zinc-800'}`}>
+              <span>{icon}</span> {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Drawer with the selected pre-game card */}
+      {dock && (
+        <div className="fixed inset-0 z-50 flex items-end">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setDock(null)} />
+          <div className="relative w-full max-w-2xl mx-auto max-h-[75vh] overflow-y-auto bg-gray-50 rounded-t-2xl shadow-2xl p-4 space-y-4 pb-8">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-black uppercase tracking-widest text-gray-400">Pre-game setup</span>
+              <button onClick={() => setDock(null)} className="text-gray-400 hover:text-gray-700 text-lg leading-none">✕</button>
+            </div>
+            {dock === 'branding' && (<>
             {/* Branding & look */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-4">
               <h2 className="text-sm font-semibold text-gray-800">Branding & look</h2>
@@ -896,6 +1068,30 @@ function ControlInner() {
                 </label>
               </div>
 
+              <div className="space-y-1.5">
+                <span className="text-xs font-medium text-gray-600">Badge roll — sponsors (H-E-B, Ledger…)</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {extraBadges.map((b, i) => (
+                    <span key={i} className="flex items-center gap-1 bg-gray-100 rounded-lg px-1.5 py-1">
+                      <img src={b} className="h-5 max-w-[52px] object-contain" alt="" />
+                      <button onClick={() => setExtraBadges(l => l.filter((_, j) => j !== i))} className="text-gray-400 hover:text-red-500 text-xs">✕</button>
+                    </span>
+                  ))}
+                  <label className="flex items-center gap-1 border border-dashed border-gray-300 rounded-lg px-2 py-1 text-[10px] text-gray-500 cursor-pointer hover:bg-gray-50">
+                    <Upload size={10} /> Add
+                    <input type="file" accept="image/*" className="hidden"
+                      onChange={e => uploadMugshot(e, url => setExtraBadges(l => [...l, url]))} />
+                  </label>
+                  {banners.length > 0 && (
+                    <select value="" onChange={e => { if (e.target.value) setExtraBadges(l => [...l, e.target.value]); }}
+                      className="border border-gray-200 rounded-lg px-1.5 py-1 text-[10px] bg-white">
+                      <option value="">from banners…</option>
+                      {banners.map(b => <option key={b.id} value={b.url}>{b.name}</option>)}
+                    </select>
+                  )}
+                </div>
+              </div>
+
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs font-medium text-gray-600">Banners ({banners.length})</span>
@@ -927,7 +1123,8 @@ function ControlInner() {
                 )}
               </div>
             </div>
-
+            </>)}
+            {dock === 'trivia' && (<>
             {/* Sponsored Trivia */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-3">
               <div className="flex items-center justify-between">
@@ -938,7 +1135,7 @@ function ControlInner() {
                 </button>
               </div>
               <input value={trivia.question} onChange={e => setTrivia(t => ({ ...t, question: e.target.value }))}
-                placeholder="Question — e.g. ¿Cuántos campeonatos tiene el equipo?"
+                placeholder="Question — e.g. How many championships has the team won?"
                 className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-black" />
               {trivia.options.map((opt, i) => (
                 <div key={i} className="flex items-center gap-2">
@@ -965,7 +1162,8 @@ function ControlInner() {
                 </button>
               </div>
             </div>
-
+            </>)}
+            {dock === 'portal' && (<>
             {/* Hoop Portal — AR-style sponsor reveal on the backboard camera */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-3">
               <div className="flex items-center justify-between">
@@ -1017,7 +1215,8 @@ function ControlInner() {
                 </label>
               ))}
             </div>
-
+            </>)}
+            {dock === 'team' && (<>
             {/* Broadcast Team (commentators) */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-3">
               <div className="flex items-center justify-between">
@@ -1042,7 +1241,8 @@ function ControlInner() {
                 <Plus size={12} /> Add commentator
               </button>
             </div>
-
+            </>)}
+            {dock === 'mention' && (<>
             {/* Special Mention / VIP */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-3">
               <div className="flex items-center justify-between">
@@ -1060,89 +1260,57 @@ function ControlInner() {
               <input value={mentionCfg.label} onChange={e => setMentionCfg(m => ({ ...m, label: e.target.value }))}
                 placeholder="Ribbon label — Special Guest / In the Building" className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none" />
             </div>
-
-            {/* Leaders quick-fire */}
-            {leaders.length > 0 && (
-              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-                <h2 className="text-sm font-semibold text-gray-800 mb-3">Top scorers — one-tap lower third</h2>
-                <div className="space-y-2">
-                  {leaders.map(a => (
-                    <button key={a.id} onClick={() => fire({ lowerId: active.lowerId === a.id ? null : a.id })}
-                      className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-left ${active.lowerId === a.id ? 'bg-purple-600 text-white' : 'bg-gray-50 hover:bg-gray-100'}`}>
-                      <PlayerPhoto src={photoOverrides[a.id] || a.headshot} tone="light" className="w-9 h-9 rounded-full object-cover object-top bg-gray-200 shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-semibold truncate">{a.name}</div>
-                        <div className={`text-xs ${active.lowerId === a.id ? 'text-purple-200' : 'text-gray-500'}`}>{a.teamAbbr} · #{a.jersey}</div>
-                      </div>
-                      <div className="text-sm font-bold shrink-0">{a.stats.pts} PTS</div>
-                    </button>
+            </>)}
+            {dock === 'nextgame' && (
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-sm font-semibold text-gray-800">Next Game announcement</h2>
+                  <button onClick={() => fire({ full: active.full === 'nextgame' ? null : 'nextgame' })}
+                    disabled={!nextGameCfg.homeName && !nextGameCfg.awayName}
+                    className={`text-xs px-3 py-1.5 rounded-lg font-bold disabled:opacity-40 ${active.full === 'nextgame' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
+                    {active.full === 'nextgame' ? (mode === 'preview' ? 'IN PVW' : 'ON AIR') : 'FIRE'}
+                  </button>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  {(['away', 'home'] as const).map(side => (
+                    <div key={side} className="space-y-1.5">
+                      <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">{side}</span>
+                      <input value={(nextGameCfg as any)[side + 'Name']} onChange={e => setNextGameCfg(c => ({ ...c, [side + 'Name']: e.target.value }))}
+                        placeholder="Team name" className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none" />
+                      <label className="flex items-center gap-2 cursor-pointer text-xs text-gray-500 hover:text-gray-700">
+                        {(nextGameCfg as any)[side + 'Logo']
+                          ? <img src={(nextGameCfg as any)[side + 'Logo']} className="w-9 h-9 object-contain" alt="" />
+                          : <span className="w-9 h-9 rounded-lg bg-gray-100 flex items-center justify-center"><Upload size={13} /></span>}
+                        Logo
+                        <input type="file" accept="image/*" className="hidden"
+                          onChange={e => uploadMugshot(e, url => setNextGameCfg(c => ({ ...c, [side + 'Logo']: url })))} />
+                      </label>
+                    </div>
                   ))}
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <input value={nextGameCfg.date} onChange={e => setNextGameCfg(c => ({ ...c, date: e.target.value }))}
+                    placeholder="Sat, Mar 28" className="border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none" />
+                  <input value={nextGameCfg.time} onChange={e => setNextGameCfg(c => ({ ...c, time: e.target.value }))}
+                    placeholder="7:00 PM" className="border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none" />
+                  <input value={nextGameCfg.venue} onChange={e => setNextGameCfg(c => ({ ...c, venue: e.target.value }))}
+                    placeholder="H-E-B Center at Cedar Park" className="border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none" />
                 </div>
               </div>
             )}
-          </div>
-
-          {/* ── Player roster (fire lower thirds) ── */}
-          <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-            <div className="px-5 py-3 border-b bg-gray-50 flex items-center gap-3">
-              <h2 className="text-sm font-semibold text-gray-800">Players — click to fire lower third</h2>
-              <div className="relative ml-auto">
-                <Search size={13} className="absolute left-2.5 top-2 text-gray-400" />
-                <input value={playerQuery} onChange={e => setPlayerQuery(e.target.value)} placeholder="Search player"
-                  className="border border-gray-200 rounded-lg pl-7 pr-2 py-1 text-xs w-44 focus:outline-none" />
+            {dock === 'coaches' && (
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-3">
+                <h2 className="text-sm font-semibold text-gray-800">Head Coaches</h2>
+                <p className="text-[11px] text-gray-400">Names shown on the coach graphic with each team's logo. Fire from the Fire graphics card.</p>
+                {(['away', 'home'] as const).map(side => (
+                  <div key={side} className="flex items-center gap-2">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-gray-400 w-12">{side}</span>
+                    <input value={coachCfg[side]} onChange={e => setCoachCfg(c => ({ ...c, [side]: e.target.value }))}
+                      placeholder="Coach name" className="flex-1 border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none" />
+                  </div>
+                ))}
               </div>
-            </div>
-            <div className="overflow-x-auto max-h-[560px] overflow-y-auto">
-              <table className="w-full text-xs">
-                <thead className="bg-gray-50 text-gray-500 uppercase sticky top-0">
-                  <tr>
-                    <th className="px-3 py-2 text-left">Player</th>
-                    <th className="px-2 py-2 text-left w-12">Team</th>
-                    <th className="px-2 py-2 text-right w-10">MIN</th>
-                    <th className="px-2 py-2 text-right w-10">PTS</th>
-                    <th className="px-2 py-2 text-right w-10">REB</th>
-                    <th className="px-2 py-2 text-right w-10">AST</th>
-                    <th className="px-2 py-2 text-right w-14">FG</th>
-                    <th className="px-2 py-2 text-right w-14">3PT</th>
-                    <th className="px-2 py-2 text-right w-12">+/−</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {filteredAthletes.map(a => (
-                    <tr key={a.id} onClick={() => fire({ lowerId: active.lowerId === a.id ? null : a.id })}
-                      className={`cursor-pointer ${active.lowerId === a.id ? 'bg-purple-50' : 'hover:bg-gray-50'}`}>
-                      <td className="px-3 py-1.5">
-                        <div className="flex items-center gap-2 group/mug">
-                          <PlayerPhoto src={photoOverrides[a.id] || a.headshot} tone="light" className="w-7 h-7 rounded-full object-cover object-top bg-gray-200 shrink-0" />
-                          <span className="font-medium text-gray-800">{a.name}</span>
-                          {a.starter && <span className="text-[10px] text-gray-400">S</span>}
-                          {active.lowerId === a.id && <span className="text-[10px] font-bold text-purple-600">{mode === 'preview' ? 'IN PVW' : 'ON AIR'}</span>}
-                          <span className="ml-auto flex items-center gap-1 opacity-0 group-hover/mug:opacity-100" onClick={e => e.stopPropagation()}>
-                            <button onClick={() => fire({ ftId: active.ftId === a.id ? null : a.id })} title="Free throw — at the line"
-                              className={`px-1.5 py-0.5 rounded text-[10px] ${active.ftId === a.id ? 'bg-amber-400' : 'bg-gray-100 hover:bg-amber-100'}`}>🎯</button>
-                            <button onClick={() => googleMugshot(a.name, a.teamAbbr)} title="Buscar foto en Google Images"
-                              className="px-1.5 py-0.5 rounded bg-gray-100 hover:bg-blue-100 text-[10px]">🔍</button>
-                            <button onClick={() => pasteMugshot(overrideFor(a))} title="Pegar imagen copiada del portapapeles"
-                              className="px-1.5 py-0.5 rounded bg-gray-100 hover:bg-green-100 text-[10px]">📋</button>
-                            <label title="Subir archivo" className="px-1.5 py-0.5 rounded bg-gray-100 hover:bg-gray-200 text-[10px] cursor-pointer">⬆
-                              <input type="file" accept="image/*" className="hidden" onChange={e => uploadMugshot(e, overrideFor(a))} />
-                            </label>
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-2 py-1.5 font-semibold" style={{ color: a.teamColor }}>{a.teamAbbr}</td>
-                      <td className="px-2 py-1.5 text-right text-gray-500">{a.stats.min}</td>
-                      <td className="px-2 py-1.5 text-right font-bold">{a.stats.pts}</td>
-                      <td className="px-2 py-1.5 text-right">{a.stats.reb}</td>
-                      <td className="px-2 py-1.5 text-right">{a.stats.ast}</td>
-                      <td className="px-2 py-1.5 text-right text-gray-500">{a.stats.fg}</td>
-                      <td className="px-2 py-1.5 text-right text-gray-500">{a.stats.tp}</td>
-                      <td className="px-2 py-1.5 text-right text-gray-500">{a.stats.plusMinus}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            )}
           </div>
         </div>
       )}

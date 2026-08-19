@@ -5,7 +5,7 @@
    ?bg=dark for preview. No login: it reads a public live_graphics token doc
    for the operator's cues and polls the NBA feed for live data. */
 
-import { useState, useEffect, useMemo, useRef, use } from 'react';
+import React, { useState, useEffect, useMemo, useRef, use } from 'react';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import PlayerPhoto from '@/components/PlayerPhoto';
@@ -18,12 +18,14 @@ import {
 interface BusState {
   bug?: boolean;
   lowerId?: string | null;
-  full?: 'teamstats' | 'lineups' | 'leaders' | 'matchup' | 'trivia' | null;
+  full?: 'teamstats' | 'lineups' | 'leaders' | 'matchup' | 'trivia' | 'nextgame' | null;
   banner?: string | null;               // URL of the currently-aired banner
   portal?: boolean;                     // hoop-portal sponsor reveal
   talent?: boolean;                     // broadcast team graphic
   mention?: boolean;                    // special guest / VIP mention
   ftId?: string | null;                 // free-throw spotlight player
+  sub?: { inId: string; outId: string } | null;
+  coach?: 'away' | 'home' | null;
 }
 
 interface GfxDoc extends BusState {
@@ -43,6 +45,9 @@ interface GfxDoc extends BusState {
   mentionCfg?: { label?: string; name?: string; title?: string; photo?: string } | null;
   photoOverrides?: Record<string, string> | null;
   leagueBadge?: string | null;          // league logo chip (G League, NBA…)
+  extraBadges?: string[] | null;        // sponsor logos in the badge roll
+  nextGameCfg?: { awayName?: string; awayLogo?: string; homeName?: string; homeLogo?: string; date?: string; time?: string; venue?: string } | null;
+  coachCfg?: { away?: string; home?: string } | null;
 }
 
 const CALLOUT_MS = 4500;
@@ -83,6 +88,10 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
     };
     document.addEventListener('keydown', onKey);
     document.addEventListener('dblclick', goFullscreen);
+    // iOS/Safari can block autoplay entirely (e.g. Low Power Mode): any tap resumes all videos
+    const resumeVideos = () => document.querySelectorAll('video').forEach(v => { v.muted = true; if (v.paused) v.play().catch(() => {}); });
+    document.addEventListener('touchstart', resumeVideos, { passive: true });
+    document.addEventListener('click', resumeVideos);
     document.addEventListener('mousemove', onMove);
     onMove();
 
@@ -96,6 +105,8 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
     return () => {
       document.removeEventListener('keydown', onKey);
       document.removeEventListener('dblclick', goFullscreen);
+      document.removeEventListener('touchstart', resumeVideos);
+      document.removeEventListener('click', resumeVideos);
       document.removeEventListener('mousemove', onMove);
       document.removeEventListener('visibilitychange', onVis);
       clearTimeout(idle);
@@ -185,6 +196,14 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
     if (!summary || !bus.ftId) return null;
     return [...summary.home.athletes, ...summary.away.athletes].find(a => a.id === bus.ftId) || null;
   }, [summary, bus.ftId]);
+
+  const subPair = useMemo(() => {
+    if (!summary || !bus.sub) return null;
+    const all = [...summary.home.athletes, ...summary.away.athletes];
+    const pin = all.find(a => a.id === bus.sub!.inId);
+    const pout = all.find(a => a.id === bus.sub!.outId);
+    return pin && pout ? { pin, pout } : null;
+  }, [summary, bus.sub]);
 
   /* Theme: official team colors by default, operator overrides at will */
   const custom = !!(gfx.theme && gfx.theme.useTeamColors === false);
@@ -346,7 +365,7 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
                   )}
                   {(brand || gfx.leagueBadge) && (
                     <div className="bg-white px-2.5 flex items-center">
-                      <BadgeRoll logos={[brand?.logo || '', gfx.leagueBadge || ''].filter(Boolean)} scale={brandScale} />
+                      <BadgeRoll logos={[brand?.logo || '', gfx.leagueBadge || '', ...(gfx.extraBadges || [])].filter(Boolean)} scale={brandScale} />
                     </div>
                   )}
                   <TeamCell team={summary.away} color={awayColor} scale={logoScale} float={motionOn} />
@@ -474,7 +493,14 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
                   {/* The portal itself: fire FX video (alpha) or the CSS golden ring */}
                   {video ? (
                     <video autoPlay loop muted playsInline preload="auto"
-                      ref={el => { if (el && el.paused) el.play().catch(() => {}); }}
+                      ref={el => {
+                        if (!el) return;
+                        el.muted = true;
+                        const tryPlay = () => { if (el.paused) el.play().catch(() => {}); };
+                        tryPlay();
+                        el.addEventListener('canplay', tryPlay, { once: true });
+                        setTimeout(tryPlay, 800);
+                      }}
                       className="relative z-10 pointer-events-none"
                       style={{ width: 700 * size, maxWidth: 'none' }}>
                       {video === DEFAULT_PORTAL_VIDEO ? (
@@ -565,6 +591,58 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
             );
           })()}
 
+          {/* ── SUBSTITUTION ── */}
+          {subPair && (
+            <div className="absolute bottom-28 left-8"
+              style={{ animation: 'plg-lower-in 0.5s cubic-bezier(0.3, 1.15, 0.6, 1) both' }}>
+              <div className="flex items-stretch rounded-xl overflow-hidden shadow-2xl text-white">
+                <div className="plg-label px-3 flex items-center text-[10px] font-black uppercase tracking-[0.2em] text-black">
+                  Substitution
+                </div>
+                <div className="plg-accent px-4 py-2 flex items-center gap-2.5"
+                  style={{ ['--tc' as any]: '#16a34a', ['--dir' as any]: '135deg' }}>
+                  <span className="text-lg font-black">▲</span>
+                  <PlayerPhoto src={subPair.pin.headshot} className="w-9 h-9 rounded-full object-cover object-top bg-black/30 shrink-0" />
+                  <div>
+                    <div className="font-black leading-tight whitespace-nowrap">{subPair.pin.name}</div>
+                    <div className="text-[9px] font-bold uppercase tracking-widest opacity-80">#{subPair.pin.jersey} · IN</div>
+                  </div>
+                </div>
+                <div className="plg-accent px-4 py-2 flex items-center gap-2.5"
+                  style={{ ['--tc' as any]: '#dc2626', ['--dir' as any]: '135deg' }}>
+                  <span className="text-lg font-black">▼</span>
+                  <PlayerPhoto src={subPair.pout.headshot} className="w-9 h-9 rounded-full object-cover object-top bg-black/30 shrink-0" />
+                  <div>
+                    <div className="font-black leading-tight whitespace-nowrap">{subPair.pout.name}</div>
+                    <div className="text-[9px] font-bold uppercase tracking-widest opacity-80">#{subPair.pout.jersey} · {subPair.pout.stats.pts || '0'} PTS · OUT</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── HEAD COACH ── */}
+          {bus.coach && (() => {
+            const team = bus.coach === 'home' ? summary.home : summary.away;
+            const name = bus.coach === 'home' ? gfx.coachCfg?.home : gfx.coachCfg?.away;
+            const color = bus.coach === 'home' ? homeColor : awayColor;
+            if (!name) return null;
+            return (
+              <div className="absolute bottom-28 left-8"
+                style={{ animation: 'plg-lower-in 0.5s cubic-bezier(0.3, 1.15, 0.6, 1) both' }}>
+                <div className="flex items-stretch rounded-xl overflow-hidden shadow-2xl text-white">
+                  <div className="plg-accent px-4 flex items-center" style={{ ['--tc' as any]: color, ['--dir' as any]: '135deg' }}>
+                    {team.logo ? <img src={team.logo} className="w-12 h-12 object-contain drop-shadow" alt="" /> : <span className="font-black">{team.abbr}</span>}
+                  </div>
+                  <div className="plg-panel px-5 py-2.5">
+                    <div className="text-xl font-black leading-tight whitespace-nowrap">{name}</div>
+                    <div className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Head Coach · {team.name}</div>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
           {/* ── FREE THROW SPOTLIGHT (side panel, animated FT gauge) ── */}
           {ftPlayer && (() => {
             const a = ftPlayer;
@@ -577,8 +655,7 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
               <div className="absolute right-8 top-1/2 -translate-y-1/2 w-64"
                 style={{ animation: 'plg-slide-r 0.55s cubic-bezier(0.34, 1.3, 0.64, 1) both' }}>
                 <div className="rounded-2xl overflow-hidden shadow-2xl text-white">
-                  <div className="plg-label px-4 py-2 text-[10px] font-black uppercase tracking-[0.25em] text-black flex items-center gap-2">
-                    <span style={{ animation: 'plg-ball 1.1s ease-in-out infinite', display: 'inline-block' }}>🏀</span>
+                  <div className="plg-label px-4 py-2 text-[10px] font-black uppercase tracking-[0.25em] text-black">
                     At The Line
                   </div>
                   <div className="plg-accent px-4 py-3 flex items-center gap-3"
@@ -669,7 +746,7 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
                   <div className="text-center">
                     <div className="text-sm font-bold text-yellow-400">{summary.state === 'in' ? `${periodLabel(summary.period)} · ${summary.clock}` : summary.statusDetail}</div>
                     <div className="text-[10px] uppercase tracking-widest text-zinc-400 mt-0.5">
-                      {bus.full === 'teamstats' ? 'Team Stats' : bus.full === 'lineups' ? 'Starting Lineups' : bus.full === 'matchup' ? 'Matchup — Top 5' : bus.full === 'trivia' ? 'Trivia' : 'Top Performers'}
+                      {bus.full === 'teamstats' ? 'Team Stats' : bus.full === 'lineups' ? 'Starting Lineups' : bus.full === 'matchup' ? 'Matchup — Top 5' : bus.full === 'trivia' ? 'Trivia' : bus.full === 'nextgame' ? 'Up Next' : 'Top Performers'}
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
@@ -684,6 +761,43 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
                 {bus.full === 'leaders' && <Leaders summary={summary} custom={custom} awayColor={awayColor} />}
                 {bus.full === 'matchup' && <Matchup summary={summary} awayColor={awayColor} homeColor={homeColor} />}
                 {bus.full === 'trivia' && <Trivia trivia={gfx.trivia || {}} sponsorFallback={brand?.logo || ''} accent={awayColor} />}
+                {bus.full === 'nextgame' && (() => {
+                  const ng = gfx.nextGameCfg || {};
+                  return (
+                    <div className="px-10 py-10">
+                      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-8">
+                        {([['away', awayColor], ['home', homeColor]] as ['away' | 'home', string][]).map(([side, color], i) => (
+                          <React.Fragment key={side}>
+                            {i === 1 && (
+                              <div className="text-center">
+                                <div className="text-4xl font-black text-zinc-500"
+                                  style={{ animation: 'plg-ft-pulse 2s ease-in-out infinite' }}>VS</div>
+                              </div>
+                            )}
+                            <div className="text-center" style={{ animation: `plg-rise 0.7s cubic-bezier(0.34, 1.3, 0.64, 1) ${0.15 + i * 0.25}s both` }}>
+                              <div className="mx-auto w-44 h-44 rounded-3xl plg-accent flex items-center justify-center mb-4"
+                                style={{ ['--tc' as any]: color, ['--dir' as any]: '160deg' }}>
+                                {(ng as any)[side + 'Logo']
+                                  ? <img src={(ng as any)[side + 'Logo']} className="max-w-[82%] max-h-[82%] object-contain drop-shadow-2xl"
+                                      style={{ animation: 'plg-float-logo 3.4s ease-in-out infinite' }} alt="" />
+                                  : <span className="text-5xl font-black opacity-60">🏀</span>}
+                              </div>
+                              <div className="text-2xl font-black leading-tight">{(ng as any)[side + 'Name'] || (side === 'away' ? 'Visitors' : 'Home')}</div>
+                            </div>
+                          </React.Fragment>
+                        ))}
+                      </div>
+                      <div className="mt-8 flex items-center justify-center gap-4 text-center">
+                        {[ng.date, ng.time, ng.venue].filter(Boolean).map((v, i) => (
+                          <div key={i} className="plg-panel rounded-xl px-5 py-2.5"
+                            style={{ animation: `plg-rise 0.6s cubic-bezier(0.34, 1.3, 0.64, 1) ${0.7 + i * 0.15}s both` }}>
+                            <span className="text-sm font-black tracking-wide">{v}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 <div className="px-8 py-2.5 bg-black/40 flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -727,7 +841,7 @@ function BadgeRoll({ logos, scale }: { logos: string[]; scale: number }) {
       <div style={{ animation: `${name} ${N * 4.5}s cubic-bezier(0.5, 0, 0.2, 1) infinite` }}>
         {[...logos, logos[0]].map((l, i) => (
           <div key={i} style={{ height: itemH, width: w }} className="flex items-center justify-center">
-            <img src={l} className="object-contain" style={{ maxHeight: itemH - 6, maxWidth: w }} alt="" />
+            <img src={l} className="object-contain" style={{ maxHeight: itemH - 2, maxWidth: w }} alt="" />
           </div>
         ))}
       </div>

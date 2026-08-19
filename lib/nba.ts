@@ -82,7 +82,7 @@ export const DEFAULT_PORTAL_VIDEO_HEVC =
 /* ESPN league slugs this CG can drive automatically */
 export const LEAGUES: { id: string; label: string; logo: string }[] = [
   { id: 'nba', label: 'NBA', logo: 'https://a.espncdn.com/i/teamlogos/leagues/500/nba.png' },
-  { id: 'nba-development', label: 'G League', logo: 'https://a.espncdn.com/combiner/i?img=/i/teamlogos/leagues/500/nba_gleague.png' },
+  { id: 'nba-development', label: 'G League', logo: 'https://firebasestorage.googleapis.com/v0/b/prologicstudio-4a6f5.firebasestorage.app/o/graphics_assets%2Fgleague.png?alt=media&token=gleague-logo-2026' },
   { id: 'mens-college-basketball', label: 'NCAA Men', logo: '' },
   { id: 'womens-college-basketball', label: 'NCAA Women', logo: '' },
   { id: 'wnba', label: 'WNBA', logo: 'https://a.espncdn.com/i/teamlogos/leagues/500/wnba.png' },
