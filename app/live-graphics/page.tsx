@@ -74,6 +74,8 @@ function ControlInner() {
   const [c2, setC2] = useState('#0ea5e9');
   const [logoScale, setLogoScale] = useState(1);      // team logos on bug & headers
   const [brandScale, setBrandScale] = useState(1);    // company logo chip
+  const [badgeSec, setBadgeSec] = useState(4.5);      // seconds each badge-roll logo holds
+  const [bugStyle, setBugStyle] = useState<'classic' | 'bar' | 'strip' | 'stack'>('classic');
   const [motionFx, setMotionFx] = useState(false);    // breathing logos + shine sweep
   const [bugPos, setBugPos] = useState<'left' | 'center' | 'right'>('left');
   const [lowerPos, setLowerPos] = useState<'left' | 'center' | 'right'>('left');
@@ -128,6 +130,7 @@ function ControlInner() {
   const [banners, setBanners] = useState<BannerItem[]>([]);
   const [uploading, setUploading] = useState(false);
   const bannerRef = useRef<HTMLInputElement>(null);
+  const badgeLogoRef = useRef<HTMLInputElement>(null);
 
   /* Output token: stable per browser so the OBS source URL survives reloads.
      Hydrate persisted settings (banners, colors) from the existing doc. */
@@ -163,6 +166,8 @@ function ControlInner() {
         if (d.theme.lowerPos) setLowerPos(d.theme.lowerPos);
         if (d.theme.ftPos) setFtPos(d.theme.ftPos);
         if (d.theme.skin) setSkin(d.theme.skin);
+        if (d.theme.badgeSec) setBadgeSec(d.theme.badgeSec);
+        if (d.theme.bugStyle) setBugStyle(d.theme.bugStyle);
       }
       if (d.trivia) setTrivia({ question: '', options: ['', '', ''], correct: 0, sponsor: '', reveal: false, ...d.trivia });
       if (d.portalCfg) setPortalCfg({ x: 50, y: 30, size: 1, logo: '', video: '', content: 'logo', ...d.portalCfg });
@@ -234,7 +239,7 @@ function ControlInner() {
         sourceMode: source, league,
         brand: { logo: company?.logo_url || '', name: company?.name || '' },
         showBrand, autoCallouts,
-        theme: { useTeamColors, c1, c2, logoScale, brandScale, motion: motionFx, bugPos, skin, lowerPos, ftPos },
+        theme: { useTeamColors, c1, c2, logoScale, brandScale, motion: motionFx, bugPos, skin, lowerPos, ftPos, badgeSec, bugStyle },
         trivia,
         portalCfg,
         talentCfg: { list: talentList },
@@ -275,7 +280,7 @@ function ControlInner() {
   /* Re-push settings when branding/theme changes (only once a game is loaded) */
   useEffect(() => {
     if ((eventId || source === 'manual') && token) pushDoc({});
-  }, [showBrand, autoCallouts, useTeamColors, c1, c2, banners, logoScale, brandScale, motionFx, trivia, portalCfg, talentList, mentionCfg, bugPos, skin, lowerPos, ftPos, photoOverrides, leagueBadge, league, source, extraBadges, nextGameCfg, coachCfg]);
+  }, [showBrand, autoCallouts, useTeamColors, c1, c2, banners, logoScale, brandScale, badgeSec, bugStyle, motionFx, trivia, portalCfg, talentList, mentionCfg, bugPos, skin, lowerPos, ftPos, photoOverrides, leagueBadge, league, source, extraBadges, nextGameCfg, coachCfg]);
 
   /* Fire a play callout for the on-air player (or top scorer) */
   const calloutTarget: Athlete | null = useMemo(() => {
@@ -289,16 +294,18 @@ function ControlInner() {
     dd: 'DOUBLE-DOUBLE!', td: 'TRIPLE-DOUBLE!', custom: '',
   };
   const clearCalloutSoon = () => setTimeout(() => pushDoc({ callout: null }), 8000);
+  const fireGeneric = (kind: Callout['kind']) => {
+    pushDoc({ callout: { id: Math.random().toString(36).slice(2, 10), kind, title: CALLOUT_TITLES[kind], color: '#f59e0b' } });
+    clearCalloutSoon();
+  };
   const fireCallout = (kind: Callout['kind']) => {
-    if (calloutWho === 'generic') {
-      pushDoc({ callout: { id: Math.random().toString(36).slice(2, 10), kind, title: CALLOUT_TITLES[kind], color: '#f59e0b' } });
-      clearCalloutSoon();
-      return;
-    }
+    if (calloutWho === 'generic') { fireGeneric(kind); return; }
+    /* Specific pick that no longer exists in this game airs nameless —
+       never fall back to a different player's name. */
     const target = calloutWho === 'auto'
       ? calloutTarget
-      : allAthletes.find(a => a.id === calloutWho) || calloutTarget;
-    if (!target) return;
+      : allAthletes.find(a => a.id === calloutWho) || null;
+    if (!target) { fireGeneric(kind); return; }
     pushDoc({ callout: buildCallout(target, kind) });
     clearCalloutSoon();
   };
@@ -316,6 +323,22 @@ function ControlInner() {
       setBanners(b => [...b, { id: Math.random().toString(36).slice(2, 10), url, name: file.name }]);
     } catch (err: any) { alert('Upload failed: ' + err.message); }
     finally { setUploading(false); if (bannerRef.current) bannerRef.current.value = ''; }
+  };
+
+  /* Custom center logo for the score bug chip */
+  const uploadCenterLogo = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    const uid = auth.currentUser?.uid;
+    if (!file || !uid) return;
+    setUploading(true);
+    try {
+      const path = `graphics_banners/${uid}/centerlogo_${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+      const snap = await uploadBytes(storageRef(storage, path), file);
+      const url = await getDownloadURL(snap.ref);
+      setBanners(b => [...b, { id: Math.random().toString(36).slice(2, 10), url, name: file.name }]);
+      setLeagueBadge(url);
+    } catch (err: any) { alert('Upload failed: ' + err.message); }
+    finally { setUploading(false); if (badgeLogoRef.current) badgeLogoRef.current.value = ''; }
   };
 
   /* Custom portal FX video upload (alpha webm/mov) */
@@ -484,6 +507,19 @@ function ControlInner() {
   const allAthletes = useMemo(() => summary
     ? [...summary.away.athletes, ...summary.home.athletes].filter(a => a.played)
     : [], [summary]);
+  /* Selection pointing at a player who isn't in this game drops to generic */
+  useEffect(() => {
+    if (calloutWho !== 'auto' && calloutWho !== 'generic' && !allAthletes.some(a => a.id === calloutWho)) {
+      setCalloutWho('generic');
+    }
+  }, [allAthletes, calloutWho]);
+
+  /* Sweep any leftover callout from a previous run so it can never replay */
+  useEffect(() => {
+    if (!token) return;
+    setDoc(doc(db, 'live_graphics', token), { callout: null }, { merge: true }).catch(() => {});
+  }, [token]);
+
   const filteredAthletes = useMemo(() => {
     const q = playerQuery.toLowerCase();
     return q ? allAthletes.filter(a => a.name.toLowerCase().includes(q)) : allAthletes;
@@ -784,6 +820,22 @@ function ControlInner() {
                   {LEAGUES.filter(l => l.logo).map(l => <option key={l.id} value={l.logo}>{l.label}</option>)}
                   {banners.map(b => <option key={b.id} value={b.url}>{b.name}</option>)}
                 </select>
+                <button onClick={() => badgeLogoRef.current?.click()} title="Upload center logo"
+                  className="p-1 rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-100 border border-gray-200">
+                  <Upload size={12} />
+                </button>
+                <input ref={badgeLogoRef} type="file" accept="image/*" className="hidden" onChange={uploadCenterLogo} />
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] text-gray-400 uppercase tracking-wide">Bug style</span>
+                <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5 ml-auto">
+                  {(['classic', 'bar', 'strip', 'stack'] as const).map(s => (
+                    <button key={s} onClick={() => setBugStyle(s)}
+                      className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase ${bugStyle === s ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500'}`}>
+                      {s}
+                    </button>
+                  ))}
+                </div>
               </div>
               <div className="flex items-center gap-1.5">
                 <span className="text-[10px] text-gray-400 uppercase tracking-wide">Bug position</span>
@@ -913,7 +965,13 @@ function ControlInner() {
                   className="flex-1 border border-gray-200 rounded-lg px-2 py-1.5 text-xs bg-white">
                   <option value="generic">Generic — no player name</option>
                   <option value="auto">Auto (on-air / top scorer{calloutTarget ? `: ${calloutTarget.name}` : ''})</option>
-                  {allAthletes.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                  {[summary?.away, summary?.home].map(t => t && (
+                    <optgroup key={t.id} label={t.name}>
+                      {t.athletes.filter(a => a.played).slice().sort(byJerseyThenName).map(a => (
+                        <option key={a.id} value={a.id}>{a.jersey ? `#${a.jersey} — ` : ''}{a.name}</option>
+                      ))}
+                    </optgroup>
+                  ))}
                 </select>
               </div>
               <div className="grid grid-cols-3 gap-2">
@@ -921,7 +979,7 @@ function ControlInner() {
                   ['3pt', '3-POINTER'], ['2pt', '+2'], ['ft', '+1 FT'],
                   ['ast', 'ASSIST'], ['dd', 'DOUBLE-DBL'], ['td', 'TRIPLE-DBL'],
                 ] as [Callout['kind'], string][]).map(([kind, label]) => (
-                  <button key={kind} onClick={() => fireCallout(kind)} disabled={!calloutTarget}
+                  <button key={kind} onClick={() => fireCallout(kind)} disabled={calloutWho === 'auto' && !calloutTarget}
                     className="px-2 py-2 rounded-lg text-[11px] font-bold bg-gray-100 text-gray-700 hover:bg-yellow-100 hover:text-yellow-800 disabled:opacity-40">
                     {label}
                   </button>
@@ -1159,6 +1217,12 @@ function ControlInner() {
                   <input type="range" min={0.7} max={2} step={0.05} value={brandScale}
                     onChange={e => setBrandScale(parseFloat(e.target.value))} className="flex-1" />
                   <span className="w-10 text-right tabular-nums">{brandScale.toFixed(2)}×</span>
+                </label>
+                <label className="flex items-center gap-2 text-xs text-gray-500">
+                  <span className="w-14">Roll time</span>
+                  <input type="range" min={2} max={10} step={0.5} value={badgeSec}
+                    onChange={e => setBadgeSec(parseFloat(e.target.value))} className="flex-1" />
+                  <span className="w-10 text-right tabular-nums">{badgeSec.toFixed(1)}s</span>
                 </label>
               </div>
 
@@ -1463,6 +1527,14 @@ function Monitor({ src, label, color, width = 352 }: { src: string; label: strin
     </div>
   );
 }
+
+const byJerseyThenName = (a: Athlete, b: Athlete) => {
+  const na = parseInt(a.jersey, 10), nb = parseInt(b.jersey, 10);
+  if (!isNaN(na) && !isNaN(nb) && na !== nb) return na - nb;
+  if (!isNaN(na) !== !isNaN(nb)) return isNaN(na) ? 1 : -1;
+  const last = (n: string) => n.trim().split(/\s+/).slice(-1)[0].toLowerCase();
+  return last(a.name).localeCompare(last(b.name));
+};
 
 export default function LiveGraphicsPage() {
   return (

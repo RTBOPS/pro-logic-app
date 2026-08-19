@@ -39,7 +39,7 @@ interface GfxDoc extends BusState {
   showBrand?: boolean;
   autoCallouts?: boolean;
   callout?: Callout | null;             // manual fire from the control panel
-  theme?: { useTeamColors?: boolean; c1?: string; c2?: string; logoScale?: number; brandScale?: number; motion?: boolean; bugPos?: 'left' | 'center' | 'right'; skin?: string; lowerPos?: 'left' | 'center' | 'right'; ftPos?: 'left' | 'right' } | null;
+  theme?: { useTeamColors?: boolean; c1?: string; c2?: string; logoScale?: number; brandScale?: number; motion?: boolean; bugPos?: 'left' | 'center' | 'right'; skin?: string; lowerPos?: 'left' | 'center' | 'right'; ftPos?: 'left' | 'right'; badgeSec?: number; bugStyle?: string } | null;
   trivia?: { question?: string; options?: string[]; correct?: number; sponsor?: string; reveal?: boolean } | null;
   portalCfg?: { x?: number; y?: number; size?: number; logo?: string; video?: string; content?: 'logo' | 'trivia' } | null;
   talentCfg?: { list?: { id: string; name: string; role: string; photo: string }[] } | null;
@@ -335,8 +335,25 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
           {/* ── SCORE BUG (pure CSS — rAF-proof) ── */}
           {bus.bug && (() => {
             const pos = gfx.theme?.bugPos || 'left';
+            const bugStyle = gfx.theme?.bugStyle || 'classic';
             const posCls = pos === 'center' ? 'left-1/2 -translate-x-1/2 items-center'
               : pos === 'right' ? 'right-8 items-end' : 'left-8 items-start';
+            const badgeSecs = gfx.theme?.badgeSec || 4.5;
+            const badges = [brand?.logo || '', gfx.leagueBadge || '', ...(gfx.extraBadges || [])].filter(Boolean);
+            const shine = motionOn && (
+              <div className="absolute inset-y-0 w-1/3 bg-gradient-to-r from-transparent via-white/25 to-transparent pointer-events-none z-10"
+                style={{ animation: 'plg-shine 6.4s ease-in-out infinite' }} />
+            );
+            const clockCol = (
+              summary.state === 'in' ? (
+                <>
+                  <span className="text-yellow-400 font-bold text-lg leading-tight">{summary.clock}</span>
+                  <span className="text-zinc-400 text-xs font-semibold">{periodLabel(summary.period)}</span>
+                </>
+              ) : (
+                <span className="text-zinc-300 text-xs font-bold uppercase text-center leading-tight px-1">{summary.statusDetail}</span>
+              )
+            );
             return (
               <div className={`absolute bottom-8 flex flex-col gap-2 ${posCls}`}
                 style={{ fontVariantNumeric: 'tabular-nums', animation: 'plg-rise 0.5s cubic-bezier(0.34, 1.3, 0.64, 1) both' }}>
@@ -357,29 +374,128 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
                   </div>
                 )}
 
-                <div className="relative flex items-stretch rounded-xl overflow-hidden shadow-2xl text-white">
-                  {motionOn && (
-                    <div className="absolute inset-y-0 w-1/3 bg-gradient-to-r from-transparent via-white/25 to-transparent pointer-events-none z-10"
-                      style={{ animation: 'plg-shine 6.4s ease-in-out infinite' }} />
-                  )}
-                  {(brand || gfx.leagueBadge) && (
-                    <div className="bg-white px-2.5 flex items-center">
-                      <BadgeRoll logos={[brand?.logo || '', gfx.leagueBadge || '', ...(gfx.extraBadges || [])].filter(Boolean)} scale={brandScale} />
+                {bugStyle === 'classic' && (
+                  <div className="relative flex items-stretch rounded-xl overflow-hidden shadow-2xl text-white">
+                    {shine}
+                    {badges.length > 0 && (
+                      <div className="bg-white px-2.5 flex items-center">
+                        <BadgeRoll logos={badges} scale={brandScale} secs={badgeSecs} />
+                      </div>
+                    )}
+                    <TeamCell team={summary.away} color={awayColor} scale={logoScale} float={motionOn} />
+                    <div className="plg-panel px-4 flex flex-col items-center justify-center min-w-[92px]">
+                      {clockCol}
                     </div>
-                  )}
-                  <TeamCell team={summary.away} color={awayColor} scale={logoScale} float={motionOn} />
-                  <div className="plg-panel px-4 flex flex-col items-center justify-center min-w-[92px]">
-                    {summary.state === 'in' ? (
-                      <>
-                        <span className="text-yellow-400 font-bold text-lg leading-tight">{summary.clock}</span>
-                        <span className="text-zinc-400 text-xs font-semibold">{periodLabel(summary.period)}</span>
-                      </>
-                    ) : (
-                      <span className="text-zinc-300 text-xs font-bold uppercase text-center leading-tight px-1">{summary.statusDetail}</span>
+                    <TeamCell team={summary.home} color={homeColor} scale={logoScale} float={motionOn} reverse />
+                  </div>
+                )}
+
+                {/* Broadcast bar — full horizontal band, scores oversized, sponsor strip below */}
+                {bugStyle === 'bar' && (
+                  <div className="flex flex-col rounded-lg overflow-hidden shadow-2xl text-white">
+                    <div className="relative flex items-stretch">
+                      {shine}
+                      {([summary.away, summary.home] as const).map((t, i) => {
+                        const first = i === 0;
+                        const cells = [
+                          t.logo && <img key="l" src={t.logo} className="drop-shadow object-contain" alt=""
+                            style={{ width: 34 * logoScale, height: 34 * logoScale, animation: motionOn ? 'plg-float-logo 3s ease-in-out infinite' : undefined }} />,
+                          <span key="a" className="font-black text-lg tracking-wide">{t.abbr}</span>,
+                          <Score key="s" value={t.score} />,
+                        ];
+                        return (
+                          <div key={t.id} className={`plg-accent flex items-center gap-3 px-5 ${first ? '' : 'flex-row-reverse'}`}
+                            style={{ ['--tc' as any]: first ? awayColor : homeColor, ['--dir' as any]: first ? '90deg' : '270deg' }}>
+                            {cells}
+                          </div>
+                        );
+                      }).flatMap((el, i) => i === 1 ? [
+                        <div key="clock" className="plg-panel px-5 py-1.5 flex flex-col items-center justify-center min-w-[110px]">{clockCol}</div>, el,
+                      ] : [el])}
+                    </div>
+                    {badges.length > 0 && (
+                      <div className="plg-panel border-t border-white/15 flex items-center justify-center py-0.5">
+                        <BadgeRoll logos={badges} scale={brandScale * 0.75} secs={badgeSecs} />
+                      </div>
                     )}
                   </div>
-                  <TeamCell team={summary.home} color={homeColor} scale={logoScale} float={motionOn} reverse />
-                </div>
+                )}
+
+                {/* Sideline strip — compact single row with team color edges + info line */}
+                {bugStyle === 'strip' && (
+                  <div className="flex flex-col rounded-md overflow-hidden shadow-2xl text-white">
+                    <div className="relative flex items-stretch">
+                      {shine}
+                      {badges.length > 0 && (
+                        <div className="bg-white px-2 flex items-center">
+                          <BadgeRoll logos={badges} scale={brandScale * 0.85} secs={badgeSecs} />
+                        </div>
+                      )}
+                      {([summary.away, summary.home] as const).map((t, i) => (
+                        <div key={t.id} className="plg-panel flex items-center gap-2 pl-3 pr-4 py-1.5"
+                          style={{ boxShadow: `inset 4px 0 0 ${i === 0 ? awayColor : homeColor}` }}>
+                          {t.logo && <img src={t.logo} className="object-contain" alt="" style={{ width: 26 * logoScale, height: 26 * logoScale }} />}
+                          <span className="font-black text-base tracking-wide">{t.abbr}</span>
+                          <span key={t.score} className="font-black text-2xl ml-1" style={{ animation: 'plg-score-pop 0.6s ease-out both' }}>{t.score}</span>
+                        </div>
+                      ))}
+                      <div className="plg-accent px-4 flex items-center gap-2" style={{ ['--tc' as any]: '#1f2937', ['--dir' as any]: '90deg' }}>
+                        {summary.state === 'in' ? (
+                          <>
+                            <span className="text-zinc-300 text-xs font-bold">{periodLabel(summary.period)}</span>
+                            <span className="text-yellow-400 font-black text-xl">{summary.clock}</span>
+                          </>
+                        ) : (
+                          <span className="text-zinc-200 text-xs font-bold uppercase">{summary.statusDetail}</span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="plg-label text-[10px] font-bold px-3 py-0.5 tracking-widest uppercase text-center">
+                      {summary.away.name} vs {summary.home.name}
+                    </div>
+                  </div>
+                )}
+
+                {/* Center stack — boxed vertical layout, clock on top, abbr rail below */}
+                {bugStyle === 'stack' && (
+                  <div className="relative flex flex-col rounded-lg overflow-hidden shadow-2xl text-white min-w-[280px]">
+                    {shine}
+                    <div className="plg-panel text-center text-[11px] font-bold uppercase tracking-widest px-4 py-1 border-b border-white/15">
+                      {summary.state === 'in' ? (
+                        <>
+                          <span className="text-zinc-400 mr-2">{periodLabel(summary.period)}</span>
+                          <span className="text-yellow-400 text-sm">{summary.clock}</span>
+                        </>
+                      ) : (
+                        <span className="text-zinc-300">{summary.statusDetail}</span>
+                      )}
+                    </div>
+                    <div className="flex items-stretch">
+                      {([summary.away, summary.home] as const).map((t, i) => {
+                        const first = i === 0;
+                        return (
+                          <div key={t.id} className={`plg-accent flex-1 flex items-center justify-between gap-3 px-4 py-2 ${first ? '' : 'flex-row-reverse'}`}
+                            style={{ ['--tc' as any]: first ? awayColor : homeColor, ['--dir' as any]: first ? '90deg' : '270deg' }}>
+                            {t.logo
+                              ? <img src={t.logo} className="drop-shadow object-contain" alt=""
+                                  style={{ width: 34 * logoScale, height: 34 * logoScale, animation: motionOn ? 'plg-float-logo 3s ease-in-out infinite' : undefined }} />
+                              : <span className="font-black text-base">{t.abbr}</span>}
+                            <Score value={t.score} />
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div className="flex items-stretch text-[10px] font-black uppercase tracking-widest">
+                      <div className="flex-1 plg-panel text-center py-1">{summary.away.abbr}</div>
+                      {badges.length > 0 && (
+                        <div className="bg-white px-2 flex items-center">
+                          <BadgeRoll logos={badges} scale={brandScale * 0.65} secs={badgeSecs} />
+                        </div>
+                      )}
+                      <div className="flex-1 plg-panel text-center py-1">{summary.home.abbr}</div>
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })()}
@@ -861,7 +977,7 @@ function Logo3D({ src: url, size }: { src: string; size: number }) {
 
 /* Rotating badge chip: rolls UP through company logo, league logo and any
    extra badges — pure CSS keyframes (generated per list), seamless loop. */
-function BadgeRoll({ logos, scale }: { logos: string[]; scale: number }) {
+function BadgeRoll({ logos, scale, secs = 4.5 }: { logos: string[]; scale: number; secs?: number }) {
   const itemH = Math.round(34 * scale);
   const w = Math.round(78 * scale);
   if (logos.length === 0) return null;
@@ -879,7 +995,7 @@ function BadgeRoll({ logos, scale }: { logos: string[]; scale: number }) {
   return (
     <div style={{ height: itemH, width: w, overflow: 'hidden' }}>
       <style>{kf}</style>
-      <div style={{ animation: `${name} ${N * 4.5}s cubic-bezier(0.5, 0, 0.2, 1) infinite` }}>
+      <div style={{ animation: `${name} ${N * secs}s cubic-bezier(0.5, 0, 0.2, 1) infinite` }}>
         {[...logos, logos[0]].map((l, i) => (
           <div key={i} style={{ height: itemH, width: w }} className="flex items-center justify-center">
             <img src={l} className="object-contain" style={{ width: w - 4, height: itemH - 4 }} alt="" />
