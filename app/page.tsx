@@ -9,6 +9,7 @@ import {
   CheckSquare, Layers, BarChart3, Zap, Globe,
   ArrowRight, Star, ChevronRight,
   ClipboardCheck, IdCard, BookImage, Loader2, CreditCard, Mic,
+  MonitorPlay, Tv, ListOrdered, Shield,
 } from 'lucide-react';
 
 const FEATURES = [
@@ -24,7 +25,11 @@ const FEATURES = [
   { icon: ClipboardCheck, title: 'Equipment Forms',  desc: 'Digital check-out, return inspection, maintenance, and retirement forms with mobile finger signatures.',           color: 'bg-yellow-400/10 text-yellow-400' },
   { icon: BarChart3,     title: 'Gantt Chart',       desc: 'Visual timeline across your entire production schedule. See every task, dependency, and deadline at once.',        color: 'bg-yellow-400/10 text-yellow-400' },
   { icon: ClipboardList, title: 'Shoot Log',         desc: 'On-set take journal: scene, shot, lens, aperture, ISO, shutter speed, sound roll — all logged in real time.',     color: 'bg-yellow-400/10 text-yellow-400' },
-  { icon: Mic,           title: 'Audio Planner',     desc: 'Live-show input lists with recommended mics, gain structure, phantom power, RF frequency coordination, and monitor mixes. Paste a technical rider — get the patch list.', color: 'bg-yellow-400/10 text-yellow-400' },
+  { icon: Mic,           title: 'Audio Planner',     desc: 'Live-show input lists with recommended mics, gain structure, phantom power, RF frequency coordination, monitor mixes and comms (walkies, intercom, IFB). Paste a technical rider — get the patch list.', color: 'bg-yellow-400/10 text-yellow-400' },
+  { icon: MonitorPlay,   title: 'Live Sports Graphics', desc: 'A real-time broadcast CG: score bug with official clocks, player lower thirds, auto play callouts, sponsored trivia and AR-style reveals — driven by live NBA, NCAA, G League & WNBA feeds or fully manual for local teams. Preview/Take, skins, and OBS/vMix-ready output.', color: 'bg-yellow-400/10 text-yellow-400' },
+  { icon: Tv,            title: 'Broadcast Plan',    desc: 'The TD\'s paperwork for live multi-cam shows: camera plan with presets, replay units, event-driven graphics package, and transmission circuits coordinated with the network.', color: 'bg-yellow-400/10 text-yellow-400' },
+  { icon: ListOrdered,   title: 'Run of Show',       desc: 'The show-caller\'s master timing: segments, cues per department (audio, video, lighting, SFX), computed clock times and total runtime. Doubles as a broadcast rundown.', color: 'bg-yellow-400/10 text-yellow-400' },
+  { icon: Shield,        title: 'Safety & Risk',     desc: 'Hazard matrix with severity scoring, mitigations per stunt, pyro, rigging or crowd, emergency plan, and a sign-off ready PDF.', color: 'bg-yellow-400/10 text-yellow-400' },
 ];
 
 const PLANS = [
@@ -35,7 +40,7 @@ const PLANS = [
   },
   {
     name: 'Pro', price: '$29', period: '/month', planKey: 'pro',
-    features: ['Unlimited productions', 'Unlimited crew & inventory', 'All PDF documents', 'Audio planner (input list & RF)', 'Storyboard + Blueprint', 'Equipment forms & ID cards', 'Priority support'],
+    features: ['Unlimited productions', 'Unlimited crew & inventory', 'All PDF documents', 'Live sports graphics (CG)', 'Audio planner (input list & RF)', 'Storyboard + Blueprint', 'Equipment forms & ID cards', 'Priority support'],
     cta: 'Subscribe — $29/mo', highlight: true, badge: 'Most Popular',
   },
   {
