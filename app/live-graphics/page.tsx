@@ -1152,11 +1152,20 @@ function ControlInner() {
                 </div>
               ))}
               <div className="flex items-center gap-2">
+                {trivia.sponsor && <img src={trivia.sponsor} className="h-7 max-w-[64px] object-contain shrink-0" alt="" />}
                 <select value={trivia.sponsor} onChange={e => setTrivia(t => ({ ...t, sponsor: e.target.value }))}
                   className="flex-1 border border-gray-200 rounded-lg px-2 py-1.5 text-xs bg-white">
                   <option value="">Sponsor logo: none (use brand)</option>
                   {banners.map(b => <option key={b.id} value={b.url}>{b.name}</option>)}
+                  {trivia.sponsor && !banners.some(b => b.url === trivia.sponsor) && (
+                    <option value={trivia.sponsor}>Uploaded sponsor</option>
+                  )}
                 </select>
+                <label title="Upload sponsor logo" className="cursor-pointer text-gray-400 hover:text-gray-700 shrink-0 border border-dashed border-gray-300 rounded-lg p-1.5">
+                  <Upload size={13} />
+                  <input type="file" accept="image/*" className="hidden"
+                    onChange={e => uploadMugshot(e, url => setTrivia(t => ({ ...t, sponsor: url })))} />
+                </label>
                 <button onClick={() => setTrivia(t => ({ ...t, reveal: !t.reveal }))}
                   className={`text-xs px-3 py-1.5 rounded-lg font-bold ${trivia.reveal ? 'bg-green-600 text-white' : 'border border-green-300 text-green-700 hover:bg-green-50'}`}>
                   {trivia.reveal ? 'ANSWER SHOWN' : 'REVEAL ANSWER'}
@@ -1201,11 +1210,22 @@ function ControlInner() {
                 </label>
               </div>
               {portalCfg.content === 'logo' && (
-                <select value={portalCfg.logo} onChange={e => setPortalCfg(c => ({ ...c, logo: e.target.value }))}
-                  className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs bg-white">
-                  <option value="">Logo: trivia sponsor / brand</option>
-                  {banners.map(b => <option key={b.id} value={b.url}>{b.name}</option>)}
-                </select>
+                <div className="flex items-center gap-2">
+                  {portalCfg.logo && <img src={portalCfg.logo} className="h-7 max-w-[64px] object-contain shrink-0" alt="" />}
+                  <select value={portalCfg.logo} onChange={e => setPortalCfg(c => ({ ...c, logo: e.target.value }))}
+                    className="flex-1 border border-gray-200 rounded-lg px-2 py-1.5 text-xs bg-white">
+                    <option value="">Logo: trivia sponsor / brand</option>
+                    {banners.map(b => <option key={b.id} value={b.url}>{b.name}</option>)}
+                    {portalCfg.logo && !banners.some(b => b.url === portalCfg.logo) && (
+                      <option value={portalCfg.logo}>Uploaded logo</option>
+                    )}
+                  </select>
+                  <label title="Upload sponsor logo" className="cursor-pointer text-gray-400 hover:text-gray-700 shrink-0 border border-dashed border-gray-300 rounded-lg p-1.5">
+                    <Upload size={13} />
+                    <input type="file" accept="image/*" className="hidden"
+                      onChange={e => uploadMugshot(e, url => setPortalCfg(c => ({ ...c, logo: url })))} />
+                  </label>
+                </div>
               )}
               {([['x', 'X', 0, 100], ['y', 'Y', 0, 100], ['size', 'Size', 0.5, 2]] as [keyof typeof portalCfg, string, number, number][]).map(([k, label, min, max]) => (
                 <label key={k} className="flex items-center gap-2 text-xs text-gray-500">

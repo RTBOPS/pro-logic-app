@@ -293,7 +293,7 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
 
         /* ── ATX Night: Austin live-music neon duotone ── */
         .skin-spurs-atx .plg-panel { background: repeating-linear-gradient(0deg, rgba(255,45,149,0.05) 0 1px, transparent 1px 5px), linear-gradient(160deg, #14060f, #060612 70%); border: 1px solid rgba(255,45,149,0.5); box-shadow: 0 0 14px rgba(255,45,149,0.25), 0 0 22px rgba(0,194,255,0.15); }
-        .skin-spurs-atx .plg-accent { background-image: linear-gradient(var(--dir, 90deg), var(--tc, #ff2d95), rgba(0,194,255,0.55) 160%); border: 1px solid rgba(255,255,255,0.25); }
+        .skin-spurs-atx .plg-accent { background-image: repeating-linear-gradient(0deg, rgba(0,0,0,0.28) 0 1px, transparent 1px 4px), linear-gradient(180deg, rgba(255,255,255,0.22), transparent 45%), linear-gradient(var(--dir, 90deg), var(--tc, #ff2d95), rgba(0,194,255,0.55) 160%); border: 1px solid rgba(255,255,255,0.25); }
         .skin-spurs-atx .plg-label { background: linear-gradient(90deg, #ff2d95, #7b5cff 55%, #00c2ff); color: #0a0511 !important; }
 
         /* ── Los Raros: psychedelic teal/pink farewell ── */
@@ -302,13 +302,13 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
         .skin-spurs-raros .plg-label { background: linear-gradient(90deg, #00c9b1, #ff5da2 60%, #9b5cff); color: #120817 !important; }
 
         /* ── Star Wars Night: starfield & saber edges ── */
-        .skin-spurs-wars .plg-panel { background-image: radial-gradient(rgba(255,255,255,0.35) 0.6px, transparent 1.1px), radial-gradient(rgba(255,255,255,0.18) 0.5px, transparent 1px), linear-gradient(180deg, #05060d, #010208); background-size: 42px 34px, 23px 19px, 100% 100%; border-top: 1px solid rgba(58,169,255,0.6); box-shadow: 0 0 16px rgba(58,169,255,0.2); }
-        .skin-spurs-wars .plg-accent { background-image: linear-gradient(180deg, rgba(255,255,255,0.14), transparent 50%), linear-gradient(var(--dir, 90deg), var(--tc, #3aa9ff), #05060d 160%); border-bottom: 2px solid var(--tc, #3aa9ff); box-shadow: inset 0 -6px 12px -6px var(--tc, #3aa9ff); }
+        .skin-spurs-wars .plg-panel { background-image: radial-gradient(rgba(255,255,255,0.35) 0.6px, transparent 1.1px), radial-gradient(rgba(255,255,255,0.18) 0.5px, transparent 1px), linear-gradient(180deg, #05060d, #010208); background-size: 34px 27px, 19px 15px, 100% 100%; border-top: 1px solid rgba(58,169,255,0.6); box-shadow: 0 0 16px rgba(58,169,255,0.2); }
+        .skin-spurs-wars .plg-accent { background-image: radial-gradient(rgba(255,255,255,0.5) 0.6px, transparent 1.1px), linear-gradient(180deg, rgba(255,255,255,0.14), transparent 50%), linear-gradient(var(--dir, 90deg), var(--tc, #3aa9ff), #05060d 160%); background-size: 26px 21px, 100% 100%, 100% 100%; border-bottom: 2px solid var(--tc, #3aa9ff); box-shadow: inset 0 -6px 12px -6px var(--tc, #3aa9ff); }
         .skin-spurs-wars .plg-label { background: #ffe81f; color: #05060d !important; letter-spacing: 0.35em; }
 
         /* ── Harry Potter Night: scarlet, parchment & gold ── */
         .skin-spurs-potter .plg-panel { background: repeating-linear-gradient(45deg, rgba(211,166,37,0.05) 0 2px, transparent 2px 9px), linear-gradient(180deg, #1c0d10, #12070a 65%); border-top: 2px solid #d3a625; }
-        .skin-spurs-potter .plg-accent { background-image: linear-gradient(180deg, rgba(255,230,160,0.2), transparent 50%), linear-gradient(var(--dir, 90deg), var(--tc, #740001), #12070a 160%); }
+        .skin-spurs-potter .plg-accent { background-image: repeating-linear-gradient(45deg, rgba(211,166,37,0.14) 0 2px, transparent 2px 8px), repeating-linear-gradient(-45deg, rgba(0,0,0,0.18) 0 2px, transparent 2px 8px), linear-gradient(180deg, rgba(255,230,160,0.2), transparent 50%), linear-gradient(var(--dir, 90deg), var(--tc, #740001), #12070a 160%); }
         .skin-spurs-potter .plg-label { background: linear-gradient(180deg, #f3e3bd, #e0c98f); color: #4a2c0c !important; box-shadow: inset 0 0 0 1px #b08d57; font-style: italic; }
 
         /* ── Princess Night: rose, lavender & sparkles ── */
@@ -318,7 +318,7 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
 
         /* ── Lotería Night: card frames, folk red & teal ── */
         .skin-spurs-loteria .plg-panel { background: linear-gradient(180deg, #17100c, #100a08 65%); border: 2px solid #f6e7c1; outline: 2px solid #d62828; outline-offset: -6px; }
-        .skin-spurs-loteria .plg-accent { background-image: linear-gradient(180deg, rgba(255,244,214,0.18), transparent 45%), linear-gradient(var(--dir, 90deg), var(--tc, #d62828), #100a08 160%); border-bottom: 2px dashed rgba(246,231,193,0.55); }
+        .skin-spurs-loteria .plg-accent { background-image: radial-gradient(rgba(246,231,193,0.3) 1px, transparent 1.6px), linear-gradient(180deg, rgba(255,244,214,0.18), transparent 45%), linear-gradient(var(--dir, 90deg), var(--tc, #d62828), #100a08 160%); background-size: 9px 9px, 100% 100%, 100% 100%; border-bottom: 2px dashed rgba(246,231,193,0.55); }
         .skin-spurs-loteria .plg-label { background: #f6e7c1; color: #a01818 !important; box-shadow: inset 0 0 0 2px #d62828; }
 
         /* ── Pride Night: classic rainbow trims ── */
@@ -822,10 +822,10 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
    extra badges — pure CSS keyframes (generated per list), seamless loop. */
 function BadgeRoll({ logos, scale }: { logos: string[]; scale: number }) {
   const itemH = Math.round(34 * scale);
-  const w = Math.round(64 * scale);
+  const w = Math.round(78 * scale);
   if (logos.length === 0) return null;
   if (logos.length === 1) {
-    return <img src={logos[0]} className="object-contain" style={{ height: itemH - 4, maxWidth: w }} alt="" />;
+    return <img src={logos[0]} className="object-contain" style={{ width: w, height: itemH - 4 }} alt="" />;
   }
   const N = logos.length;
   const name = `plgroll${N}x${itemH}`;
@@ -841,7 +841,7 @@ function BadgeRoll({ logos, scale }: { logos: string[]; scale: number }) {
       <div style={{ animation: `${name} ${N * 4.5}s cubic-bezier(0.5, 0, 0.2, 1) infinite` }}>
         {[...logos, logos[0]].map((l, i) => (
           <div key={i} style={{ height: itemH, width: w }} className="flex items-center justify-center">
-            <img src={l} className="object-contain" style={{ maxHeight: itemH - 2, maxWidth: w }} alt="" />
+            <img src={l} className="object-contain" style={{ width: w - 4, height: itemH - 4 }} alt="" />
           </div>
         ))}
       </div>
