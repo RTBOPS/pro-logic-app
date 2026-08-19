@@ -80,12 +80,12 @@ export const DEFAULT_PORTAL_VIDEO_HEVC =
   'https://firebasestorage.googleapis.com/v0/b/prologicstudio-4a6f5.firebasestorage.app/o/graphics_assets%2Fportal-fire.mov?alt=media&token=a1b2c3d4-portal-hevc-2026';
 
 /* ESPN league slugs this CG can drive automatically */
-export const LEAGUES: { id: string; label: string }[] = [
-  { id: 'nba', label: 'NBA' },
-  { id: 'nba-development', label: 'G League' },
-  { id: 'mens-college-basketball', label: 'NCAA Men' },
-  { id: 'womens-college-basketball', label: 'NCAA Women' },
-  { id: 'wnba', label: 'WNBA' },
+export const LEAGUES: { id: string; label: string; logo: string }[] = [
+  { id: 'nba', label: 'NBA', logo: 'https://a.espncdn.com/i/teamlogos/leagues/500/nba.png' },
+  { id: 'nba-development', label: 'G League', logo: 'https://a.espncdn.com/combiner/i?img=/i/teamlogos/leagues/500/nba_gleague.png' },
+  { id: 'mens-college-basketball', label: 'NCAA Men', logo: '' },
+  { id: 'womens-college-basketball', label: 'NCAA Women', logo: '' },
+  { id: 'wnba', label: 'WNBA', logo: 'https://a.espncdn.com/i/teamlogos/leagues/500/wnba.png' },
 ];
 
 /* ── Manual game mode ──────────────────────────────────────
@@ -396,4 +396,19 @@ export function comparedTeamStats(summary: Summary): { label: string; away: stri
     away: summary.away.stats.find(s => s.label === label)?.value || '—',
     home: summary.home.stats.find(s => s.label === label)?.value || '—',
   })).filter(r => r.away !== '—' || r.home !== '—');
+}
+
+/* ── Photo overrides ───────────────────────────────────────
+   Operator-assigned mugshots (pasted from a Google Images search or uploaded)
+   that replace missing feed headshots everywhere they render. */
+export function applyPhotoOverrides(
+  summary: Summary | null,
+  overrides: Record<string, string> | null | undefined
+): Summary | null {
+  if (!summary || !overrides || Object.keys(overrides).length === 0) return summary;
+  const fix = (t: TeamBox): TeamBox => ({
+    ...t,
+    athletes: t.athletes.map(a => overrides[a.id] ? { ...a, headshot: overrides[a.id] } : a),
+  });
+  return { ...summary, home: fix(summary.home), away: fix(summary.away) };
 }

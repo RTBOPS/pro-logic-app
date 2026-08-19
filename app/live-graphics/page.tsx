@@ -31,8 +31,9 @@ interface GfxState {
   portal: boolean;
   talent: boolean;
   mention: boolean;
+  ftId: string | null;
 }
-const GFX_OFF: GfxState = { bug: false, lowerId: null, full: null, banner: null, portal: false, talent: false, mention: false };
+const GFX_OFF: GfxState = { bug: false, lowerId: null, full: null, banner: null, portal: false, talent: false, mention: false, ftId: null };
 
 const DEMO = { label: 'Demo: Finals 2024 — DAL @ BOS (G5)', date: '20240617' };
 
@@ -91,6 +92,8 @@ function ControlInner() {
   /* Broadcast team & special mentions */
   const [talentList, setTalentList] = useState<{ id: string; name: string; role: string; photo: string }[]>([]);
   const [mentionCfg, setMentionCfg] = useState({ label: 'Special Guest', name: '', title: '', photo: '' });
+  const [photoOverrides, setPhotoOverrides] = useState<Record<string, string>>({});
+  const [leagueBadge, setLeagueBadge] = useState('auto');   // auto | none | url
   const [banners, setBanners] = useState<BannerItem[]>([]);
   const [uploading, setUploading] = useState(false);
   const bannerRef = useRef<HTMLInputElement>(null);
@@ -132,6 +135,8 @@ function ControlInner() {
       if (d.portalCfg) setPortalCfg({ x: 50, y: 30, size: 1, logo: '', video: '', content: 'logo', ...d.portalCfg });
       if (Array.isArray(d.talentCfg?.list)) setTalentList(d.talentCfg.list);
       if (d.mentionCfg) setMentionCfg({ label: 'Special Guest', name: '', title: '', photo: '', ...d.mentionCfg });
+      if (d.photoOverrides) setPhotoOverrides(d.photoOverrides);
+      if (d.leagueBadgeMode) setLeagueBadge(d.leagueBadgeMode);
     }).catch(() => {});
   }, []);
 
@@ -190,6 +195,11 @@ function ControlInner() {
         portalCfg,
         talentCfg: { list: talentList },
         mentionCfg,
+        photoOverrides,
+        leagueBadgeMode: leagueBadge,
+        leagueBadge: leagueBadge === 'none' ? '' : leagueBadge === 'auto'
+          ? (source === 'feed' ? (LEAGUES.find(l => l.id === league)?.logo || '') : '')
+          : leagueBadge,
         banners,
         updatedAt: new Date().toISOString(),
         ...fields,
@@ -218,7 +228,7 @@ function ControlInner() {
   /* Re-push settings when branding/theme changes (only once a game is loaded) */
   useEffect(() => {
     if ((eventId || source === 'manual') && token) pushDoc({});
-  }, [showBrand, autoCallouts, useTeamColors, c1, c2, banners, logoScale, brandScale, motionFx, trivia, portalCfg, talentList, mentionCfg, bugPos, skin]);
+  }, [showBrand, autoCallouts, useTeamColors, c1, c2, banners, logoScale, brandScale, motionFx, trivia, portalCfg, talentList, mentionCfg, bugPos, skin, photoOverrides, leagueBadge, league, source]);
 
   /* Fire a play callout for the on-air player (or top scorer) */
   const calloutTarget: Athlete | null = useMemo(() => {
@@ -273,6 +283,38 @@ function ControlInner() {
       assign(await getDownloadURL(snap.ref));
     } catch (err: any) { alert('Upload failed: ' + err.message); }
   };
+
+  /* ── Mugshot tools: find on Google → copy → paste here (or upload a file) ── */
+  const uploadBlobAsPhoto = async (blob: Blob, assign: (url: string) => void) => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
+    const ext = (blob.type.split('/')[1] || 'png').replace('jpeg', 'jpg');
+    const path = `graphics_banners/${uid}/mug_${Date.now()}.${ext}`;
+    const snap = await uploadBytes(storageRef(storage, path), blob);
+    assign(await getDownloadURL(snap.ref));
+  };
+  const googleMugshot = (name: string, team: string) =>
+    window.open(`https://www.google.com/search?tbm=isch&q=${encodeURIComponent(`${name} ${team} basketball`)}`, '_blank');
+  const pasteMugshot = async (assign: (url: string) => void) => {
+    try {
+      const items = await (navigator.clipboard as any).read();
+      for (const item of items) {
+        const type = item.types.find((t: string) => t.startsWith('image/'));
+        if (type) {
+          await uploadBlobAsPhoto(await item.getType(type), assign);
+          return;
+        }
+      }
+      alert('No image on the clipboard. In Google Images: right-click the photo → "Copy image", then try again.');
+    } catch (e: any) {
+      alert('Clipboard not available: ' + (e?.message || e));
+    }
+  };
+  const uploadMugshot = (e: React.ChangeEvent<HTMLInputElement>, assign: (url: string) => void) => {
+    const file = e.target.files?.[0];
+    if (file) uploadBlobAsPhoto(file, assign).catch(err => alert('Upload failed: ' + err.message));
+  };
+  const overrideFor = (a: Athlete) => (url: string) => setPhotoOverrides(o => ({ ...o, [a.id]: url }));
 
   const selectGame = (id: string) => {
     setEventId(id);
@@ -602,6 +644,13 @@ function ControlInner() {
                           <button onClick={() => mPlayer(side, pl.id, { starter: !pl.starter }, true)}
                             className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${pl.starter ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-400'}`}
                             title="Starter">S</button>
+                          <PlayerPhoto src={pl.photo} tone="light" className="w-6 h-6 rounded-full object-cover object-top bg-gray-200 shrink-0" />
+                          <button onClick={() => googleMugshot(pl.name, t.name || t.abbr)} title="Buscar foto en Google Images"
+                            className="px-1 py-0.5 rounded bg-gray-100 hover:bg-blue-100 text-[10px]">🔍</button>
+                          <button onClick={() => pasteMugshot(url => mPlayer(side, pl.id, { photo: url }, true))} title="Pegar imagen del portapapeles"
+                            className="px-1 py-0.5 rounded bg-gray-100 hover:bg-green-100 text-[10px]">📋</button>
+                          <button onClick={() => fire({ ftId: active.ftId === pl.id ? null : pl.id })} title="Free throw — at the line"
+                            className={`px-1 py-0.5 rounded text-[10px] ${active.ftId === pl.id ? 'bg-amber-400' : 'bg-gray-100 hover:bg-amber-100'}`}>🎯</button>
                           <span className="text-xs font-bold w-6 text-right tabular-nums">{pl.pts}</span>
                           {[1, 2, 3].map(n => (
                             <button key={n} onClick={() => mBucket(side, pl.id, n)}
@@ -666,6 +715,16 @@ function ControlInner() {
                 Score Bug (auto clock + score) {active.bug ? <Eye size={15} /> : <EyeOff size={15} />}
               </button>
               <div className="flex items-center gap-1.5">
+                <span className="text-[10px] text-gray-400 uppercase tracking-wide">League badge</span>
+                <select value={leagueBadge} onChange={e => setLeagueBadge(e.target.value)}
+                  className="ml-auto border border-gray-200 rounded-lg px-2 py-1 text-[11px] bg-white">
+                  <option value="auto">Auto (liga del feed)</option>
+                  <option value="none">None</option>
+                  {LEAGUES.filter(l => l.logo).map(l => <option key={l.id} value={l.logo}>{l.label}</option>)}
+                  {banners.map(b => <option key={b.id} value={b.url}>{b.name}</option>)}
+                </select>
+              </div>
+              <div className="flex items-center gap-1.5">
                 <span className="text-[10px] text-gray-400 uppercase tracking-wide">Bug position</span>
                 <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5 ml-auto">
                   {(['left', 'center', 'right'] as const).map(p => (
@@ -687,6 +746,12 @@ function ControlInner() {
                   {label} {active.full === kind ? <Eye size={15} /> : <EyeOff size={15} />}
                 </button>
               ))}
+              {active.ftId && (
+                <button onClick={() => fire({ ftId: null })}
+                  className="w-full px-4 py-2.5 rounded-xl text-sm font-medium bg-amber-500 text-white">
+                  Hide Free Throw spotlight
+                </button>
+              )}
               {active.lowerId && (
                 <button onClick={() => fire({ lowerId: null })}
                   className="w-full px-4 py-2.5 rounded-xl text-sm font-medium bg-purple-600 text-white">
@@ -732,12 +797,22 @@ function ControlInner() {
               <div>
                 <span className="text-xs font-medium text-gray-600 block mb-2">Graphics style</span>
                 <div className="mb-2">
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400 block mb-1.5">Team pack · Austin Spurs (home)</span>
-                  <div className="grid grid-cols-3 gap-1.5">
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400 block mb-1.5">Team pack · Austin Spurs 2025-26</span>
+                  <div className="grid grid-cols-3 gap-1.5 max-h-44 overflow-y-auto pr-1">
                     {([
                       ['spurs', 'Silver & Black', 'linear-gradient(180deg, #f2f5f7, #b9c2c9 50%, #1a1b1e)', '#3a3d42', '#c4ced4'],
-                      ['spurs-dc', 'DC Night', 'radial-gradient(circle at 30% 30%, #ffd83d 18%, transparent 19%), linear-gradient(135deg, #d0021b 40%, #0d1b3d 60%)', '#123a8f', '#d0021b'],
-                      ['spurs-fiesta', 'Texas Fiesta', 'linear-gradient(90deg, #e91e8c, #ff8c00, #ffd400, #00b8a9)', '#00b8a9', '#e91e8c'],
+                      ['spurs-toros', 'Toros Throwback', 'linear-gradient(180deg, #7a1f1f, #c9a227)', '#6b6e72', '#7a1f1f'],
+                      ['spurs-dragons', 'Riverdragons', 'linear-gradient(135deg, #0e7a5f, #d3a625)', '#4b2e83', '#0e7a5f'],
+                      ['spurs-atx', 'ATX Night', 'linear-gradient(90deg, #ff2d95, #00c2ff)', '#00c2ff', '#ff2d95'],
+                      ['spurs-raros', 'Los Raros', 'linear-gradient(90deg, #00c9b1, #ff5da2, #9b5cff)', '#9b5cff', '#00c9b1'],
+                      ['spurs-dc', 'DC Superhero', 'radial-gradient(circle at 30% 30%, #ffd83d 18%, transparent 19%), linear-gradient(135deg, #d0021b 40%, #0d1b3d 60%)', '#123a8f', '#d0021b'],
+                      ['spurs-wars', 'Star Wars', 'radial-gradient(circle at 25% 30%, #fff 4%, transparent 5%), linear-gradient(135deg, #05060d 60%, #3aa9ff)', '#37d24a', '#3aa9ff'],
+                      ['spurs-potter', 'Harry Potter', 'linear-gradient(135deg, #740001 55%, #d3a625)', '#1a472a', '#740001'],
+                      ['spurs-fiesta', 'Fiesta Night', 'linear-gradient(90deg, #e91e8c, #ff8c00, #ffd400, #00b8a9)', '#00b8a9', '#e91e8c'],
+                      ['spurs-princess', 'Princess Night', 'linear-gradient(135deg, #ffd9ea, #b39ddb)', '#b39ddb', '#ff9ecb'],
+                      ['spurs-loteria', 'Lotería Night', 'linear-gradient(135deg, #f6e7c1 50%, #d62828 50%)', '#1d8a99', '#d62828'],
+                      ['spurs-pride', 'Pride Night', 'linear-gradient(90deg, #e40303, #ff8c00, #ffed00, #008026, #24408e, #732982)', '#24408e', '#732982'],
+                      ['spurs-troops', 'Hoops for Troops', 'linear-gradient(135deg, #4b5320, #6b6347 60%, #23251a)', '#5e563c', '#4b5320'],
                     ] as [string, string, string, string, string][]).map(([id, label, swatch, packC1, packC2]) => (
                       <button key={id}
                         onClick={() => { setSkin(id); setUseTeamColors(false); setC1(packC1); setC2(packC2); }}
@@ -994,7 +1069,7 @@ function ControlInner() {
                   {leaders.map(a => (
                     <button key={a.id} onClick={() => fire({ lowerId: active.lowerId === a.id ? null : a.id })}
                       className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-left ${active.lowerId === a.id ? 'bg-purple-600 text-white' : 'bg-gray-50 hover:bg-gray-100'}`}>
-                      <PlayerPhoto src={a.headshot} tone="light" className="w-9 h-9 rounded-full object-cover object-top bg-gray-200 shrink-0" />
+                      <PlayerPhoto src={photoOverrides[a.id] || a.headshot} tone="light" className="w-9 h-9 rounded-full object-cover object-top bg-gray-200 shrink-0" />
                       <div className="flex-1 min-w-0">
                         <div className="text-sm font-semibold truncate">{a.name}</div>
                         <div className={`text-xs ${active.lowerId === a.id ? 'text-purple-200' : 'text-gray-500'}`}>{a.teamAbbr} · #{a.jersey}</div>
@@ -1037,11 +1112,22 @@ function ControlInner() {
                     <tr key={a.id} onClick={() => fire({ lowerId: active.lowerId === a.id ? null : a.id })}
                       className={`cursor-pointer ${active.lowerId === a.id ? 'bg-purple-50' : 'hover:bg-gray-50'}`}>
                       <td className="px-3 py-1.5">
-                        <div className="flex items-center gap-2">
-                          <PlayerPhoto src={a.headshot} tone="light" className="w-7 h-7 rounded-full object-cover object-top bg-gray-200 shrink-0" />
+                        <div className="flex items-center gap-2 group/mug">
+                          <PlayerPhoto src={photoOverrides[a.id] || a.headshot} tone="light" className="w-7 h-7 rounded-full object-cover object-top bg-gray-200 shrink-0" />
                           <span className="font-medium text-gray-800">{a.name}</span>
                           {a.starter && <span className="text-[10px] text-gray-400">S</span>}
                           {active.lowerId === a.id && <span className="text-[10px] font-bold text-purple-600">{mode === 'preview' ? 'IN PVW' : 'ON AIR'}</span>}
+                          <span className="ml-auto flex items-center gap-1 opacity-0 group-hover/mug:opacity-100" onClick={e => e.stopPropagation()}>
+                            <button onClick={() => fire({ ftId: active.ftId === a.id ? null : a.id })} title="Free throw — at the line"
+                              className={`px-1.5 py-0.5 rounded text-[10px] ${active.ftId === a.id ? 'bg-amber-400' : 'bg-gray-100 hover:bg-amber-100'}`}>🎯</button>
+                            <button onClick={() => googleMugshot(a.name, a.teamAbbr)} title="Buscar foto en Google Images"
+                              className="px-1.5 py-0.5 rounded bg-gray-100 hover:bg-blue-100 text-[10px]">🔍</button>
+                            <button onClick={() => pasteMugshot(overrideFor(a))} title="Pegar imagen copiada del portapapeles"
+                              className="px-1.5 py-0.5 rounded bg-gray-100 hover:bg-green-100 text-[10px]">📋</button>
+                            <label title="Subir archivo" className="px-1.5 py-0.5 rounded bg-gray-100 hover:bg-gray-200 text-[10px] cursor-pointer">⬆
+                              <input type="file" accept="image/*" className="hidden" onChange={e => uploadMugshot(e, overrideFor(a))} />
+                            </label>
+                          </span>
                         </div>
                       </td>
                       <td className="px-2 py-1.5 font-semibold" style={{ color: a.teamColor }}>{a.teamAbbr}</td>

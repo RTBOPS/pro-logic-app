@@ -11,7 +11,7 @@ import { db } from '@/lib/firebase';
 import PlayerPhoto from '@/components/PlayerPhoto';
 import {
   normalizeSummary, gameLeaders, comparedTeamStats, periodLabel, detectCallouts,
-  manualToSummary, topFive, DEFAULT_PORTAL_VIDEO, DEFAULT_PORTAL_VIDEO_HEVC, type ManualGame,
+  manualToSummary, topFive, applyPhotoOverrides, DEFAULT_PORTAL_VIDEO, DEFAULT_PORTAL_VIDEO_HEVC, type ManualGame,
   type Summary, type Athlete, type Callout,
 } from '@/lib/nba';
 
@@ -23,6 +23,7 @@ interface BusState {
   portal?: boolean;                     // hoop-portal sponsor reveal
   talent?: boolean;                     // broadcast team graphic
   mention?: boolean;                    // special guest / VIP mention
+  ftId?: string | null;                 // free-throw spotlight player
 }
 
 interface GfxDoc extends BusState {
@@ -40,6 +41,8 @@ interface GfxDoc extends BusState {
   portalCfg?: { x?: number; y?: number; size?: number; logo?: string; video?: string; content?: 'logo' | 'trivia' } | null;
   talentCfg?: { list?: { id: string; name: string; role: string; photo: string }[] } | null;
   mentionCfg?: { label?: string; name?: string; title?: string; photo?: string } | null;
+  photoOverrides?: Record<string, string> | null;
+  leagueBadge?: string | null;          // league logo chip (G League, NBA…)
 }
 
 const CALLOUT_MS = 4500;
@@ -146,7 +149,7 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
         const res = await fetch(`/api/nba/summary?event=${eventId}&league=${league}`);
         const json = await res.json();
         if (!alive) return;
-        const next = normalizeSummary(json);
+        const next = applyPhotoOverrides(normalizeSummary(json), gfx.photoOverrides);
         if (next) {
           if (gfx.autoCallouts !== false && next.state === 'in') {
             const events = detectCallouts(prevSummary.current, next);
@@ -160,7 +163,7 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
     load();
     const t = setInterval(load, 4000);
     return () => { alive = false; clearInterval(t); };
-  }, [gfx.eventId, gfx.autoCallouts, gfx.sourceMode, gfx.manual, gfx.league]);
+  }, [gfx.eventId, gfx.autoCallouts, gfx.sourceMode, gfx.manual, gfx.league, gfx.photoOverrides]);
 
   /* Callout queue: show one at a time */
   const current = queue[0] || null;
@@ -177,6 +180,11 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
     if (!summary || !bus.lowerId) return null;
     return [...summary.home.athletes, ...summary.away.athletes].find(a => a.id === bus.lowerId) || null;
   }, [summary, bus.lowerId]);
+
+  const ftPlayer: Athlete | null = useMemo(() => {
+    if (!summary || !bus.ftId) return null;
+    return [...summary.home.athletes, ...summary.away.athletes].find(a => a.id === bus.ftId) || null;
+  }, [summary, bus.ftId]);
 
   /* Theme: official team colors by default, operator overrides at will */
   const custom = !!(gfx.theme && gfx.theme.useTeamColors === false);
@@ -208,6 +216,10 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
         @keyframes plg-shine { 0% { transform: translateX(-130%); } 26% { transform: translateX(430%); } 100% { transform: translateX(430%); } }
         @keyframes plg-float-logo { 0%, 100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-2.5px) scale(1.05); } }
         @keyframes plg-correct-pop { 0% { transform: scale(1); } 40% { transform: scale(1.06); } 100% { transform: scale(1); } }
+        @keyframes plg-gauge { from { stroke-dashoffset: 327; } to { stroke-dashoffset: var(--off, 327); } }
+        @keyframes plg-ball { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-7px); } }
+        @keyframes plg-ft-pulse { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
+        @keyframes plg-needle { from { transform: rotate(-90deg); } to { transform: rotate(var(--ang, 0deg)); } }
 
         /* ── Surface system: every bar/panel uses these; skins re-texture them ── */
         .plg-panel { background: rgba(24, 24, 27, 0.95); }
@@ -249,6 +261,56 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
         .skin-spurs-fiesta .plg-panel { background: linear-gradient(180deg, #17121c, #0e0a12 60%, #140f19); border-top: 3px solid; border-image: linear-gradient(90deg, #e91e8c, #ff8c00, #ffd400, #00b8a9, #7b5cff) 1; }
         .skin-spurs-fiesta .plg-accent { background-image: repeating-linear-gradient(135deg, rgba(255,255,255,0.1) 0 3px, transparent 3px 10px), linear-gradient(180deg, rgba(255,255,255,0.22), rgba(255,255,255,0) 50%), linear-gradient(var(--dir, 90deg), var(--tc, #e91e8c), rgba(20,15,25,0.55) 165%); }
         .skin-spurs-fiesta .plg-label { background: linear-gradient(90deg, #e91e8c, #ff8c00 30%, #ffd400 55%, #00b8a9 80%, #7b5cff); color: #14101a !important; }
+
+        /* ── Toros Throwback: rawhide & maroon western ── */
+        .skin-spurs-toros .plg-panel { background: repeating-linear-gradient(80deg, rgba(0,0,0,0.25) 0 2px, transparent 2px 7px), linear-gradient(180deg, #221512, #140c0a 60%, #1b100d); border-top: 2px solid #c9a227; }
+        .skin-spurs-toros .plg-accent { background-image: repeating-linear-gradient(80deg, rgba(0,0,0,0.2) 0 2px, transparent 2px 7px), linear-gradient(180deg, rgba(255,220,150,0.18), transparent 45%), linear-gradient(var(--dir, 90deg), var(--tc, #7a1f1f), #1b100d 155%); }
+        .skin-spurs-toros .plg-label { background: linear-gradient(180deg, #e5c35a, #c9a227 55%, #8a6d14); color: #1b100d !important; letter-spacing: 0.3em; }
+
+        /* ── Riverdragons: jade dragon scales & gold ── */
+        .skin-spurs-dragons .plg-panel { background-image: radial-gradient(circle at 4px 0, transparent 4px, rgba(14,122,95,0.16) 4.5px, transparent 6px), linear-gradient(180deg, #0c1f1b, #071411 60%, #0b1a16); background-size: 12px 8px, 100% 100%; border-top: 2px solid #d3a625; }
+        .skin-spurs-dragons .plg-accent { background-image: radial-gradient(circle at 5px 0, transparent 4px, rgba(0,0,0,0.25) 4.5px, transparent 6.5px), linear-gradient(180deg, rgba(255,255,255,0.2), transparent 45%), linear-gradient(var(--dir, 90deg), var(--tc, #0e7a5f), #071411 155%); background-size: 13px 9px, 100% 100%, 100% 100%; }
+        .skin-spurs-dragons .plg-label { background: linear-gradient(180deg, #f1d582, #d3a625 55%, #96741a); color: #0b1a16 !important; }
+
+        /* ── ATX Night: Austin live-music neon duotone ── */
+        .skin-spurs-atx .plg-panel { background: repeating-linear-gradient(0deg, rgba(255,45,149,0.05) 0 1px, transparent 1px 5px), linear-gradient(160deg, #14060f, #060612 70%); border: 1px solid rgba(255,45,149,0.5); box-shadow: 0 0 14px rgba(255,45,149,0.25), 0 0 22px rgba(0,194,255,0.15); }
+        .skin-spurs-atx .plg-accent { background-image: linear-gradient(var(--dir, 90deg), var(--tc, #ff2d95), rgba(0,194,255,0.55) 160%); border: 1px solid rgba(255,255,255,0.25); }
+        .skin-spurs-atx .plg-label { background: linear-gradient(90deg, #ff2d95, #7b5cff 55%, #00c2ff); color: #0a0511 !important; }
+
+        /* ── Los Raros: psychedelic teal/pink farewell ── */
+        .skin-spurs-raros .plg-panel { background: linear-gradient(120deg, #12081a, #081411 55%, #140812); border-top: 3px solid; border-image: linear-gradient(90deg, #00c9b1, #ff5da2, #9b5cff) 1; }
+        .skin-spurs-raros .plg-accent { background-image: repeating-linear-gradient(150deg, rgba(255,255,255,0.09) 0 4px, transparent 4px 11px), linear-gradient(var(--dir, 90deg), var(--tc, #00c9b1), #ff5da2 170%); }
+        .skin-spurs-raros .plg-label { background: linear-gradient(90deg, #00c9b1, #ff5da2 60%, #9b5cff); color: #120817 !important; }
+
+        /* ── Star Wars Night: starfield & saber edges ── */
+        .skin-spurs-wars .plg-panel { background-image: radial-gradient(rgba(255,255,255,0.35) 0.6px, transparent 1.1px), radial-gradient(rgba(255,255,255,0.18) 0.5px, transparent 1px), linear-gradient(180deg, #05060d, #010208); background-size: 42px 34px, 23px 19px, 100% 100%; border-top: 1px solid rgba(58,169,255,0.6); box-shadow: 0 0 16px rgba(58,169,255,0.2); }
+        .skin-spurs-wars .plg-accent { background-image: linear-gradient(180deg, rgba(255,255,255,0.14), transparent 50%), linear-gradient(var(--dir, 90deg), var(--tc, #3aa9ff), #05060d 160%); border-bottom: 2px solid var(--tc, #3aa9ff); box-shadow: inset 0 -6px 12px -6px var(--tc, #3aa9ff); }
+        .skin-spurs-wars .plg-label { background: #ffe81f; color: #05060d !important; letter-spacing: 0.35em; }
+
+        /* ── Harry Potter Night: scarlet, parchment & gold ── */
+        .skin-spurs-potter .plg-panel { background: repeating-linear-gradient(45deg, rgba(211,166,37,0.05) 0 2px, transparent 2px 9px), linear-gradient(180deg, #1c0d10, #12070a 65%); border-top: 2px solid #d3a625; }
+        .skin-spurs-potter .plg-accent { background-image: linear-gradient(180deg, rgba(255,230,160,0.2), transparent 50%), linear-gradient(var(--dir, 90deg), var(--tc, #740001), #12070a 160%); }
+        .skin-spurs-potter .plg-label { background: linear-gradient(180deg, #f3e3bd, #e0c98f); color: #4a2c0c !important; box-shadow: inset 0 0 0 1px #b08d57; font-style: italic; }
+
+        /* ── Princess Night: rose, lavender & sparkles ── */
+        .skin-spurs-princess .plg-panel { background-image: radial-gradient(rgba(255,255,255,0.5) 0.6px, transparent 1.2px), linear-gradient(180deg, #1c1020, #140b18 65%); background-size: 26px 22px, 100% 100%; border-top: 2px solid #ffb6d9; }
+        .skin-spurs-princess .plg-accent { background-image: radial-gradient(rgba(255,255,255,0.45) 0.7px, transparent 1.3px), linear-gradient(180deg, rgba(255,255,255,0.3), transparent 50%), linear-gradient(var(--dir, 90deg), var(--tc, #ff9ecb), #6f5a8f 165%); background-size: 20px 17px, 100% 100%, 100% 100%; }
+        .skin-spurs-princess .plg-label { background: linear-gradient(180deg, #ffd9ea, #ffb0d4 60%, #e58fb9); color: #47143b !important; }
+
+        /* ── Lotería Night: card frames, folk red & teal ── */
+        .skin-spurs-loteria .plg-panel { background: linear-gradient(180deg, #17100c, #100a08 65%); border: 2px solid #f6e7c1; outline: 2px solid #d62828; outline-offset: -6px; }
+        .skin-spurs-loteria .plg-accent { background-image: linear-gradient(180deg, rgba(255,244,214,0.18), transparent 45%), linear-gradient(var(--dir, 90deg), var(--tc, #d62828), #100a08 160%); border-bottom: 2px dashed rgba(246,231,193,0.55); }
+        .skin-spurs-loteria .plg-label { background: #f6e7c1; color: #a01818 !important; box-shadow: inset 0 0 0 2px #d62828; }
+
+        /* ── Pride Night: classic rainbow trims ── */
+        .skin-spurs-pride .plg-panel { background: linear-gradient(180deg, #16161a, #0d0d11 65%); border-top: 4px solid; border-image: linear-gradient(90deg, #e40303, #ff8c00, #ffed00, #008026, #24408e, #732982) 1; }
+        .skin-spurs-pride .plg-accent { background-image: linear-gradient(180deg, rgba(255,255,255,0.18), transparent 50%), linear-gradient(var(--dir, 90deg), var(--tc, #24408e), #0d0d11 160%); }
+        .skin-spurs-pride .plg-label { background: linear-gradient(90deg, #e40303, #ff8c00 22%, #ffed00 42%, #008026 62%, #24408e 82%, #732982); color: #0d0d11 !important; }
+
+        /* ── Hoops for Troops: camo & stencil ── */
+        .skin-spurs-troops .plg-panel { background-image: radial-gradient(ellipse 46px 26px at 18% 30%, rgba(75,83,32,0.55) 45%, transparent 52%), radial-gradient(ellipse 52px 30px at 72% 68%, rgba(60,52,36,0.6) 45%, transparent 52%), radial-gradient(ellipse 40px 22px at 48% 12%, rgba(94,86,60,0.45) 45%, transparent 52%), linear-gradient(180deg, #23251a, #171910); }
+        .skin-spurs-troops .plg-accent { background-image: radial-gradient(ellipse 42px 24px at 26% 40%, rgba(0,0,0,0.28) 45%, transparent 52%), radial-gradient(ellipse 46px 26px at 70% 62%, rgba(0,0,0,0.22) 45%, transparent 52%), linear-gradient(var(--dir, 90deg), var(--tc, #4b5320), #171910 160%); }
+        .skin-spurs-troops .plg-label { background: #4b5320; color: #e8e4cf !important; letter-spacing: 0.3em; border: 1px dashed #e8e4cf; }
       `}</style>
       {summary && (
         <>
@@ -282,9 +344,9 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
                     <div className="absolute inset-y-0 w-1/3 bg-gradient-to-r from-transparent via-white/25 to-transparent pointer-events-none z-10"
                       style={{ animation: 'plg-shine 6.4s ease-in-out infinite' }} />
                   )}
-                  {brand && (
-                    <div className="bg-white px-3 flex items-center">
-                      <img src={brand.logo} className="object-contain" style={{ height: 32 * brandScale, maxWidth: 72 * brandScale }} alt={brand.name || ''} />
+                  {(brand || gfx.leagueBadge) && (
+                    <div className="bg-white px-2.5 flex items-center">
+                      <BadgeRoll logos={[brand?.logo || '', gfx.leagueBadge || ''].filter(Boolean)} scale={brandScale} />
                     </div>
                   )}
                   <TeamCell team={summary.away} color={awayColor} scale={logoScale} float={motionOn} />
@@ -503,6 +565,95 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
             );
           })()}
 
+          {/* ── FREE THROW SPOTLIGHT (side panel, animated FT gauge) ── */}
+          {ftPlayer && (() => {
+            const a = ftPlayer;
+            const [made, att] = (a.stats.ft || '').split('-').map(n => parseInt(n, 10));
+            const hasFt = Number.isFinite(made) && Number.isFinite(att) && att > 0;
+            const pct = hasFt ? made / att : 0;
+            const C = 327;   // circumference of r=52 ring
+            const color = custom ? awayColor : a.teamColor;
+            return (
+              <div className="absolute right-8 top-1/2 -translate-y-1/2 w-64"
+                style={{ animation: 'plg-slide-r 0.55s cubic-bezier(0.34, 1.3, 0.64, 1) both' }}>
+                <div className="rounded-2xl overflow-hidden shadow-2xl text-white">
+                  <div className="plg-label px-4 py-2 text-[10px] font-black uppercase tracking-[0.25em] text-black flex items-center gap-2">
+                    <span style={{ animation: 'plg-ball 1.1s ease-in-out infinite', display: 'inline-block' }}>🏀</span>
+                    At The Line
+                  </div>
+                  <div className="plg-accent px-4 py-3 flex items-center gap-3"
+                    style={{ ['--tc' as any]: color, ['--dir' as any]: '135deg' }}>
+                    <PlayerPhoto src={a.headshot} className="w-14 h-14 rounded-xl object-cover object-top bg-black/30 shrink-0" />
+                    <div className="min-w-0">
+                      <div className="text-lg font-black leading-tight truncate">{a.name}</div>
+                      <div className="text-[10px] font-bold uppercase tracking-widest opacity-80 flex items-center gap-1.5">
+                        {a.teamLogo && <img src={a.teamLogo} className="w-4 h-4 object-contain" alt="" />}
+                        {a.teamAbbr} · #{a.jersey}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="plg-panel px-4 py-4 flex items-center gap-4">
+                    <div className="relative w-[120px] shrink-0">
+                      {(() => {
+                        const zone = !hasFt ? null : pct >= 0.75 ? 'hot' : pct >= 0.5 ? 'steady' : 'cold';
+                        const zoneColor = zone === 'hot' ? '#22c55e' : zone === 'steady' ? '#f59e0b' : '#ef4444';
+                        const pt = (pp: number) => {
+                          const ang = Math.PI * (1 - pp);
+                          return [60 + 46 * Math.cos(ang), 58 - 46 * Math.sin(ang)];
+                        };
+                        const arc = (p1: number, p2: number) => {
+                          const [x1, y1] = pt(p1); const [x2, y2] = pt(p2);
+                          return `M ${x1.toFixed(1)} ${y1.toFixed(1)} A 46 46 0 0 1 ${x2.toFixed(1)} ${y2.toFixed(1)}`;
+                        };
+                        const seg = (p1: number, p2: number, colorSeg: string, id: string) => (
+                          <path key={id} d={arc(p1, p2)} fill="none" stroke={colorSeg} strokeWidth="9" strokeLinecap="round"
+                            opacity={zone === id ? 1 : 0.28}
+                            style={zone === id ? { filter: `drop-shadow(0 0 5px ${colorSeg})` } : undefined} />
+                        );
+                        return (
+                          <>
+                            <svg viewBox="0 0 120 66" className="w-full">
+                              {seg(0.02, 0.46, '#ef4444', 'cold')}
+                              {seg(0.52, 0.71, '#f59e0b', 'steady')}
+                              {seg(0.77, 0.98, '#22c55e', 'hot')}
+                              {hasFt && (
+                                <g style={{ transformOrigin: '60px 58px', ['--ang' as any]: `${((pct - 0.5) * 180).toFixed(1)}deg`, animation: 'plg-needle 1.2s cubic-bezier(0.2, 1.2, 0.4, 1) 0.4s both' }}>
+                                  <line x1="60" y1="58" x2="60" y2="20" stroke="#ffffff" strokeWidth="3.5" strokeLinecap="round" />
+                                </g>
+                              )}
+                              <circle cx="60" cy="58" r="5.5" fill="#ffffff" />
+                            </svg>
+                            <div className="text-center -mt-1">
+                              <span className="text-2xl font-black leading-none" style={{ color: hasFt ? zoneColor : undefined }}>
+                                {hasFt ? Math.round(pct * 100) + '%' : '—'}
+                              </span>
+                              <div className="text-[9px] font-black tracking-[0.25em] mt-0.5"
+                                style={{ color: hasFt ? zoneColor : '#71717a' }}>
+                                {zone === 'hot' ? 'HOT 🔥' : zone === 'steady' ? 'STEADY' : zone === 'cold' ? 'COLD' : 'FT TONIGHT'}
+                              </div>
+                            </div>
+                          </>
+                        );
+                      })()}
+                    </div>
+                    <div className="flex-1 space-y-2">
+                      <div>
+                        <div className="text-xl font-black leading-none" style={{ animation: 'plg-ft-pulse 1.6s ease-in-out infinite' }}>
+                          {hasFt ? `${made}-${att}` : '0-0'}
+                        </div>
+                        <div className="text-[9px] font-bold tracking-widest text-zinc-400">FREE THROWS</div>
+                      </div>
+                      <div>
+                        <div className="text-xl font-black leading-none">{a.stats.pts || '0'}</div>
+                        <div className="text-[9px] font-bold tracking-widest text-zinc-400">POINTS</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
           {/* ── FULL SCREENS (pure CSS) ── */}
           {bus.full && (
             <div key={bus.full} className="absolute inset-0 flex items-center justify-center"
@@ -539,13 +690,47 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
                     {brand && <img src={brand.logo} className="h-5 max-w-[90px] object-contain brightness-0 invert opacity-80" alt="" />}
                     {brand?.name && <span className="text-[10px] font-semibold text-zinc-400">{brand.name}</span>}
                   </div>
-                  <span className="text-[10px] uppercase tracking-widest text-zinc-500">PRO-LOGIC Studio · Live Graphics</span>
+                  <div className="flex items-center gap-2">
+                    {gfx.leagueBadge && <img src={gfx.leagueBadge} className="h-5 object-contain" alt="" />}
+                    <span className="text-[10px] uppercase tracking-widest text-zinc-500">PRO-LOGIC Studio · Live Graphics</span>
+                  </div>
                 </div>
               </div>
             </div>
           )}
         </>
       )}
+    </div>
+  );
+}
+
+/* Rotating badge chip: rolls UP through company logo, league logo and any
+   extra badges — pure CSS keyframes (generated per list), seamless loop. */
+function BadgeRoll({ logos, scale }: { logos: string[]; scale: number }) {
+  const itemH = Math.round(34 * scale);
+  const w = Math.round(64 * scale);
+  if (logos.length === 0) return null;
+  if (logos.length === 1) {
+    return <img src={logos[0]} className="object-contain" style={{ height: itemH - 4, maxWidth: w }} alt="" />;
+  }
+  const N = logos.length;
+  const name = `plgroll${N}x${itemH}`;
+  let kf = `@keyframes ${name} { `;
+  for (let i = 0; i < N; i++) {
+    kf += `${((i / N) * 100).toFixed(2)}% { transform: translateY(${-i * itemH}px); } `;
+    kf += `${(((i + 0.88) / N) * 100).toFixed(2)}% { transform: translateY(${-i * itemH}px); } `;
+  }
+  kf += `100% { transform: translateY(${-N * itemH}px); } }`;
+  return (
+    <div style={{ height: itemH, width: w, overflow: 'hidden' }}>
+      <style>{kf}</style>
+      <div style={{ animation: `${name} ${N * 4.5}s cubic-bezier(0.5, 0, 0.2, 1) infinite` }}>
+        {[...logos, logos[0]].map((l, i) => (
+          <div key={i} style={{ height: itemH, width: w }} className="flex items-center justify-center">
+            <img src={l} className="object-contain" style={{ maxHeight: itemH - 6, maxWidth: w }} alt="" />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
