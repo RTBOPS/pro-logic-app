@@ -12,13 +12,15 @@ import PlayerPhoto from '@/components/PlayerPhoto';
 import {
   normalizeSummary, gameLeaders, comparedTeamStats, periodLabel,
   manualToSummary, topFive, applyPhotoOverrides, DEFAULT_PORTAL_VIDEO, DEFAULT_PORTAL_VIDEO_HEVC, type ManualGame,
-  type Summary, type Athlete, type Callout,
+  normalizeShots, normalizeAssists, assistLeaders, computeAlerts,
+  type Summary, type Athlete, type Callout, type ShotPlay, type AssistLink, type GameAlert,
 } from '@/lib/nba';
 
 interface BusState {
   bug?: boolean;
   lowerId?: string | null;
-  full?: 'teamstats' | 'lineups' | 'leaders' | 'matchup' | 'linescore' | 'trivia' | 'nextgame' | null;
+  full?: 'teamstats' | 'lineups' | 'leaders' | 'matchup' | 'linescore' | 'shotchart' | 'assists' | 'alerts' | 'trivia' | 'nextgame' | null;
+  shotFilter?: string | null;   // 'all' | teamId | athleteId
   banner?: string | null;               // URL of the currently-aired banner
   portal?: boolean;                     // hoop-portal sponsor reveal
   talent?: boolean;                     // broadcast team graphic
@@ -57,6 +59,9 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
   const { token } = use(params);
   const [gfx, setGfx] = useState<GfxDoc>({});
   const [summary, setSummary] = useState<Summary | null>(null);
+  const [shots, setShots] = useState<ShotPlay[]>([]);
+  const [assists, setAssists] = useState<AssistLink[]>([]);
+  const [alerts, setAlerts] = useState<GameAlert[]>([]);
   const [bg, setBg] = useState('transparent');
   const [queue, setQueue] = useState<Callout[]>([]);
   const lastManual = useRef<string>('');
@@ -163,7 +168,12 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
         const json = await res.json();
         if (!alive) return;
         const next = applyPhotoOverrides(normalizeSummary(json), gfx.photoOverrides);
-        if (next) setSummary(next);
+        if (next) {
+          setSummary(next);
+          setShots(normalizeShots(json));
+          setAssists(normalizeAssists(json));
+          setAlerts(computeAlerts(json, next));
+        }
       } catch { /* keep last */ }
     };
     load();
@@ -865,7 +875,7 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
                     )}
                     <div className="text-sm font-bold text-yellow-400">{summary.state === 'in' ? `${periodLabel(summary.period)} · ${summary.clock}` : summary.statusDetail}</div>
                     <div className="text-[10px] uppercase tracking-widest text-zinc-400 mt-0.5">
-                      {bus.full === 'teamstats' ? 'Team Stats' : bus.full === 'lineups' ? 'Starting Lineups' : bus.full === 'matchup' ? 'Matchup — Top 5' : bus.full === 'linescore' ? (summary.state === 'post' ? 'Final Stats' : 'Quarter Break') : bus.full === 'trivia' ? 'Trivia' : bus.full === 'nextgame' ? 'Up Next' : 'Top Performers'}
+                      {bus.full === 'teamstats' ? 'Team Stats' : bus.full === 'lineups' ? 'Starting Lineups' : bus.full === 'matchup' ? 'Matchup — Top 5' : bus.full === 'linescore' ? (summary.state === 'post' ? 'Final Stats' : 'Quarter Break') : bus.full === 'shotchart' ? 'Shot Chart' : bus.full === 'assists' ? 'Assist Leaders' : bus.full === 'alerts' ? 'Game Alerts' : bus.full === 'trivia' ? 'Trivia' : bus.full === 'nextgame' ? 'Up Next' : 'Top Performers'}
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
@@ -880,6 +890,9 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
                 {bus.full === 'leaders' && <Leaders summary={summary} custom={custom} awayColor={awayColor} />}
                 {bus.full === 'matchup' && <Matchup summary={summary} awayColor={awayColor} homeColor={homeColor} />}
                 {bus.full === 'linescore' && <QuarterBreak summary={summary} awayColor={awayColor} homeColor={homeColor} nextGame={gfx.nextGameCfg || null} />}
+                {bus.full === 'shotchart' && <ShotChart summary={summary} shots={shots} filter={gfx.shotFilter || 'all'} awayColor={awayColor} homeColor={homeColor} />}
+                {bus.full === 'assists' && <AssistBoard summary={summary} links={assists} awayColor={awayColor} homeColor={homeColor} />}
+                {bus.full === 'alerts' && <AlertsBoard summary={summary} alerts={alerts} awayColor={awayColor} homeColor={homeColor} />}
                 {bus.full === 'trivia' && <Trivia trivia={gfx.trivia || {}} sponsorFallback={brand?.logo || ''} accent={awayColor} />}
                 {bus.full === 'nextgame' && (() => {
                   const ng = gfx.nextGameCfg || {};
@@ -1039,6 +1052,132 @@ function StatChip({ label, value, color, big = false }: { label: string; value: 
       style={big ? { ['--tc' as any]: color || '#7c3aed', ['--dir' as any]: '135deg' } : undefined}>
       <div className="text-lg font-black leading-none">{value || '0'}</div>
       <div className="text-[9px] font-bold text-white/70 tracking-widest">{label}</div>
+    </div>
+  );
+}
+
+/* Half-court shot chart. ESPN coords: x 0..50 (25 = center), y = distance
+   from baseline (0 at rim). Made = filled dot in team color, miss = hollow. */
+function ShotChart({ summary, shots, filter, awayColor, homeColor }: {
+  summary: Summary; shots: ShotPlay[]; filter: string; awayColor: string; homeColor: string;
+}) {
+  const W = 500, H = 470, S = 10;   // 50ft x 47ft, 10px/ft
+  const sel = shots.filter(s =>
+    filter === 'all' ? true : (s.teamId === filter || s.athleteId === filter));
+  const cx = (x: number) => x * S;
+  const cy = (y: number) => H - y * S - 20;   // rim near the bottom
+  const colorOf = (s: ShotPlay) => (s.teamId === summary.home.id ? homeColor : awayColor);
+  const made = sel.filter(s => s.made);
+  const eff = sel.length ? Math.round((made.length / sel.length) * 100) : 0;
+  const three = sel.filter(s => s.value === 3);
+  const threeMade = three.filter(s => s.made).length;
+  const who = filter === 'all' ? 'Both Teams'
+    : summary.home.id === filter ? summary.home.name
+    : summary.away.id === filter ? summary.away.name
+    : [...summary.home.athletes, ...summary.away.athletes].find(a => a.id === filter)?.name || '';
+  return (
+    <div className="px-8 py-6 flex gap-6 items-center">
+      <div className="shrink-0">
+        <svg viewBox={`0 0 ${W} ${H}`} style={{ width: 380, height: 357 }}>
+          <rect x={2} y={2} width={W - 4} height={H - 4} rx={10} fill="rgba(255,255,255,0.03)" stroke="rgba(255,255,255,0.25)" strokeWidth={2} />
+          {/* paint */}
+          <rect x={W / 2 - 80} y={H - 190 - 20} width={160} height={190} fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth={2} />
+          {/* free-throw circle */}
+          <circle cx={W / 2} cy={H - 190 - 20} r={60} fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth={2} />
+          {/* restricted + rim */}
+          <path d={`M ${W / 2 - 40} ${H - 20} A 40 40 0 0 1 ${W / 2 + 40} ${H - 20}`} fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth={2} />
+          <circle cx={W / 2} cy={H - 52} r={7.5} fill="none" stroke="rgba(255,255,255,0.45)" strokeWidth={2.5} />
+          {/* 3pt arc */}
+          <path d={`M 30 ${H - 20} L 30 ${H - 140} A 237 237 0 0 0 ${W - 30} ${H - 140} L ${W - 30} ${H - 20}`} fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth={2} />
+          {sel.map((s, i) => s.made ? (
+            <circle key={i} cx={cx(s.x)} cy={cy(s.y)} r={7} fill={colorOf(s)} stroke="#fff" strokeWidth={1.5}
+              style={{ animation: `plg-pop 0.4s ease-out ${Math.min(i * 0.012, 1)}s both` }} />
+          ) : (
+            <g key={i} style={{ animation: `plg-pop 0.4s ease-out ${Math.min(i * 0.012, 1)}s both` }}>
+              <line x1={cx(s.x) - 5} y1={cy(s.y) - 5} x2={cx(s.x) + 5} y2={cy(s.y) + 5} stroke={colorOf(s)} strokeWidth={2.5} strokeLinecap="round" opacity={0.75} />
+              <line x1={cx(s.x) + 5} y1={cy(s.y) - 5} x2={cx(s.x) - 5} y2={cy(s.y) + 5} stroke={colorOf(s)} strokeWidth={2.5} strokeLinecap="round" opacity={0.75} />
+            </g>
+          ))}
+        </svg>
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="text-2xl font-black leading-tight mb-1">{who}</div>
+        <div className="text-[11px] font-bold uppercase tracking-widest text-zinc-400 mb-5">Shot Chart</div>
+        <div className="flex gap-2.5">
+          {[['FG', `${made.length}/${sel.length}`], ['FG%', `${eff}%`], ['3PT', `${threeMade}/${three.length}`]].map(([k, v]) => (
+            <div key={k} className="flex-1 min-w-0 rounded-xl border border-white/10 px-2 py-3 text-center">
+              <div className="text-xl font-black tabular-nums whitespace-nowrap">{v}</div>
+              <div className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mt-1">{k}</div>
+            </div>
+          ))}
+        </div>
+        <div className="flex items-center gap-5 mt-5 text-xs font-bold text-zinc-300">
+          <span className="flex items-center gap-2"><span className="w-3.5 h-3.5 rounded-full inline-block" style={{ background: awayColor, boxShadow: '0 0 0 1.5px #fff' }} />Made</span>
+          <span className="flex items-center gap-1.5"><span className="text-base leading-none" style={{ color: awayColor }}>✕</span>Missed</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* Assist leaders — bars per team with the top playmakers by assists dished. */
+function AssistBoard({ summary, links, awayColor, homeColor }: {
+  summary: Summary; links: AssistLink[]; awayColor: string; homeColor: string;
+}) {
+  const cols: [Summary['home'], string][] = [[summary.away, awayColor], [summary.home, homeColor]];
+  const max = Math.max(1, ...cols.flatMap(([t]) => assistLeaders(summary, links, t.id).slice(0, 5).map(x => x.count)));
+  return (
+    <div className="px-8 py-6 grid grid-cols-2 gap-8">
+      {cols.map(([t, color]) => {
+        const rows = assistLeaders(summary, links, t.id).slice(0, 5);
+        return (
+          <div key={t.id}>
+            <div className="flex items-center gap-2.5 mb-4">
+              {t.logo && <img src={t.logo} className="w-8 h-8 object-contain" alt="" />}
+              <span className="text-lg font-black">{t.name}</span>
+            </div>
+            <div className="space-y-3">
+              {rows.length === 0 && <div className="text-sm text-zinc-500">No assists yet</div>}
+              {rows.map(({ athlete, count }, i) => (
+                <div key={athlete.id} className="flex items-center gap-3"
+                  style={{ animation: `plg-lower-in 0.5s cubic-bezier(0.3,1.15,0.6,1) ${i * 0.1}s both` }}>
+                  <PlayerPhoto src={athlete.headshot} className="w-10 h-10 rounded-full object-cover object-top shrink-0 border border-white/10" />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-black truncate">{athlete.name}</div>
+                    <div className="h-2.5 rounded-full mt-1" style={{ width: `${(count / max) * 100}%`, background: color, minWidth: 8 }} />
+                  </div>
+                  <div className="text-2xl font-black tabular-nums w-8 text-right">{count}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/* Game alerts — computed run / lead cards from the play stream. */
+function AlertsBoard({ summary, alerts, awayColor, homeColor }: {
+  summary: Summary; alerts: GameAlert[]; awayColor: string; homeColor: string;
+}) {
+  const colorOf = (id?: string) => (id === summary.home.id ? homeColor : id === summary.away.id ? awayColor : '#f59e0b');
+  return (
+    <div className="px-8 py-8 flex flex-col gap-4 items-center justify-center min-h-[240px]">
+      {alerts.length === 0 && <div className="text-lg text-zinc-500">No active alerts</div>}
+      {alerts.map((a, i) => (
+        <div key={i} className="w-full max-w-[620px] flex items-center gap-5 rounded-2xl overflow-hidden shadow-2xl"
+          style={{ animation: `plg-pop 0.5s cubic-bezier(0.34,1.3,0.64,1) ${i * 0.12}s both` }}>
+          <div className="plg-accent px-6 py-5 font-black text-4xl tracking-wide flex items-center justify-center min-w-[150px]"
+            style={{ ['--tc' as any]: colorOf(a.teamId), ['--dir' as any]: '135deg' }}>
+            {a.title}
+          </div>
+          <div className="plg-panel flex-1 px-5 py-5">
+            <div className="text-[10px] font-black uppercase tracking-widest text-zinc-400">{a.kind === 'run' ? 'Scoring Run' : a.kind === 'lead' ? 'Lead Watch' : a.kind}</div>
+            <div className="text-xl font-black mt-1">{a.detail}</div>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

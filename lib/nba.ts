@@ -346,6 +346,152 @@ export function normalizeSummary(json: any): Summary | null {
   };
 }
 
+/* ── Play-by-play derived data (shots, assists, feed, alerts) ──
+   All parsed from ESPN's `plays` array — the same public summary payload,
+   no extra source. Swappable for an official low-latency feed later. */
+
+export interface ShotPlay {
+  id: string;
+  x: number;            // 0..50 court width (25 = center)
+  y: number;            // 0..~47 distance from baseline (0 = at rim)
+  made: boolean;
+  value: number;        // 2 or 3
+  teamId: string;
+  athleteId: string;
+  text: string;
+  period: number;
+  clock: string;
+}
+
+export interface PlayEvent {
+  id: string;
+  text: string;
+  scoreValue: number;
+  scoring: boolean;
+  teamId: string;
+  period: number;
+  clock: string;
+  awayScore: number;
+  homeScore: number;
+  athleteId: string;
+}
+
+export interface AssistLink {
+  scorerId: string;
+  assisterId: string;
+  value: number;
+  made: boolean;
+}
+
+export interface GameAlert {
+  kind: 'run' | 'lead' | 'streak' | 'milestone';
+  title: string;
+  detail: string;
+  teamId?: string;
+}
+
+const validCoord = (n: any) => typeof n === 'number' && Math.abs(n) <= 100;
+
+export function normalizeShots(json: any): ShotPlay[] {
+  const plays: any[] = json?.plays || [];
+  return plays
+    .filter(p => p.shootingPlay && p.coordinate && validCoord(p.coordinate.x) && validCoord(p.coordinate.y))
+    .map(p => ({
+      id: String(p.id || p.sequenceNumber || ''),
+      x: p.coordinate.x,
+      y: p.coordinate.y,
+      made: !!p.scoringPlay,
+      value: Number(p.scoreValue) || 2,
+      teamId: String(p.team?.id || ''),
+      athleteId: String(p.participants?.[0]?.athlete?.id || ''),
+      text: p.text || '',
+      period: p.period?.number || 0,
+      clock: p.clock?.displayValue || '',
+    }));
+}
+
+export function normalizePlays(json: any): PlayEvent[] {
+  const plays: any[] = json?.plays || [];
+  return plays.map(p => ({
+    id: String(p.id || p.sequenceNumber || ''),
+    text: p.text || '',
+    scoreValue: Number(p.scoreValue) || 0,
+    scoring: !!p.scoringPlay,
+    teamId: String(p.team?.id || ''),
+    period: p.period?.number || 0,
+    clock: p.clock?.displayValue || '',
+    awayScore: Number(p.awayScore) || 0,
+    homeScore: Number(p.homeScore) || 0,
+    athleteId: String(p.participants?.[0]?.athlete?.id || ''),
+  }));
+}
+
+/* Assist connections from made shots that credit a second participant. */
+export function normalizeAssists(json: any): AssistLink[] {
+  const plays: any[] = json?.plays || [];
+  return plays
+    .filter(p => p.scoringPlay && p.shootingPlay && (p.participants?.length || 0) > 1)
+    .map(p => ({
+      scorerId: String(p.participants[0]?.athlete?.id || ''),
+      assisterId: String(p.participants[1]?.athlete?.id || ''),
+      value: Number(p.scoreValue) || 2,
+      made: true,
+    }));
+}
+
+/* Assist leaders for a team, resolved to athletes, from the assist links. */
+export function assistLeaders(summary: Summary, links: AssistLink[], teamId?: string): { athlete: Athlete; count: number }[] {
+  const all = [...summary.home.athletes, ...summary.away.athletes];
+  const byId = new Map(all.map(a => [a.id, a]));
+  const teamOf = (id: string) => (summary.home.athletes.some(a => a.id === id) ? summary.home.id : summary.away.id);
+  const counts = new Map<string, number>();
+  for (const l of links) {
+    if (!l.assisterId) continue;
+    if (teamId && teamOf(l.assisterId) !== teamId) continue;
+    counts.set(l.assisterId, (counts.get(l.assisterId) || 0) + 1);
+  }
+  return [...counts.entries()]
+    .map(([id, count]) => ({ athlete: byId.get(id)!, count }))
+    .filter(x => x.athlete)
+    .sort((a, b) => b.count - a.count);
+}
+
+/* Compute broadcast alerts from the play stream: scoring runs and biggest lead.
+   Milestones/streaks that need historical data are left for the official feed. */
+export function computeAlerts(json: any, summary: Summary): GameAlert[] {
+  const plays = normalizePlays(json).filter(p => p.scoring);
+  const alerts: GameAlert[] = [];
+  if (plays.length < 2) return alerts;
+  // Current scoring run: walk back while the same team keeps scoring
+  const last = plays[plays.length - 1];
+  let runTeamHome = last.homeScore > (plays[plays.length - 2]?.homeScore ?? 0);
+  let runPts = 0, i = plays.length - 1;
+  let prevA = plays[i].awayScore, prevH = plays[i].homeScore;
+  for (; i >= 1; i--) {
+    const dH = plays[i].homeScore - plays[i - 1].homeScore;
+    const dA = plays[i].awayScore - plays[i - 1].awayScore;
+    const scoredHome = dH > 0;
+    if (i === plays.length - 1) runTeamHome = scoredHome;
+    if (scoredHome === runTeamHome && (scoredHome ? dH : dA) > 0) {
+      runPts += scoredHome ? dH : dA;
+      prevA = plays[i - 1].awayScore; prevH = plays[i - 1].homeScore;
+    } else break;
+  }
+  const oppScored = runTeamHome ? (last.awayScore - prevA) : (last.homeScore - prevH);
+  if (runPts >= 6 && oppScored === 0) {
+    const t = runTeamHome ? summary.home : summary.away;
+    alerts.push({ kind: 'run', title: `${runPts}-0 RUN`, detail: `${t.name} on a ${runPts}-0 run`, teamId: t.id });
+  }
+  // Biggest current lead
+  const hs = parseInt(summary.home.score || '0'), as = parseInt(summary.away.score || '0');
+  const diff = Math.abs(hs - as);
+  if (diff >= 10) {
+    const leader = hs > as ? summary.home : summary.away;
+    alerts.push({ kind: 'lead', title: `+${diff}`, detail: `${leader.name} lead by ${diff}`, teamId: leader.id });
+  }
+  return alerts;
+}
+
 /* Top-N scorers across both teams (for the leaders full-screen) */
 export function gameLeaders(summary: Summary, n = 3): Athlete[] {
   return [...summary.home.athletes, ...summary.away.athletes]

@@ -27,7 +27,8 @@ interface BannerItem { id: string; url: string; name: string }
 interface GfxState {
   bug: boolean;
   lowerId: string | null;
-  full: 'teamstats' | 'lineups' | 'leaders' | 'matchup' | 'linescore' | 'trivia' | 'nextgame' | null;
+  full: 'teamstats' | 'lineups' | 'leaders' | 'matchup' | 'linescore' | 'shotchart' | 'assists' | 'alerts' | 'trivia' | 'nextgame' | null;
+  shotFilter?: string | null;
   banner: string | null;
   portal: boolean;
   talent: boolean;
@@ -876,12 +877,32 @@ function ControlInner() {
                 ['leaders', 'Top Performers'],
                 ['matchup', 'Matchup Top 5'],
                 ['linescore', 'Quarter Break'],
-              ] as ['teamstats' | 'lineups' | 'leaders' | 'matchup' | 'linescore', string][]).map(([kind, label]) => (
+                ['shotchart', 'Shot Chart'],
+                ['assists', 'Assist Leaders'],
+                ['alerts', 'Game Alerts'],
+              ] as ['teamstats' | 'lineups' | 'leaders' | 'matchup' | 'linescore' | 'shotchart' | 'assists' | 'alerts', string][]).map(([kind, label]) => (
                 <button key={kind} onClick={() => fire({ full: active.full === kind ? null : kind })}
                   className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-medium ${active.full === kind ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
                   {label} {active.full === kind ? <Eye size={15} /> : <EyeOff size={15} />}
                 </button>
               ))}
+              {active.full === 'shotchart' && (
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] text-gray-400 uppercase tracking-wide shrink-0">Shot filter</span>
+                  <select value={active.shotFilter || 'all'} onChange={e => fire({ shotFilter: e.target.value })}
+                    className="flex-1 border border-gray-200 rounded-lg px-2 py-1.5 text-xs bg-white">
+                    <option value="all">Both teams</option>
+                    {[summary?.away, summary?.home].map(t => t && (
+                      <optgroup key={t.id} label={t.name}>
+                        <option value={t.id}>{t.name} — all shots</option>
+                        {t.athletes.filter(a => a.played).slice().sort(byJerseyThenName).map(a => (
+                          <option key={a.id} value={a.id}>{a.jersey ? `#${a.jersey} — ` : ''}{a.name}</option>
+                        ))}
+                      </optgroup>
+                    ))}
+                  </select>
+                </div>
+              )}
               {active.ftId && (
                 <button onClick={() => fire({ ftId: null })}
                   className="w-full px-4 py-2.5 rounded-xl text-sm font-medium bg-amber-500 text-white">
