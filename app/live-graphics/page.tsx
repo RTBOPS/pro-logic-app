@@ -288,9 +288,11 @@ function ControlInner() {
     '3pt': '3-POINTER!', '2pt': '+2', ft: '+1 FT', ast: 'ASSIST',
     dd: 'DOUBLE-DOUBLE!', td: 'TRIPLE-DOUBLE!', custom: '',
   };
+  const clearCalloutSoon = () => setTimeout(() => pushDoc({ callout: null }), 8000);
   const fireCallout = (kind: Callout['kind']) => {
     if (calloutWho === 'generic') {
       pushDoc({ callout: { id: Math.random().toString(36).slice(2, 10), kind, title: CALLOUT_TITLES[kind], color: '#f59e0b' } });
+      clearCalloutSoon();
       return;
     }
     const target = calloutWho === 'auto'
@@ -298,6 +300,7 @@ function ControlInner() {
       : allAthletes.find(a => a.id === calloutWho) || calloutTarget;
     if (!target) return;
     pushDoc({ callout: buildCallout(target, kind) });
+    clearCalloutSoon();
   };
 
   /* Banner upload to Storage */
@@ -892,7 +895,7 @@ function ControlInner() {
                   {suggestions.map(sg => (
                     <div key={sg.id} className="flex items-center gap-1.5">
                       <button
-                        onClick={() => { pushDoc({ callout: { ...sg, id: Math.random().toString(36).slice(2, 10) } }); setSuggestions(prev => prev.filter(x => x.id !== sg.id)); }}
+                        onClick={() => { pushDoc({ callout: { ...sg, id: Math.random().toString(36).slice(2, 10) } }); clearCalloutSoon(); setSuggestions(prev => prev.filter(x => x.id !== sg.id)); }}
                         className="flex-1 flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-amber-50 border border-amber-200 hover:bg-amber-100 text-left">
                         <span className="text-[10px] font-black px-1.5 py-0.5 rounded" style={{ background: sg.color || '#f59e0b', color: '#fff' }}>{sg.title}</span>
                         <span className="text-xs text-gray-700 truncate">{sg.sub || ''}</span>

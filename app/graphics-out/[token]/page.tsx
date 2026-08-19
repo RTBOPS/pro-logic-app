@@ -30,6 +30,7 @@ interface BusState {
 
 interface GfxDoc extends BusState {
   eventId?: string;
+  updatedAt?: string;
   league?: string;
   sourceMode?: 'feed' | 'manual';       // manual: operator-keyed game data
   manual?: ManualGame | null;
@@ -120,14 +121,24 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
       () => setGfx({}));
   }, [token]);
 
-  /* Manual callouts from the control panel */
+  /* Manual callouts from the control panel.
+     The doc keeps the last callout — on (re)load we swallow it silently so
+     old plays never replay; only callouts fired AFTER load go on air. */
+  const calloutPrimed = useRef(false);
   useEffect(() => {
     const c = gfx.callout;
+    if (!calloutPrimed.current) {
+      if (gfx.updatedAt !== undefined || c !== undefined) {
+        lastManual.current = c?.id || '';
+        calloutPrimed.current = true;
+      }
+      return;
+    }
     if (c?.id && c.id !== lastManual.current) {
       lastManual.current = c.id;
       setQueue(q => [...q, c].slice(-6));
     }
-  }, [gfx.callout]);
+  }, [gfx.callout, gfx.updatedAt]);
 
   /* Live game data + auto callout detection.
      Feed mode: poll our NBA proxy every 4 s.
