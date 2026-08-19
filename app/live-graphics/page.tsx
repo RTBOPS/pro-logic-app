@@ -109,6 +109,7 @@ function ControlInner() {
   }, [dock, league]);
   const [coachCfg, setCoachCfg] = useState({ away: '', home: '' });
   const [subIn, setSubIn] = useState('');
+  const [calloutWho, setCalloutWho] = useState('auto');   // auto | generic | athleteId
   const [subOut, setSubOut] = useState('');
   const [banners, setBanners] = useState<BannerItem[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -261,9 +262,20 @@ function ControlInner() {
     return all.find(a => a.id === (active.lowerId || gfx.lowerId)) || gameLeaders(summary, 1)[0] || null;
   }, [summary, active.lowerId, gfx.lowerId]);
 
+  const CALLOUT_TITLES: Record<Callout['kind'], string> = {
+    '3pt': '3-POINTER!', '2pt': '+2', ft: '+1 FT', ast: 'ASSIST',
+    dd: 'DOUBLE-DOUBLE!', td: 'TRIPLE-DOUBLE!', custom: '',
+  };
   const fireCallout = (kind: Callout['kind']) => {
-    if (!calloutTarget) return;
-    pushDoc({ callout: buildCallout(calloutTarget, kind) });
+    if (calloutWho === 'generic') {
+      pushDoc({ callout: { id: Math.random().toString(36).slice(2, 10), kind, title: CALLOUT_TITLES[kind], color: '#f59e0b' } });
+      return;
+    }
+    const target = calloutWho === 'auto'
+      ? calloutTarget
+      : allAthletes.find(a => a.id === calloutWho) || calloutTarget;
+    if (!target) return;
+    pushDoc({ callout: buildCallout(target, kind) });
   };
 
   /* Banner upload to Storage */
@@ -852,8 +864,16 @@ function ControlInner() {
               </div>
               <p className="text-xs text-gray-400">
                 Auto detects threes, buckets, assists and double-doubles from the live feed.
-                Manual fire targets: <span className="font-semibold text-gray-600">{calloutTarget?.name || '—'}</span>
               </p>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-gray-400 uppercase tracking-wide shrink-0">Manual target</span>
+                <select value={calloutWho} onChange={e => setCalloutWho(e.target.value)}
+                  className="flex-1 border border-gray-200 rounded-lg px-2 py-1.5 text-xs bg-white">
+                  <option value="generic">Generic — no player name</option>
+                  <option value="auto">Auto (on-air / top scorer{calloutTarget ? `: ${calloutTarget.name}` : ''})</option>
+                  {allAthletes.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                </select>
+              </div>
               <div className="grid grid-cols-3 gap-2">
                 {([
                   ['3pt', '3-POINTER'], ['2pt', '+2'], ['ft', '+1 FT'],
