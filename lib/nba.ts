@@ -412,3 +412,15 @@ export function applyPhotoOverrides(
   });
   return { ...summary, home: fix(summary.home), away: fix(summary.away) };
 }
+
+/* League team directory (for pickers: next-game announcement, etc.) */
+export interface LeagueTeam { id: string; name: string; abbr: string; logo: string }
+export function normalizeTeams(json: any): LeagueTeam[] {
+  const teams = json?.sports?.[0]?.leagues?.[0]?.teams || [];
+  return teams.map((t: any) => ({
+    id: String(t.team?.id || ''),
+    name: t.team?.displayName || '',
+    abbr: t.team?.abbreviation || '',
+    logo: t.team?.logos?.[0]?.href || '',
+  })).sort((a: LeagueTeam, b: LeagueTeam) => a.name.localeCompare(b.name));
+}

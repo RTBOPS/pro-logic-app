@@ -38,7 +38,7 @@ interface GfxDoc extends BusState {
   showBrand?: boolean;
   autoCallouts?: boolean;
   callout?: Callout | null;             // manual fire from the control panel
-  theme?: { useTeamColors?: boolean; c1?: string; c2?: string; logoScale?: number; brandScale?: number; motion?: boolean; bugPos?: 'left' | 'center' | 'right'; skin?: string } | null;
+  theme?: { useTeamColors?: boolean; c1?: string; c2?: string; logoScale?: number; brandScale?: number; motion?: boolean; bugPos?: 'left' | 'center' | 'right'; skin?: string; lowerPos?: 'left' | 'center' | 'right'; ftPos?: 'left' | 'right' } | null;
   trivia?: { question?: string; options?: string[]; correct?: number; sponsor?: string; reveal?: boolean } | null;
   portalCfg?: { x?: number; y?: number; size?: number; logo?: string; video?: string; content?: 'logo' | 'trivia' } | null;
   talentCfg?: { list?: { id: string; name: string; role: string; photo: string }[] } | null;
@@ -212,6 +212,9 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
   const calloutColor = (c: Callout) => (custom ? awayColor : c.color) || '#7c3aed';
 
   const brand = gfx.showBrand !== false && gfx.brand?.logo ? gfx.brand : null;
+  const lowerPosCls = (gfx.theme?.lowerPos || 'left') === 'center' ? 'left-1/2 -translate-x-1/2'
+    : (gfx.theme?.lowerPos || 'left') === 'right' ? 'right-8' : 'left-8';
+  const ftPosCls = (gfx.theme?.ftPos || 'right') === 'left' ? 'left-8' : 'right-8';
   const logoScale = gfx.theme?.logoScale || 1;
   const brandScale = gfx.theme?.brandScale || 1;
   const motionOn = !!gfx.theme?.motion;
@@ -239,6 +242,7 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
         @keyframes plg-ball { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-7px); } }
         @keyframes plg-ft-pulse { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
         @keyframes plg-needle { from { transform: rotate(-90deg); } to { transform: rotate(var(--ang, 0deg)); } }
+        @keyframes plg-spin3d { 0% { transform: rotateY(0deg); } 100% { transform: rotateY(360deg); } }
 
         /* ── Surface system: every bar/panel uses these; skins re-texture them ── */
         .plg-panel { background: rgba(24, 24, 27, 0.95); }
@@ -395,7 +399,7 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
 
           {/* ── PLAYER LOWER THIRD (pure CSS) ── */}
           {lower && (
-            <div key={lower.id} className="absolute bottom-28 left-8 flex items-end"
+            <div key={lower.id} className={`absolute bottom-28 flex items-end ${lowerPosCls}`}
               style={{ animation: 'plg-lower-in 0.5s cubic-bezier(0.3, 1.15, 0.6, 1) both' }}>
               <div className="w-36 h-36 rounded-2xl overflow-hidden shadow-2xl relative"
                 style={{ background: `linear-gradient(160deg, ${custom ? awayColor : lower.teamColor}, #111)` }}>
@@ -593,7 +597,7 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
 
           {/* ── SUBSTITUTION ── */}
           {subPair && (
-            <div className="absolute bottom-28 left-8"
+            <div className={`absolute bottom-28 ${lowerPosCls}`}
               style={{ animation: 'plg-lower-in 0.5s cubic-bezier(0.3, 1.15, 0.6, 1) both' }}>
               <div className="flex items-stretch rounded-xl overflow-hidden shadow-2xl text-white">
                 <div className="plg-label px-3 flex items-center text-[10px] font-black uppercase tracking-[0.2em] text-black">
@@ -628,7 +632,7 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
             const color = bus.coach === 'home' ? homeColor : awayColor;
             if (!name) return null;
             return (
-              <div className="absolute bottom-28 left-8"
+              <div className={`absolute bottom-28 ${lowerPosCls}`}
                 style={{ animation: 'plg-lower-in 0.5s cubic-bezier(0.3, 1.15, 0.6, 1) both' }}>
                 <div className="flex items-stretch rounded-xl overflow-hidden shadow-2xl text-white">
                   <div className="plg-accent px-4 flex items-center" style={{ ['--tc' as any]: color, ['--dir' as any]: '135deg' }}>
@@ -652,7 +656,7 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
             const C = 327;   // circumference of r=52 ring
             const color = custom ? awayColor : a.teamColor;
             return (
-              <div className="absolute right-8 top-1/2 -translate-y-1/2 w-64"
+              <div className={`absolute top-1/2 -translate-y-1/2 w-64 ${ftPosCls}`}
                 style={{ animation: 'plg-slide-r 0.55s cubic-bezier(0.34, 1.3, 0.64, 1) both' }}>
                 <div className="rounded-2xl overflow-hidden shadow-2xl text-white">
                   <div className="plg-label px-4 py-2 text-[10px] font-black uppercase tracking-[0.25em] text-black">
@@ -763,6 +767,18 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
                 {bus.full === 'trivia' && <Trivia trivia={gfx.trivia || {}} sponsorFallback={brand?.logo || ''} accent={awayColor} />}
                 {bus.full === 'nextgame' && (() => {
                   const ng = gfx.nextGameCfg || {};
+                  const fmtDate = (d?: string) => {
+                    if (!d) return '';
+                    const dt = new Date(d + 'T12:00:00');
+                    return isNaN(dt.getTime()) ? d : dt.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+                  };
+                  const fmtTime = (t?: string) => {
+                    if (!t) return '';
+                    const m = t.match(/^(\d{1,2}):(\d{2})$/);
+                    if (!m) return t;
+                    const h = parseInt(m[1], 10);
+                    return `${h % 12 || 12}:${m[2]} ${h < 12 ? 'AM' : 'PM'}`;
+                  };
                   return (
                     <div className="px-10 py-10">
                       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-8">
@@ -778,9 +794,8 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
                               <div className="mx-auto w-44 h-44 rounded-3xl plg-accent flex items-center justify-center mb-4"
                                 style={{ ['--tc' as any]: color, ['--dir' as any]: '160deg' }}>
                                 {(ng as any)[side + 'Logo']
-                                  ? <img src={(ng as any)[side + 'Logo']} className="max-w-[82%] max-h-[82%] object-contain drop-shadow-2xl"
-                                      style={{ animation: 'plg-float-logo 3.4s ease-in-out infinite' }} alt="" />
-                                  : <span className="text-5xl font-black opacity-60">🏀</span>}
+                                  ? <Logo3D src={(ng as any)[side + 'Logo']} size={140} />
+                                  : <span className="text-5xl font-black opacity-60">VS</span>}
                               </div>
                               <div className="text-2xl font-black leading-tight">{(ng as any)[side + 'Name'] || (side === 'away' ? 'Visitors' : 'Home')}</div>
                             </div>
@@ -788,7 +803,7 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
                         ))}
                       </div>
                       <div className="mt-8 flex items-center justify-center gap-4 text-center">
-                        {[ng.date, ng.time, ng.venue].filter(Boolean).map((v, i) => (
+                        {[fmtDate(ng.date), fmtTime(ng.time), ng.venue].filter(Boolean).map((v, i) => (
                           <div key={i} className="plg-panel rounded-xl px-5 py-2.5"
                             style={{ animation: `plg-rise 0.6s cubic-bezier(0.34, 1.3, 0.64, 1) ${0.7 + i * 0.15}s both` }}>
                             <span className="text-sm font-black tracking-wide">{v}</span>
@@ -814,6 +829,34 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
           )}
         </>
       )}
+    </div>
+  );
+}
+
+/* 3D coin-spin logo: fake extrusion by stacking the same image at depth
+   offsets inside a preserve-3d rotator — reads as a real 3D logo with any
+   PNG, no vectorizing, pure CSS (compositor-driven). */
+function Logo3D({ src: url, size }: { src: string; size: number }) {
+  const layers = 9;
+  const depth = 7;
+  return (
+    <div style={{ width: size, height: size, perspective: 900 }}>
+      <div className="relative w-full h-full"
+        style={{ transformStyle: 'preserve-3d', animation: 'plg-spin3d 7s linear infinite' }}>
+        {Array.from({ length: layers }, (_, i) => {
+          const z = -depth / 2 + (depth * i) / (layers - 1);
+          const edge = i === 0 || i === layers - 1;
+          return (
+            <img key={i} src={url} alt=""
+              className="absolute inset-0 w-full h-full object-contain"
+              style={{
+                transform: `translateZ(${z}px)`,
+                filter: edge ? 'brightness(1)' : 'brightness(0.55) saturate(0.8)',
+                backfaceVisibility: 'visible',
+              }} />
+          );
+        })}
+      </div>
     </div>
   );
 }

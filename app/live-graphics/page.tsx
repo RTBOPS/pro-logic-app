@@ -14,9 +14,9 @@ import {
   Palette, HelpCircle, Flame, Mic, Star, Calendar, ClipboardList,
 } from 'lucide-react';
 import {
-  normalizeScoreboard, normalizeSummary, gameLeaders, periodLabel, buildCallout,
+  normalizeScoreboard, normalizeSummary, normalizeTeams, gameLeaders, periodLabel, buildCallout,
   LEAGUES, emptyManualGame, manualToSummary, manualClockRemaining, fmtClockSec,
-  type Game, type Summary, type Athlete, type Callout, type ManualGame, type ManualPlayer,
+  type Game, type Summary, type Athlete, type Callout, type ManualGame, type ManualPlayer, type LeagueTeam,
 } from '@/lib/nba';
 
 /* Live Graphics control panel — pick an NBA game, everything populates from
@@ -76,6 +76,8 @@ function ControlInner() {
   const [brandScale, setBrandScale] = useState(1);    // company logo chip
   const [motionFx, setMotionFx] = useState(false);    // breathing logos + shine sweep
   const [bugPos, setBugPos] = useState<'left' | 'center' | 'right'>('left');
+  const [lowerPos, setLowerPos] = useState<'left' | 'center' | 'right'>('left');
+  const [ftPos, setFtPos] = useState<'left' | 'right'>('right');
   const [skin, setSkin] = useState('clean');
   const [monSize, setMonSize] = useState(352);
   useEffect(() => {
@@ -100,6 +102,11 @@ function ControlInner() {
   const [extraBadges, setExtraBadges] = useState<string[]>([]);   // sponsor logos in the badge roll
   const [dock, setDock] = useState<null | 'branding' | 'trivia' | 'portal' | 'team' | 'mention' | 'nextgame' | 'coaches'>(null);
   const [nextGameCfg, setNextGameCfg] = useState({ awayName: '', awayLogo: '', homeName: '', homeLogo: '', date: '', time: '', venue: '' });
+  const [leagueTeams, setLeagueTeams] = useState<LeagueTeam[]>([]);
+  useEffect(() => {
+    if (dock !== 'nextgame' || leagueTeams.length > 0) return;
+    fetch(`/api/nba/teams?league=${league}`).then(r => r.json()).then(j => setLeagueTeams(normalizeTeams(j))).catch(() => {});
+  }, [dock, league]);
   const [coachCfg, setCoachCfg] = useState({ away: '', home: '' });
   const [subIn, setSubIn] = useState('');
   const [subOut, setSubOut] = useState('');
@@ -138,6 +145,8 @@ function ControlInner() {
         if (d.theme.brandScale) setBrandScale(d.theme.brandScale);
         if (d.theme.motion) setMotionFx(true);
         if (d.theme.bugPos) setBugPos(d.theme.bugPos);
+        if (d.theme.lowerPos) setLowerPos(d.theme.lowerPos);
+        if (d.theme.ftPos) setFtPos(d.theme.ftPos);
         if (d.theme.skin) setSkin(d.theme.skin);
       }
       if (d.trivia) setTrivia({ question: '', options: ['', '', ''], correct: 0, sponsor: '', reveal: false, ...d.trivia });
@@ -202,7 +211,7 @@ function ControlInner() {
         sourceMode: source, league,
         brand: { logo: company?.logo_url || '', name: company?.name || '' },
         showBrand, autoCallouts,
-        theme: { useTeamColors, c1, c2, logoScale, brandScale, motion: motionFx, bugPos, skin },
+        theme: { useTeamColors, c1, c2, logoScale, brandScale, motion: motionFx, bugPos, skin, lowerPos, ftPos },
         trivia,
         portalCfg,
         talentCfg: { list: talentList },
@@ -243,7 +252,7 @@ function ControlInner() {
   /* Re-push settings when branding/theme changes (only once a game is loaded) */
   useEffect(() => {
     if ((eventId || source === 'manual') && token) pushDoc({});
-  }, [showBrand, autoCallouts, useTeamColors, c1, c2, banners, logoScale, brandScale, motionFx, trivia, portalCfg, talentList, mentionCfg, bugPos, skin, photoOverrides, leagueBadge, league, source, extraBadges, nextGameCfg, coachCfg]);
+  }, [showBrand, autoCallouts, useTeamColors, c1, c2, banners, logoScale, brandScale, motionFx, trivia, portalCfg, talentList, mentionCfg, bugPos, skin, lowerPos, ftPos, photoOverrides, leagueBadge, league, source, extraBadges, nextGameCfg, coachCfg]);
 
   /* Fire a play callout for the on-air player (or top scorer) */
   const calloutTarget: Athlete | null = useMemo(() => {
@@ -746,6 +755,28 @@ function ControlInner() {
                     <button key={p} onClick={() => setBugPos(p)}
                       className={`px-2.5 py-1 rounded-md text-[10px] font-bold uppercase ${bugPos === p ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500'}`}>
                       {p === 'left' ? '◀' : p === 'center' ? '■' : '▶'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] text-gray-400 uppercase tracking-wide">Lower third / Sub / Coach</span>
+                <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5 ml-auto">
+                  {(['left', 'center', 'right'] as const).map(p => (
+                    <button key={p} onClick={() => setLowerPos(p)}
+                      className={`px-2.5 py-1 rounded-md text-[10px] font-bold uppercase ${lowerPos === p ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500'}`}>
+                      {p === 'left' ? '◀' : p === 'center' ? '■' : '▶'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] text-gray-400 uppercase tracking-wide">Free Throw side</span>
+                <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5 ml-auto">
+                  {(['left', 'right'] as const).map(p => (
+                    <button key={p} onClick={() => setFtPos(p)}
+                      className={`px-2.5 py-1 rounded-md text-[10px] font-bold uppercase ${ftPos === p ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500'}`}>
+                      {p === 'left' ? '◀' : '▶'}
                     </button>
                   ))}
                 </div>
@@ -1296,6 +1327,14 @@ function ControlInner() {
                   {(['away', 'home'] as const).map(side => (
                     <div key={side} className="space-y-1.5">
                       <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">{side}</span>
+                      <select value="" onChange={e => {
+                          const t = leagueTeams.find(x => x.id === e.target.value);
+                          if (t) setNextGameCfg(c => ({ ...c, [side + 'Name']: t.name, [side + 'Logo']: t.logo }));
+                        }}
+                        className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs bg-white">
+                        <option value="">Pick a league team…</option>
+                        {leagueTeams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                      </select>
                       <input value={(nextGameCfg as any)[side + 'Name']} onChange={e => setNextGameCfg(c => ({ ...c, [side + 'Name']: e.target.value }))}
                         placeholder="Team name" className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none" />
                       <label className="flex items-center gap-2 cursor-pointer text-xs text-gray-500 hover:text-gray-700">
@@ -1310,10 +1349,10 @@ function ControlInner() {
                   ))}
                 </div>
                 <div className="grid grid-cols-3 gap-2">
-                  <input value={nextGameCfg.date} onChange={e => setNextGameCfg(c => ({ ...c, date: e.target.value }))}
-                    placeholder="Sat, Mar 28" className="border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none" />
-                  <input value={nextGameCfg.time} onChange={e => setNextGameCfg(c => ({ ...c, time: e.target.value }))}
-                    placeholder="7:00 PM" className="border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none" />
+                  <input type="date" value={nextGameCfg.date} onChange={e => setNextGameCfg(c => ({ ...c, date: e.target.value }))}
+                    className="border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none bg-white" />
+                  <input type="time" value={nextGameCfg.time} onChange={e => setNextGameCfg(c => ({ ...c, time: e.target.value }))}
+                    className="border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none bg-white" />
                   <input value={nextGameCfg.venue} onChange={e => setNextGameCfg(c => ({ ...c, venue: e.target.value }))}
                     placeholder="H-E-B Center at Cedar Park" className="border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none" />
                 </div>
