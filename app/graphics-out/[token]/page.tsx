@@ -414,8 +414,11 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
                       ] : [el])}
                     </div>
                     {badges.length > 0 && (
-                      <div className="plg-panel border-t border-white/15 flex items-center justify-center py-0.5">
-                        <BadgeRoll logos={badges} scale={brandScale * 0.75} secs={badgeSecs} />
+                      <div className="plg-panel border-t border-white/15 flex items-center justify-center py-1">
+                        {/* White chip so dark sponsor logos stay readable on dark skins */}
+                        <div className="bg-white rounded-md px-2.5 flex items-center">
+                          <BadgeRoll logos={badges} scale={brandScale * 0.75} secs={badgeSecs} />
+                        </div>
                       </div>
                     )}
                   </div>
