@@ -201,7 +201,7 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
         @keyframes plg-cell-flash { 0% { filter: brightness(2.6) saturate(0.4); } 100% { filter: brightness(1) saturate(1); } }
         @keyframes plg-rise { from { opacity: 0; transform: translateY(46px) scale(0.92); } to { opacity: 1; transform: translateY(0) scale(1); } }
         @keyframes plg-slide-r { from { opacity: 0; transform: translateX(70px); } to { opacity: 1; transform: translateX(0); } }
-        @keyframes plg-score-pop { 0% { transform: scale(1.45); color: #fde047; } 100% { transform: scale(1); color: #ffffff; } }
+        @keyframes plg-score-pop { 0% { transform: scale(1.45); text-shadow: 0 0 14px rgba(253, 224, 71, 0.95); } 100% { transform: scale(1); text-shadow: none; } }
         @keyframes plg-pop { from { opacity: 0; transform: translateY(16px) scale(0.9); } to { opacity: 1; transform: translateY(0) scale(1); } }
         @keyframes plg-lower-in { from { opacity: 0; transform: translateX(-420px); } to { opacity: 1; transform: translateX(0); } }
         @keyframes plg-full-in { from { opacity: 0; transform: scale(0.955); } to { opacity: 1; transform: scale(1); } }
@@ -233,6 +233,22 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
         .skin-neon .plg-panel { background: rgba(8, 10, 18, 0.92); border: 1px solid color-mix(in srgb, var(--tc, #22d3ee) 65%, white 10%); box-shadow: 0 0 14px color-mix(in srgb, var(--tc, #22d3ee) 45%, transparent), inset 0 0 10px color-mix(in srgb, var(--tc, #22d3ee) 18%, transparent); }
         .skin-neon .plg-accent { background-image: linear-gradient(var(--dir, 90deg), color-mix(in srgb, var(--tc, #22d3ee) 70%, black), rgba(8,10,18,0.9) 130%); border: 1px solid var(--tc, #22d3ee); box-shadow: 0 0 16px color-mix(in srgb, var(--tc, #22d3ee) 60%, transparent); }
         .skin-neon .plg-label { background: #0c0f18; border: 1px solid #fbbf24; box-shadow: 0 0 14px rgba(251,191,36,0.65); color: #fbbf24 !important; }
+
+        /* ── Team pack: Austin Spurs — Silver & Black (home) ── */
+        .skin-spurs .plg-panel { background: repeating-linear-gradient(115deg, rgba(255,255,255,0.03) 0 2px, transparent 2px 9px), linear-gradient(180deg, #131315, #060607 60%, #0e0e10); border-top: 1px solid rgba(196,206,212,0.55); }
+        .skin-spurs .plg-accent { background-image: repeating-linear-gradient(115deg, rgba(0,0,0,0.05) 0 2px, transparent 2px 9px), linear-gradient(180deg, rgba(255,255,255,0.5), rgba(255,255,255,0) 45%, rgba(0,0,0,0.18)), linear-gradient(var(--dir, 90deg), var(--tc, #c4ced4), #7c848b 150%); color: #0b0b0d; text-shadow: 0 1px 0 rgba(255,255,255,0.35); }
+        .skin-spurs .plg-accent .text-zinc-400, .skin-spurs .plg-accent .text-yellow-400 { color: #26282c !important; }
+        .skin-spurs .plg-label { background: linear-gradient(180deg, #f2f5f7, #b9c2c9 50%, #838b93); color: #0b0b0d !important; }
+
+        /* ── Team pack: Austin Spurs — DC Comics Night ── */
+        .skin-spurs-dc .plg-panel { background-image: radial-gradient(rgba(255,255,255,0.09) 1px, transparent 1.6px), linear-gradient(180deg, #0d1b3d, #070f24 65%, #0a1530); background-size: 7px 7px, 100% 100%; border: 2px solid #0b0c0e; box-shadow: 0 3px 0 #0b0c0e; }
+        .skin-spurs-dc .plg-accent { background-image: radial-gradient(rgba(0,0,0,0.18) 1px, transparent 1.6px), linear-gradient(180deg, rgba(255,255,255,0.28), rgba(255,255,255,0) 45%), linear-gradient(var(--dir, 90deg), var(--tc, #d0021b), #12235c 155%); background-size: 6px 6px, 100% 100%, 100% 100%; border: 2px solid #0b0c0e; font-style: italic; }
+        .skin-spurs-dc .plg-label { background: #ffd83d; color: #0b0c0e !important; border: 2px solid #0b0c0e; box-shadow: 3px 3px 0 #0b0c0e; font-style: italic; }
+
+        /* ── Team pack: Austin Spurs — Texas Fiesta ── */
+        .skin-spurs-fiesta .plg-panel { background: linear-gradient(180deg, #17121c, #0e0a12 60%, #140f19); border-top: 3px solid; border-image: linear-gradient(90deg, #e91e8c, #ff8c00, #ffd400, #00b8a9, #7b5cff) 1; }
+        .skin-spurs-fiesta .plg-accent { background-image: repeating-linear-gradient(135deg, rgba(255,255,255,0.1) 0 3px, transparent 3px 10px), linear-gradient(180deg, rgba(255,255,255,0.22), rgba(255,255,255,0) 50%), linear-gradient(var(--dir, 90deg), var(--tc, #e91e8c), rgba(20,15,25,0.55) 165%); }
+        .skin-spurs-fiesta .plg-label { background: linear-gradient(90deg, #e91e8c, #ff8c00 30%, #ffd400 55%, #00b8a9 80%, #7b5cff); color: #14101a !important; }
       `}</style>
       {summary && (
         <>

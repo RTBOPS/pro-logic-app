@@ -731,6 +731,23 @@ function ControlInner() {
 
               <div>
                 <span className="text-xs font-medium text-gray-600 block mb-2">Graphics style</span>
+                <div className="mb-2">
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400 block mb-1.5">Team pack · Austin Spurs (home)</span>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {([
+                      ['spurs', 'Silver & Black', 'linear-gradient(180deg, #f2f5f7, #b9c2c9 50%, #1a1b1e)', '#3a3d42', '#c4ced4'],
+                      ['spurs-dc', 'DC Night', 'radial-gradient(circle at 30% 30%, #ffd83d 18%, transparent 19%), linear-gradient(135deg, #d0021b 40%, #0d1b3d 60%)', '#123a8f', '#d0021b'],
+                      ['spurs-fiesta', 'Texas Fiesta', 'linear-gradient(90deg, #e91e8c, #ff8c00, #ffd400, #00b8a9)', '#00b8a9', '#e91e8c'],
+                    ] as [string, string, string, string, string][]).map(([id, label, swatch, packC1, packC2]) => (
+                      <button key={id}
+                        onClick={() => { setSkin(id); setUseTeamColors(false); setC1(packC1); setC2(packC2); }}
+                        className={`rounded-xl px-2 py-2 text-[11px] font-bold flex items-center gap-2 border ${skin === id ? 'border-black ring-1 ring-black' : 'border-gray-200 hover:border-gray-300'}`}>
+                        <span className="w-5 h-5 rounded-md shrink-0 border border-black/10" style={{ background: swatch }} />
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
                 <div className="grid grid-cols-3 gap-1.5">
                   {([
                     ['clean', 'Clean', 'linear-gradient(135deg, #27272a, #18181b)'],
