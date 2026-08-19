@@ -35,7 +35,7 @@ interface GfxDoc extends BusState {
   showBrand?: boolean;
   autoCallouts?: boolean;
   callout?: Callout | null;             // manual fire from the control panel
-  theme?: { useTeamColors?: boolean; c1?: string; c2?: string; logoScale?: number; brandScale?: number; motion?: boolean; bugPos?: 'left' | 'center' | 'right' } | null;
+  theme?: { useTeamColors?: boolean; c1?: string; c2?: string; logoScale?: number; brandScale?: number; motion?: boolean; bugPos?: 'left' | 'center' | 'right'; skin?: string } | null;
   trivia?: { question?: string; options?: string[]; correct?: number; sponsor?: string; reveal?: boolean } | null;
   portalCfg?: { x?: number; y?: number; size?: number; logo?: string; video?: string; content?: 'logo' | 'trivia' } | null;
   talentCfg?: { list?: { id: string; name: string; role: string; photo: string }[] } | null;
@@ -190,7 +190,7 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
   const motionOn = !!gfx.theme?.motion;
 
   return (
-    <div className="fixed inset-0 overflow-hidden font-sans"
+    <div className={`fixed inset-0 overflow-hidden font-sans skin-${gfx.theme?.skin || 'clean'}`}
       style={{ background: bg, cursor: cursorHidden ? 'none' : 'default' }}>
       {/* Warm the default portal FX so firing it is instant */}
       <video muted playsInline preload="auto" className="hidden">
@@ -208,6 +208,31 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
         @keyframes plg-shine { 0% { transform: translateX(-130%); } 26% { transform: translateX(430%); } 100% { transform: translateX(430%); } }
         @keyframes plg-float-logo { 0%, 100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-2.5px) scale(1.05); } }
         @keyframes plg-correct-pop { 0% { transform: scale(1); } 40% { transform: scale(1.06); } 100% { transform: scale(1); } }
+
+        /* ── Surface system: every bar/panel uses these; skins re-texture them ── */
+        .plg-panel { background: rgba(24, 24, 27, 0.95); }
+        .plg-accent { background-image: linear-gradient(var(--dir, 90deg), var(--tc, #52525b), #18181b 140%); }
+        .plg-label { background: linear-gradient(135deg, #fbbf24, #f59e0b); }
+
+        .skin-glass .plg-panel { background: rgba(13, 18, 28, 0.55); backdrop-filter: blur(14px) saturate(1.3); border-top: 1px solid rgba(255,255,255,0.22); }
+        .skin-glass .plg-accent { background-image: linear-gradient(180deg, rgba(255,255,255,0.32), rgba(255,255,255,0.02) 48%), linear-gradient(var(--dir, 90deg), var(--tc, #52525b), rgba(24,24,27,0.4) 150%); backdrop-filter: blur(10px); }
+        .skin-glass .plg-label { background: linear-gradient(180deg, rgba(255,255,255,0.35), rgba(255,255,255,0) 50%), linear-gradient(135deg, #fbbf24, #f59e0b); }
+
+        .skin-steel .plg-panel { background: repeating-linear-gradient(90deg, rgba(255,255,255,0.04) 0 1px, transparent 1px 3px), linear-gradient(180deg, #3d4046, #1a1c1f 52%, #26282c); border-top: 1px solid rgba(255,255,255,0.3); }
+        .skin-steel .plg-accent { background-image: repeating-linear-gradient(90deg, rgba(255,255,255,0.06) 0 1px, transparent 1px 3px), linear-gradient(180deg, rgba(255,255,255,0.38), rgba(255,255,255,0) 42%, rgba(0,0,0,0.42)), linear-gradient(var(--dir, 90deg), var(--tc, #52525b), #101113 150%); }
+        .skin-steel .plg-label { background: repeating-linear-gradient(90deg, rgba(255,255,255,0.08) 0 1px, transparent 1px 3px), linear-gradient(180deg, #e8e9ec, #9aa0a8 50%, #6b7078); }
+
+        .skin-gold .plg-panel { background: linear-gradient(180deg, #241d10, #171309 55%, #1f1a0d); border-top: 1px solid rgba(251,191,36,0.45); }
+        .skin-gold .plg-accent { background-image: linear-gradient(180deg, rgba(255,235,170,0.35), rgba(255,255,255,0) 42%, rgba(0,0,0,0.35)), linear-gradient(var(--dir, 90deg), var(--tc, #52525b), #171309 150%); }
+        .skin-gold .plg-label { background: linear-gradient(180deg, #f9e8a0, #e3b341 48%, #a97e1a); }
+
+        .skin-carbon .plg-panel { background: linear-gradient(27deg, #1b1d1f 5px, transparent 5px) 0 5px, linear-gradient(207deg, #1b1d1f 5px, transparent 5px) 10px 0, linear-gradient(27deg, #222427 5px, transparent 5px) 0 10px, linear-gradient(207deg, #222427 5px, transparent 5px) 10px 5px, linear-gradient(90deg, #17181a 10px, transparent 10px), linear-gradient(#131416 25%, #17181a 25%, #17181a 50%, transparent 50%, transparent 75%, #202124 75%, #202124); background-color: #131416; background-size: 20px 20px; }
+        .skin-carbon .plg-accent { background-image: repeating-linear-gradient(45deg, rgba(0,0,0,0.22) 0 2px, transparent 2px 4px), repeating-linear-gradient(-45deg, rgba(0,0,0,0.22) 0 2px, transparent 2px 4px), linear-gradient(var(--dir, 90deg), var(--tc, #52525b), #101113 150%); }
+        .skin-carbon .plg-label { background: repeating-linear-gradient(45deg, rgba(0,0,0,0.15) 0 2px, transparent 2px 4px), linear-gradient(135deg, #fbbf24, #d97706); }
+
+        .skin-neon .plg-panel { background: rgba(8, 10, 18, 0.92); border: 1px solid color-mix(in srgb, var(--tc, #22d3ee) 65%, white 10%); box-shadow: 0 0 14px color-mix(in srgb, var(--tc, #22d3ee) 45%, transparent), inset 0 0 10px color-mix(in srgb, var(--tc, #22d3ee) 18%, transparent); }
+        .skin-neon .plg-accent { background-image: linear-gradient(var(--dir, 90deg), color-mix(in srgb, var(--tc, #22d3ee) 70%, black), rgba(8,10,18,0.9) 130%); border: 1px solid var(--tc, #22d3ee); box-shadow: 0 0 16px color-mix(in srgb, var(--tc, #22d3ee) 60%, transparent); }
+        .skin-neon .plg-label { background: #0c0f18; border: 1px solid #fbbf24; box-shadow: 0 0 14px rgba(251,191,36,0.65); color: #fbbf24 !important; }
       `}</style>
       {summary && (
         <>
@@ -224,12 +249,12 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
                 {busMode === 'program' && current && (
                   <div key={current.id} className="inline-flex items-stretch rounded-xl overflow-hidden shadow-2xl text-white"
                     style={{ animation: 'plg-pop 0.4s cubic-bezier(0.34, 1.3, 0.64, 1) both' }}>
-                    <div className="px-4 py-2 font-black text-lg tracking-wide flex items-center"
-                      style={{ background: calloutColor(current) }}>
+                    <div className="plg-accent px-4 py-2 font-black text-lg tracking-wide flex items-center"
+                      style={{ ['--tc' as any]: calloutColor(current), ['--dir' as any]: '135deg' }}>
                       {current.title}
                     </div>
                     {current.sub && (
-                      <div className="pr-4 pl-3 text-sm font-semibold bg-zinc-900/95 flex items-center">
+                      <div className="plg-panel pr-4 pl-3 text-sm font-semibold flex items-center">
                         {current.sub}
                       </div>
                     )}
@@ -247,7 +272,7 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
                     </div>
                   )}
                   <TeamCell team={summary.away} color={awayColor} scale={logoScale} float={motionOn} />
-                  <div className="bg-zinc-900 px-4 flex flex-col items-center justify-center min-w-[92px]">
+                  <div className="plg-panel px-4 flex flex-col items-center justify-center min-w-[92px]">
                     {summary.state === 'in' ? (
                       <>
                         <span className="text-yellow-400 font-bold text-lg leading-tight">{summary.clock}</span>
@@ -280,7 +305,7 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
                 <PlayerPhoto src={lower.headshot} className="absolute inset-0 w-full h-full object-cover object-top" />
               </div>
               <div className="ml-[-10px] mb-2">
-                <div className="bg-zinc-900/95 text-white pl-6 pr-8 py-3 rounded-tr-2xl shadow-2xl flex items-center gap-4">
+                <div className="plg-panel text-white pl-6 pr-8 py-3 rounded-tr-2xl shadow-2xl flex items-center gap-4">
                   <div>
                     <div className="text-2xl font-black leading-none">{lower.name}</div>
                     <div className="text-xs font-semibold mt-1 text-zinc-400">
@@ -333,7 +358,7 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
                         animation: 'plg-drop 0.8s cubic-bezier(0.34, 1.4, 0.64, 1) 0.35s both',
                       } as React.CSSProperties}>
                       {showTrivia ? (
-                        <div className="bg-zinc-900/95 text-white rounded-2xl shadow-2xl border border-amber-500/40 overflow-hidden">
+                        <div className="plg-panel text-white rounded-2xl shadow-2xl border border-amber-500/40 overflow-hidden">
                           <div className="px-4 pt-3 pb-2 flex items-center justify-between gap-3">
                             <span className="text-[9px] font-bold uppercase tracking-[0.22em] text-amber-400">
                               Trivia {(t.sponsor || logo) && 'presented by'}
@@ -415,13 +440,12 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
                 zIndex: 5,
               }}>
               <div className="flex items-stretch rounded-xl overflow-hidden shadow-2xl text-white">
-                <div className="px-4 flex items-center text-[10px] font-black uppercase tracking-[0.2em] text-black whitespace-nowrap"
-                  style={{ background: 'linear-gradient(135deg, #fbbf24, #f59e0b)' }}>
+                <div className="plg-label px-4 flex items-center text-[10px] font-black uppercase tracking-[0.2em] text-black whitespace-nowrap">
                   Broadcast Team
                 </div>
                 {(gfx.talentCfg?.list || []).map((c, i) => (
                   <div key={c.id}
-                    className={`bg-zinc-900/95 px-5 py-2.5 ${i > 0 ? 'border-l border-white/10' : ''}`}
+                    className={`plg-panel px-5 py-2.5 ${i > 0 ? 'border-l border-white/10' : ''}`}
                     style={{ animation: `plg-rise 0.5s cubic-bezier(0.34, 1.3, 0.64, 1) ${0.15 + i * 0.15}s both` }}>
                     <div className="font-black leading-tight whitespace-nowrap">{c.name}</div>
                     <div className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 whitespace-nowrap">{c.role}</div>
@@ -444,11 +468,10 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
                 zIndex: 5,
               }}>
               <div className="flex items-stretch rounded-xl overflow-hidden shadow-2xl text-white">
-                <div className="px-4 flex items-center text-[10px] font-black uppercase tracking-[0.2em] text-black whitespace-nowrap"
-                  style={{ background: 'linear-gradient(135deg, #fbbf24, #f59e0b)' }}>
+                <div className="plg-label px-4 flex items-center text-[10px] font-black uppercase tracking-[0.2em] text-black whitespace-nowrap">
                   ★ {gfx.mentionCfg.label || 'Special Guest'}
                 </div>
-                <div className="bg-zinc-900/95 px-5 py-2.5">
+                <div className="plg-panel px-5 py-2.5">
                   <div className="text-lg font-black leading-tight whitespace-nowrap">{gfx.mentionCfg.name}</div>
                   {gfx.mentionCfg.title && (
                     <div className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 whitespace-nowrap">{gfx.mentionCfg.title}</div>
@@ -468,7 +491,7 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
           {bus.full && (
             <div key={bus.full} className="absolute inset-0 flex items-center justify-center"
               style={{ animation: 'plg-full-in 0.3s ease-out both' }}>
-              <div className="w-[900px] max-w-[92vw] bg-zinc-900/95 text-white rounded-3xl shadow-2xl overflow-hidden">
+              <div className="plg-panel w-[900px] max-w-[92vw] text-white rounded-3xl shadow-2xl overflow-hidden">
                 <div className="flex items-center justify-between px-8 py-4"
                   style={{ background: `linear-gradient(90deg, ${awayColor}cc, #18181b 45%, #18181b 55%, ${homeColor}cc)` }}>
                   <div className="flex items-center gap-3">
@@ -523,8 +546,8 @@ function Score({ value }: { value: string; big?: boolean }) {
 
 function TeamCell({ team, color, scale = 1, float = false, reverse = false }: { team: Summary['home']; color: string; scale?: number; float?: boolean; reverse?: boolean }) {
   return (
-    <div key={team.score} className={`flex items-center gap-3 px-4 py-2.5 ${reverse ? 'flex-row-reverse' : ''}`}
-      style={{ background: `linear-gradient(${reverse ? '270deg' : '90deg'}, ${color}, #18181b 140%)`, animation: 'plg-cell-flash 0.9s ease-out' }}>
+    <div key={team.score} className={`plg-accent flex items-center gap-3 px-4 py-2.5 ${reverse ? 'flex-row-reverse' : ''}`}
+      style={{ ['--tc' as any]: color, ['--dir' as any]: reverse ? '270deg' : '90deg', animation: 'plg-cell-flash 0.9s ease-out' }}>
       {team.logo && (
         <img src={team.logo} className="drop-shadow" alt=""
           style={{ width: 36 * scale, height: 36 * scale, animation: float ? 'plg-float-logo 3s ease-in-out infinite' : undefined }} />
@@ -537,8 +560,8 @@ function TeamCell({ team, color, scale = 1, float = false, reverse = false }: { 
 
 function StatChip({ label, value, color, big = false }: { label: string; value: string; color?: string; big?: boolean }) {
   return (
-    <div className={`px-4 py-2 text-center ${big ? '' : 'bg-zinc-800/95'}`}
-      style={big ? { background: color || '#7c3aed' } : undefined}>
+    <div className={`px-4 py-2 text-center ${big ? 'plg-accent' : 'plg-panel'}`}
+      style={big ? { ['--tc' as any]: color || '#7c3aed', ['--dir' as any]: '135deg' } : undefined}>
       <div className="text-lg font-black leading-none">{value || '0'}</div>
       <div className="text-[9px] font-bold text-white/70 tracking-widest">{label}</div>
     </div>

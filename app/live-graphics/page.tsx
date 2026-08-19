@@ -72,6 +72,7 @@ function ControlInner() {
   const [brandScale, setBrandScale] = useState(1);    // company logo chip
   const [motionFx, setMotionFx] = useState(false);    // breathing logos + shine sweep
   const [bugPos, setBugPos] = useState<'left' | 'center' | 'right'>('left');
+  const [skin, setSkin] = useState('clean');
   const [monSize, setMonSize] = useState(352);
   useEffect(() => {
     const s = parseInt(localStorage.getItem('plg_mon_size') || '352', 10);
@@ -125,6 +126,7 @@ function ControlInner() {
         if (d.theme.brandScale) setBrandScale(d.theme.brandScale);
         if (d.theme.motion) setMotionFx(true);
         if (d.theme.bugPos) setBugPos(d.theme.bugPos);
+        if (d.theme.skin) setSkin(d.theme.skin);
       }
       if (d.trivia) setTrivia({ question: '', options: ['', '', ''], correct: 0, sponsor: '', reveal: false, ...d.trivia });
       if (d.portalCfg) setPortalCfg({ x: 50, y: 30, size: 1, logo: '', video: '', content: 'logo', ...d.portalCfg });
@@ -183,7 +185,7 @@ function ControlInner() {
         sourceMode: source, league,
         brand: { logo: company?.logo_url || '', name: company?.name || '' },
         showBrand, autoCallouts,
-        theme: { useTeamColors, c1, c2, logoScale, brandScale, motion: motionFx, bugPos },
+        theme: { useTeamColors, c1, c2, logoScale, brandScale, motion: motionFx, bugPos, skin },
         trivia,
         portalCfg,
         talentCfg: { list: talentList },
@@ -216,7 +218,7 @@ function ControlInner() {
   /* Re-push settings when branding/theme changes (only once a game is loaded) */
   useEffect(() => {
     if ((eventId || source === 'manual') && token) pushDoc({});
-  }, [showBrand, autoCallouts, useTeamColors, c1, c2, banners, logoScale, brandScale, motionFx, trivia, portalCfg, talentList, mentionCfg, bugPos]);
+  }, [showBrand, autoCallouts, useTeamColors, c1, c2, banners, logoScale, brandScale, motionFx, trivia, portalCfg, talentList, mentionCfg, bugPos, skin]);
 
   /* Fire a play callout for the on-air player (or top scorer) */
   const calloutTarget: Athlete | null = useMemo(() => {
@@ -726,6 +728,26 @@ function ControlInner() {
             {/* Branding & look */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-4">
               <h2 className="text-sm font-semibold text-gray-800">Branding & look</h2>
+
+              <div>
+                <span className="text-xs font-medium text-gray-600 block mb-2">Graphics style</span>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {([
+                    ['clean', 'Clean', 'linear-gradient(135deg, #27272a, #18181b)'],
+                    ['glass', 'Glass', 'linear-gradient(135deg, rgba(148,163,184,0.55), rgba(30,41,59,0.7))'],
+                    ['steel', 'Steel', 'linear-gradient(180deg, #cbd5e1, #64748b 50%, #334155)'],
+                    ['gold', 'Gold', 'linear-gradient(180deg, #f9e8a0, #d4a017 55%, #92700c)'],
+                    ['carbon', 'Carbon', 'repeating-linear-gradient(45deg, #111 0 3px, #26272b 3px 6px)'],
+                    ['neon', 'Neon', 'linear-gradient(135deg, #0c0f18 60%, #22d3ee)'],
+                  ] as [string, string, string][]).map(([id, label, swatch]) => (
+                    <button key={id} onClick={() => setSkin(id)}
+                      className={`rounded-xl px-2 py-2 text-[11px] font-bold flex items-center gap-2 border ${skin === id ? 'border-black ring-1 ring-black' : 'border-gray-200 hover:border-gray-300'}`}>
+                      <span className="w-5 h-5 rounded-md shrink-0 border border-black/10" style={{ background: swatch }} />
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
 
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 min-w-0">

@@ -12,19 +12,19 @@ import {
 } from 'lucide-react';
 
 const FEATURES = [
-  { icon: Film,          title: 'Productions',       desc: 'Manage every production from brief to wrap. Track status, schedule, crew, and locations in one place.',          color: 'bg-purple-500/10 text-purple-400' },
-  { icon: FileText,      title: 'Documents & PDFs',  desc: 'Generate call sheets, NDAs, crew deals, shot lists, and location releases — pre-filled with your production data.', color: 'bg-blue-500/10 text-blue-400' },
-  { icon: Users,         title: 'Crew & Cast',       desc: 'Full profiles, departments, rates, availability, ID cards with QR codes, and digital deal memos.',                 color: 'bg-green-500/10 text-green-400' },
-  { icon: Package,       title: 'Equipment Inventory', desc: 'Catalog every piece of gear. Check-out, return inspection, maintenance logs, and asset retirement forms.',      color: 'bg-orange-500/10 text-orange-400' },
-  { icon: BookImage,     title: 'Stripboard',        desc: 'Drag-and-drop scene scheduling with color-coded strips, scene breakdowns, and instant PDF export.',                color: 'bg-red-500/10 text-red-400' },
-  { icon: Layers,        title: 'Storyboard',        desc: 'Draw panel-by-panel directly in the browser. Pen, pencil, and marker tools. Reorder with drag & drop.',            color: 'bg-indigo-500/10 text-indigo-400' },
-  { icon: MapPin,        title: 'Location Blueprint', desc: 'Design your set layout on a canvas. Place equipment, crew marks, lighting, and props from your inventory.',      color: 'bg-teal-500/10 text-teal-400' },
-  { icon: CheckSquare,   title: 'Checklists',        desc: '9 pre-built checklists plus custom lists. Track shoot readiness % per production — live on the dashboard.',       color: 'bg-yellow-500/10 text-yellow-400' },
-  { icon: IdCard,        title: 'ID Cards',          desc: 'Color-coded crew ID cards with QR codes. Print on Avery sheets — one click for every department.',                 color: 'bg-pink-500/10 text-pink-400' },
-  { icon: ClipboardCheck, title: 'Equipment Forms',  desc: 'Digital check-out, return inspection, maintenance, and retirement forms with mobile finger signatures.',           color: 'bg-cyan-500/10 text-cyan-400' },
-  { icon: BarChart3,     title: 'Gantt Chart',       desc: 'Visual timeline across your entire production schedule. See every task, dependency, and deadline at once.',        color: 'bg-emerald-500/10 text-emerald-400' },
-  { icon: ClipboardList, title: 'Shoot Log',         desc: 'On-set take journal: scene, shot, lens, aperture, ISO, shutter speed, sound roll — all logged in real time.',     color: 'bg-violet-500/10 text-violet-400' },
-  { icon: Mic,           title: 'Audio Planner',     desc: 'Live-show input lists with recommended mics, gain structure, phantom power, RF frequency coordination, and monitor mixes. Paste a technical rider — get the patch list.', color: 'bg-rose-500/10 text-rose-400' },
+  { icon: Film,          title: 'Productions',       desc: 'Manage every production from brief to wrap. Track status, schedule, crew, and locations in one place.',          color: 'bg-yellow-400/10 text-yellow-400' },
+  { icon: FileText,      title: 'Documents & PDFs',  desc: 'Generate call sheets, NDAs, crew deals, shot lists, and location releases — pre-filled with your production data.', color: 'bg-yellow-400/10 text-yellow-400' },
+  { icon: Users,         title: 'Crew & Cast',       desc: 'Full profiles, departments, rates, availability, ID cards with QR codes, and digital deal memos.',                 color: 'bg-yellow-400/10 text-yellow-400' },
+  { icon: Package,       title: 'Equipment Inventory', desc: 'Catalog every piece of gear. Check-out, return inspection, maintenance logs, and asset retirement forms.',      color: 'bg-yellow-400/10 text-yellow-400' },
+  { icon: BookImage,     title: 'Stripboard',        desc: 'Drag-and-drop scene scheduling with color-coded strips, scene breakdowns, and instant PDF export.',                color: 'bg-yellow-400/10 text-yellow-400' },
+  { icon: Layers,        title: 'Storyboard',        desc: 'Draw panel-by-panel directly in the browser. Pen, pencil, and marker tools. Reorder with drag & drop.',            color: 'bg-yellow-400/10 text-yellow-400' },
+  { icon: MapPin,        title: 'Location Blueprint', desc: 'Design your set layout on a canvas. Place equipment, crew marks, lighting, and props from your inventory.',      color: 'bg-yellow-400/10 text-yellow-400' },
+  { icon: CheckSquare,   title: 'Checklists',        desc: '9 pre-built checklists plus custom lists. Track shoot readiness % per production — live on the dashboard.',       color: 'bg-yellow-400/10 text-yellow-400' },
+  { icon: IdCard,        title: 'ID Cards',          desc: 'Color-coded crew ID cards with QR codes. Print on Avery sheets — one click for every department.',                 color: 'bg-yellow-400/10 text-yellow-400' },
+  { icon: ClipboardCheck, title: 'Equipment Forms',  desc: 'Digital check-out, return inspection, maintenance, and retirement forms with mobile finger signatures.',           color: 'bg-yellow-400/10 text-yellow-400' },
+  { icon: BarChart3,     title: 'Gantt Chart',       desc: 'Visual timeline across your entire production schedule. See every task, dependency, and deadline at once.',        color: 'bg-yellow-400/10 text-yellow-400' },
+  { icon: ClipboardList, title: 'Shoot Log',         desc: 'On-set take journal: scene, shot, lens, aperture, ISO, shutter speed, sound roll — all logged in real time.',     color: 'bg-yellow-400/10 text-yellow-400' },
+  { icon: Mic,           title: 'Audio Planner',     desc: 'Live-show input lists with recommended mics, gain structure, phantom power, RF frequency coordination, and monitor mixes. Paste a technical rider — get the patch list.', color: 'bg-yellow-400/10 text-yellow-400' },
 ];
 
 const PLANS = [
