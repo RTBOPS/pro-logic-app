@@ -34,11 +34,12 @@ interface GfxState {
   portal: boolean;
   talent: boolean;
   mention: boolean;
+  pbp?: boolean;
   ftId: string | null;
   sub: { inId: string; outId: string } | null;
   coach: 'away' | 'home' | null;
 }
-const GFX_OFF: GfxState = { bug: false, lowerId: null, full: null, banner: null, portal: false, talent: false, mention: false, ftId: null, sub: null, coach: null };
+const GFX_OFF: GfxState = { bug: false, lowerId: null, full: null, banner: null, portal: false, talent: false, mention: false, ftId: null, sub: null, coach: null, pbp: false };
 
 const DEMO = { label: 'Demo: Finals 2024 — DAL @ BOS (G5)', date: '20240617' };
 
@@ -813,6 +814,10 @@ function ControlInner() {
               <button onClick={() => fire({ bug: !active.bug })}
                 className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-medium ${active.bug ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
                 Score Bug {active.bug ? <Eye size={15} /> : <EyeOff size={15} />}
+              </button>
+              <button onClick={() => fire({ pbp: !active.pbp })}
+                className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-medium ${active.pbp ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
+                Play-by-Play Rail {active.pbp ? <Eye size={15} /> : <EyeOff size={15} />}
               </button>
               <div className="flex items-center gap-1.5">
                 <span className="text-[10px] text-gray-400 uppercase tracking-wide">League badge</span>

@@ -12,8 +12,8 @@ import PlayerPhoto from '@/components/PlayerPhoto';
 import {
   normalizeSummary, gameLeaders, comparedTeamStats, periodLabel,
   manualToSummary, topFive, applyPhotoOverrides, DEFAULT_PORTAL_VIDEO, DEFAULT_PORTAL_VIDEO_HEVC, type ManualGame,
-  normalizeShots, normalizeAssists, assistLeaders, computeAlerts, computeSplits,
-  type Summary, type Athlete, type Callout, type ShotPlay, type AssistLink, type GameAlert, type ShotSplit,
+  normalizeShots, normalizePlays, normalizeAssists, assistLeaders, computeAlerts, computeSplits,
+  type Summary, type Athlete, type Callout, type ShotPlay, type PlayEvent, type AssistLink, type GameAlert, type ShotSplit,
 } from '@/lib/nba';
 
 interface BusState {
@@ -27,6 +27,7 @@ interface BusState {
   talent?: boolean;                     // broadcast team graphic
   mention?: boolean;                    // special guest / VIP mention
   ftId?: string | null;                 // free-throw spotlight player
+  pbp?: boolean;                        // live play-by-play rail
   sub?: { inId: string; outId: string } | null;
   coach?: 'away' | 'home' | null;
 }
@@ -61,6 +62,7 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
   const [gfx, setGfx] = useState<GfxDoc>({});
   const [summary, setSummary] = useState<Summary | null>(null);
   const [shots, setShots] = useState<ShotPlay[]>([]);
+  const [plays, setPlays] = useState<PlayEvent[]>([]);
   const [assists, setAssists] = useState<AssistLink[]>([]);
   const [alerts, setAlerts] = useState<GameAlert[]>([]);
   const [bg, setBg] = useState('transparent');
@@ -172,6 +174,7 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
         if (next) {
           setSummary(next);
           setShots(normalizeShots(json));
+          setPlays(normalizePlays(json));
           setAssists(normalizeAssists(json));
           setAlerts(computeAlerts(json, next));
         }
@@ -887,6 +890,9 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
             );
           })()}
 
+          {/* ── LIVE PLAY-BY-PLAY RAIL ── */}
+          {bus.pbp && <PlayByPlayRail plays={plays} summary={summary} awayColor={awayColor} homeColor={homeColor} />}
+
           {/* ── FULL SCREENS (pure CSS) ── */}
           {bus.full && (
             <div key={bus.full} className="absolute inset-0 flex items-center justify-center"
@@ -1082,6 +1088,51 @@ function StatChip({ label, value, color, big = false }: { label: string; value: 
       style={big ? { ['--tc' as any]: color || '#7c3aed', ['--dir' as any]: '135deg' } : undefined}>
       <div className="text-lg font-black leading-none">{value || '0'}</div>
       <div className="text-[9px] font-bold text-white/70 tracking-widest">{label}</div>
+    </div>
+  );
+}
+
+/* Live play-by-play rail — newest plays at the top, scoring plays accented
+   in team color. Auto-updates as the feed advances. Sits on the right edge. */
+function PlayByPlayRail({ plays, summary, awayColor, homeColor }: {
+  plays: PlayEvent[]; summary: Summary; awayColor: string; homeColor: string;
+}) {
+  const recent = plays.slice(-7).reverse();
+  const colorOf = (teamId: string) => (teamId === summary.home.id ? homeColor : teamId === summary.away.id ? awayColor : '#52525b');
+  const abbrOf = (teamId: string) => (teamId === summary.home.id ? summary.home.abbr : teamId === summary.away.id ? summary.away.abbr : '');
+  const logoOf = (teamId: string) => (teamId === summary.home.id ? summary.home.logo : teamId === summary.away.id ? summary.away.logo : '');
+  return (
+    <div className="absolute top-8 right-8 w-[340px]"
+      style={{ animation: 'plg-lower-in 0.5s cubic-bezier(0.3, 1.15, 0.6, 1) both' }}>
+      <div className="plg-panel rounded-2xl overflow-hidden shadow-2xl text-white">
+        <div className="plg-accent px-4 py-2.5 flex items-center justify-between"
+          style={{ ['--tc' as any]: '#111827', ['--dir' as any]: '90deg' }}>
+          <span className="text-xs font-black uppercase tracking-[0.2em]">Play by Play</span>
+          <span className="text-[11px] font-bold text-yellow-400">
+            {summary.state === 'in' ? `${periodLabel(summary.period)} · ${summary.clock}` : summary.statusDetail}
+          </span>
+        </div>
+        <div className="divide-y divide-white/10">
+          {recent.map((p, i) => (
+            <div key={p.id} className="flex items-center gap-3 px-3.5 py-2.5"
+              style={{ boxShadow: `inset 4px 0 0 ${p.scoring ? colorOf(p.teamId) : 'transparent'}`,
+                animation: i === 0 ? 'plg-lower-in 0.4s cubic-bezier(0.3,1.15,0.6,1) both' : undefined }}>
+              {logoOf(p.teamId)
+                ? <img src={logoOf(p.teamId)} className="w-7 h-7 object-contain shrink-0" alt="" />
+                : <div className="w-7 h-7 shrink-0" />}
+              <div className="flex-1 min-w-0">
+                <div className={`text-[13px] leading-snug ${p.scoring ? 'font-bold' : 'font-medium text-zinc-300'}`}>{p.text}</div>
+                <div className="text-[9px] font-bold uppercase tracking-widest text-zinc-500 mt-0.5">
+                  {abbrOf(p.teamId)}{p.clock ? ` · ${p.clock}` : ''}
+                </div>
+              </div>
+              {p.scoring && (
+                <div className="text-xs font-black tabular-nums shrink-0 text-zinc-300">{p.awayScore}-{p.homeScore}</div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
