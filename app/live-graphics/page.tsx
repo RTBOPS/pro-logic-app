@@ -14,7 +14,7 @@ import {
   Palette, HelpCircle, Flame, Mic, Star, Calendar, ClipboardList,
 } from 'lucide-react';
 import {
-  normalizeScoreboard, normalizeSummary, normalizeTeams, gameLeaders, periodLabel, buildCallout, detectCallouts, advanceManualPeriod,
+  normalizeScoreboard, normalizeSummary, normalizeTeams, gameLeaders, periodLabel, buildCallout, detectCallouts, detectRichCallouts, advanceManualPeriod,
   LEAGUES, emptyManualGame, manualToSummary, manualClockRemaining, fmtClockSec,
   type Game, type Summary, type Athlete, type Callout, type ManualGame, type ManualPlayer, type LeagueTeam,
 } from '@/lib/nba';
@@ -118,10 +118,25 @@ function ControlInner() {
   const [shotPick, setShotPick] = useState('all');   // all | teamId | athleteId (shooting graphics)
   const [suggestions, setSuggestions] = useState<(Callout & { ts: number })[]>([]);
   const prevSumRef = useRef<Summary | null>(null);
-  const suggest = (s: Summary | null) => {
+  const seenPlaysRef = useRef<Set<string>>(new Set());   // play ids already turned into suggestions
+  const playsPrimedRef = useRef(false);                  // first poll seeds the set, emits nothing
+  const suggest = (s: Summary | null, json?: any) => {
     if (!s) return;
     if (autoCallouts && s.state === 'in') {
-      const evts = detectCallouts(prevSumRef.current, s);
+      let evts: Callout[] = [];
+      if (json) {
+        // Feed mode: rich callouts from the play stream (real shot + assist),
+        // plus dd/td milestones which only a boxscore diff surfaces.
+        const rich = detectRichCallouts(json, s, seenPlaysRef.current);
+        if (!playsPrimedRef.current) {
+          playsPrimedRef.current = true;   // seed the seen-set on first poll, don't dump the game
+        } else {
+          const ms = detectCallouts(prevSumRef.current, s).filter(e => e.kind === 'dd' || e.kind === 'td');
+          evts = [...ms, ...rich];
+        }
+      } else {
+        evts = detectCallouts(prevSumRef.current, s);
+      }
       if (evts.length) setSuggestions(prev => [...evts.map(e => ({ ...e, ts: Date.now() })), ...prev].slice(0, 6));
     }
     prevSumRef.current = s;
@@ -215,6 +230,10 @@ function ControlInner() {
       return () => clearInterval(t);
     }
     if (!eventId) { setSummary(null); return; }
+    // Fresh game → forget prior plays so old scoring never replays as suggestions
+    seenPlaysRef.current = new Set();
+    playsPrimedRef.current = false;
+    prevSumRef.current = null;
     let alive = true;
     const load = async () => {
       try {
@@ -222,7 +241,7 @@ function ControlInner() {
         const json = await res.json();
         if (alive) {
           const s = normalizeSummary(json);
-          suggest(s);
+          suggest(s, json);
           setSummary(s);
         }
       } catch { /* keep last */ }

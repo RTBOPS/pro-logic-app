@@ -569,6 +569,53 @@ export function buildCallout(a: Athlete, kind: Callout['kind']): Callout {
   }
 }
 
+/* Richer callouts straight from the play-by-play stream: real shot type,
+   distance and the assisting player — text a boxscore diff can't produce.
+   `seen` is a persistent Set of play ids so each scoring play fires once. */
+export function detectRichCallouts(json: any, summary: Summary, seen: Set<string>): Callout[] {
+  const plays: any[] = json?.plays || [];
+  const byId = new Map([...summary.home.athletes, ...summary.away.athletes].map(a => [a.id, a]));
+  const shotWord = (t: string) => {
+    const s = t.toLowerCase();
+    if (s.includes('dunk')) return 'dunk';
+    if (s.includes('layup')) return 'layup';
+    if (s.includes('hook')) return 'hook';
+    if (s.includes('floating') || s.includes('floater')) return 'floater';
+    if (s.includes('tip')) return 'tip-in';
+    if (s.includes('fadeaway')) return 'fadeaway';
+    if (s.includes('pullup') || s.includes('pull-up') || s.includes('pull up')) return 'pullup';
+    if (s.includes('bank')) return 'bank shot';
+    if (s.includes('jumper') || s.includes('jump shot')) return 'jumper';
+    return '';
+  };
+  const out: Callout[] = [];
+  for (const p of plays) {
+    if (!p.scoringPlay) continue;
+    const id = String(p.id || p.sequenceNumber || '');
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    const pa = Number(p.pointsAttempted) || Number(p.scoreValue) || 2;
+    const scorer = byId.get(String(p.participants?.[0]?.athlete?.id || ''));
+    const assister = p.participants?.length > 1 ? byId.get(String(p.participants[1]?.athlete?.id || '')) : undefined;
+    const color = scorer?.teamColor || '#f59e0b';
+    const name = scorer?.shortName || '';
+    const distM = /(\d+)-foot/.exec(p.text || '');
+    const dist = distM ? `${distM[1]}ft ` : '';
+    const word = shotWord(p.text || '');
+    const astTag = assister ? ` · ${assister.shortName} AST` : '';
+    const base = { id: Math.random().toString(36).slice(2, 10), color };
+    if (pa === 3) {
+      out.push({ ...base, kind: '3pt', title: '3-POINTER!', sub: `${name} · ${dist}3PT${astTag}` });
+    } else if (pa === 1) {
+      out.push({ ...base, kind: 'ft', title: '+1 FT', sub: `${name} · ${scorer?.stats.pts || '0'} PTS` });
+    } else {
+      const dunk = word === 'dunk';
+      out.push({ ...base, kind: '2pt', title: dunk ? 'SLAM DUNK!' : '+2', sub: `${name}${word ? ' · ' + word : ''}${astTag}` });
+    }
+  }
+  return out.slice(-4);
+}
+
 /* Diff two consecutive summaries → the callouts a broadcast would flash */
 export function detectCallouts(prev: Summary | null, curr: Summary): Callout[] {
   if (!prev) return [];
