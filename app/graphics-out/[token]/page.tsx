@@ -28,6 +28,7 @@ interface BusState {
   mention?: boolean;                    // special guest / VIP mention
   ftId?: string | null;                 // free-throw spotlight player
   pbp?: boolean;                        // live play-by-play rail
+  pbpTicker?: boolean;                  // latest-play strip hanging off the score bug
   sub?: { inId: string; outId: string } | null;
   coach?: 'away' | 'home' | null;
 }
@@ -387,6 +388,8 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
                     )}
                   </div>
                 )}
+
+                {bus.pbpTicker && <PlayTicker plays={plays} summary={summary} awayColor={awayColor} homeColor={homeColor} />}
 
                 {bugStyle === 'classic' && (
                   <div className="relative flex items-stretch rounded-xl overflow-hidden shadow-2xl text-white">
@@ -1088,6 +1091,33 @@ function StatChip({ label, value, color, big = false }: { label: string; value: 
       style={big ? { ['--tc' as any]: color || '#7c3aed', ['--dir' as any]: '135deg' } : undefined}>
       <div className="text-lg font-black leading-none">{value || '0'}</div>
       <div className="text-[9px] font-bold text-white/70 tracking-widest">{label}</div>
+    </div>
+  );
+}
+
+/* Compact latest-play strip that hangs off the score bug and rolls up each
+   time a new play lands — the bug-attached counterpart to the side rail. */
+function PlayTicker({ plays, summary, awayColor, homeColor }: {
+  plays: PlayEvent[]; summary: Summary; awayColor: string; homeColor: string;
+}) {
+  const latest = plays[plays.length - 1];
+  if (!latest) return null;
+  const isHome = latest.teamId === summary.home.id;
+  const isAway = latest.teamId === summary.away.id;
+  const color = isHome ? homeColor : isAway ? awayColor : '#52525b';
+  const logo = isHome ? summary.home.logo : isAway ? summary.away.logo : '';
+  const abbr = isHome ? summary.home.abbr : isAway ? summary.away.abbr : '';
+  return (
+    <div className="overflow-hidden rounded-lg shadow-2xl" style={{ maxWidth: 560 }}>
+      <style>{`@keyframes plg-tickroll { from { transform: translateY(115%); opacity: 0 } to { transform: translateY(0); opacity: 1 } }`}</style>
+      <div key={latest.id} className="plg-panel flex items-center gap-2.5 pl-3 pr-4 py-2 text-white"
+        style={{ boxShadow: `inset 4px 0 0 ${color}`, animation: 'plg-tickroll 0.45s cubic-bezier(0.3, 1.15, 0.6, 1) both' }}>
+        {logo && <img src={logo} className="w-6 h-6 object-contain shrink-0" alt="" />}
+        <span className="text-[13px] font-semibold leading-tight truncate min-w-0">{latest.text}</span>
+        <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 shrink-0 ml-auto">
+          {abbr}{latest.clock ? ` · ${latest.clock}` : ''}
+        </span>
+      </div>
     </div>
   );
 }
