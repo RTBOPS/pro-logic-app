@@ -395,19 +395,58 @@ const validCoord = (n: any) => typeof n === 'number' && Math.abs(n) <= 100;
 export function normalizeShots(json: any): ShotPlay[] {
   const plays: any[] = json?.plays || [];
   return plays
-    .filter(p => p.shootingPlay && p.coordinate && validCoord(p.coordinate.x) && validCoord(p.coordinate.y))
+    // Field goals only (pointsAttempted 2 or 3) — free throws excluded from the chart.
+    // pointsAttempted marks the ATTEMPT value, so missed 3s count as 3s (scoreValue is 0 on a miss).
+    .filter(p => p.shootingPlay && Number(p.pointsAttempted) >= 2
+      && p.coordinate && validCoord(p.coordinate.x) && validCoord(p.coordinate.y))
     .map(p => ({
       id: String(p.id || p.sequenceNumber || ''),
       x: p.coordinate.x,
       y: p.coordinate.y,
       made: !!p.scoringPlay,
-      value: Number(p.scoreValue) || 2,
+      value: Number(p.pointsAttempted) || 2,
       teamId: String(p.team?.id || ''),
       athleteId: String(p.participants?.[0]?.athlete?.id || ''),
       text: p.text || '',
       period: p.period?.number || 0,
       clock: p.clock?.displayValue || '',
     }));
+}
+
+export interface ShotSplit {
+  label: string;
+  fgm: number; fga: number; pct: number;
+  tpm: number; tpa: number;
+  headshot: string;
+  logo: string;
+  color: string;
+  teamAbbr: string;
+  jersey: string;
+  isPlayer: boolean;
+}
+
+/* Shooting splits for a filter ('all' | teamId | athleteId) from the shot list. */
+export function computeSplits(shots: ShotPlay[], filter: string, summary: Summary): ShotSplit {
+  const all = [...summary.home.athletes, ...summary.away.athletes];
+  const player = filter !== 'all' && filter !== summary.home.id && filter !== summary.away.id
+    ? all.find(a => a.id === filter) : undefined;
+  const team = filter === summary.home.id ? summary.home : filter === summary.away.id ? summary.away : undefined;
+  const sel = shots.filter(s =>
+    filter === 'all' ? true : (s.teamId === filter || s.athleteId === filter));
+  const fga = sel.length;
+  const fgm = sel.filter(s => s.made).length;
+  const three = sel.filter(s => s.value === 3);
+  return {
+    label: player ? player.name : team ? team.name : 'Both Teams',
+    fgm, fga, pct: fga ? Math.round((fgm / fga) * 100) : 0,
+    tpm: three.filter(s => s.made).length, tpa: three.length,
+    headshot: player?.headshot || '',
+    logo: player ? player.teamLogo : team?.logo || '',
+    color: player ? player.teamColor : team?.color || '#1f2937',
+    teamAbbr: player?.teamAbbr || team?.abbr || '',
+    jersey: player?.jersey || '',
+    isPlayer: !!player,
+  };
 }
 
 export function normalizePlays(json: any): PlayEvent[] {

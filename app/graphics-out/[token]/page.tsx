@@ -12,15 +12,16 @@ import PlayerPhoto from '@/components/PlayerPhoto';
 import {
   normalizeSummary, gameLeaders, comparedTeamStats, periodLabel,
   manualToSummary, topFive, applyPhotoOverrides, DEFAULT_PORTAL_VIDEO, DEFAULT_PORTAL_VIDEO_HEVC, type ManualGame,
-  normalizeShots, normalizeAssists, assistLeaders, computeAlerts,
-  type Summary, type Athlete, type Callout, type ShotPlay, type AssistLink, type GameAlert,
+  normalizeShots, normalizeAssists, assistLeaders, computeAlerts, computeSplits,
+  type Summary, type Athlete, type Callout, type ShotPlay, type AssistLink, type GameAlert, type ShotSplit,
 } from '@/lib/nba';
 
 interface BusState {
   bug?: boolean;
   lowerId?: string | null;
   full?: 'teamstats' | 'lineups' | 'leaders' | 'matchup' | 'linescore' | 'shotchart' | 'assists' | 'alerts' | 'trivia' | 'nextgame' | null;
-  shotFilter?: string | null;   // 'all' | teamId | athleteId
+  shotFilter?: string | null;   // 'all' | teamId | athleteId (full-screen shot chart)
+  shotLine?: string | null;     // 'all' | teamId | athleteId (bottom shooting-splits band)
   banner?: string | null;               // URL of the currently-aired banner
   portal?: boolean;                     // hoop-portal sponsor reveal
   talent?: boolean;                     // broadcast team graphic
@@ -714,6 +715,35 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
                 )}
               </div>
             </div>
+            );
+          })()}
+
+          {/* ── SHOOTING SPLITS LOWER THIRD ── */}
+          {bus.shotLine && (() => {
+            const sp = computeSplits(shots, bus.shotLine, summary);
+            return (
+              <div key={bus.shotLine} className={`absolute bottom-28 ${lowerPosCls}`}
+                style={{ animation: 'plg-lower-in 0.5s cubic-bezier(0.3, 1.15, 0.6, 1) both' }}>
+                <div className="flex items-stretch rounded-xl overflow-hidden shadow-2xl text-white">
+                  <div className="plg-accent flex items-center gap-3 px-4 py-2.5"
+                    style={{ ['--tc' as any]: sp.color, ['--dir' as any]: '135deg' }}>
+                    {sp.isPlayer
+                      ? <PlayerPhoto src={sp.headshot} className="w-11 h-11 rounded-full object-cover object-top bg-black/30 shrink-0" />
+                      : sp.logo && <img src={sp.logo} className="w-11 h-11 object-contain drop-shadow shrink-0" alt="" />}
+                    <div>
+                      <div className="text-lg font-black leading-tight whitespace-nowrap">{sp.label}</div>
+                      <div className="text-[9px] font-bold uppercase tracking-widest opacity-80">
+                        {sp.isPlayer ? `${sp.teamAbbr}${sp.jersey ? ' · #' + sp.jersey : ''} · Shooting` : 'Team Shooting'}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex">
+                    <StatChip label="FG" value={`${sp.fgm}/${sp.fga}`} color={sp.color} big />
+                    <StatChip label="FG%" value={`${sp.pct}%`} />
+                    <StatChip label="3PT" value={`${sp.tpm}/${sp.tpa}`} />
+                  </div>
+                </div>
+              </div>
             );
           })()}
 

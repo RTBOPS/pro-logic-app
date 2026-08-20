@@ -29,6 +29,7 @@ interface GfxState {
   lowerId: string | null;
   full: 'teamstats' | 'lineups' | 'leaders' | 'matchup' | 'linescore' | 'shotchart' | 'assists' | 'alerts' | 'trivia' | 'nextgame' | null;
   shotFilter?: string | null;
+  shotLine?: string | null;
   banner: string | null;
   portal: boolean;
   talent: boolean;
@@ -113,6 +114,7 @@ function ControlInner() {
   const [coachCfg, setCoachCfg] = useState({ away: '', home: '' });
   const [subIn, setSubIn] = useState('');
   const [calloutWho, setCalloutWho] = useState('auto');   // auto | generic | athleteId
+  const [shotPick, setShotPick] = useState('all');   // all | teamId | athleteId (shooting graphics)
   const [suggestions, setSuggestions] = useState<(Callout & { ts: number })[]>([]);
   const prevSumRef = useRef<Summary | null>(null);
   const suggest = (s: Summary | null) => {
@@ -915,6 +917,37 @@ function ControlInner() {
                   Hide Lower Third
                 </button>
               )}
+              <div className="border-t border-gray-100 pt-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Shooting splits</span>
+                  {active.shotLine && (
+                    <button onClick={() => fire({ shotLine: null })} className="text-[10px] font-bold text-red-500 hover:text-red-600 uppercase tracking-wide">Hide</button>
+                  )}
+                </div>
+                <select value={shotPick} onChange={e => setShotPick(e.target.value)}
+                  className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs bg-white">
+                  <option value="all">Both teams</option>
+                  {[summary?.away, summary?.home].map(t => t && (
+                    <optgroup key={t.id} label={t.name}>
+                      <option value={t.id}>{t.name} — team</option>
+                      {t.athletes.filter(a => a.played).slice().sort(byJerseyThenName).map(a => (
+                        <option key={a.id} value={a.id}>{a.jersey ? `#${a.jersey} — ` : ''}{a.name}</option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
+                <div className="flex gap-2">
+                  <button onClick={() => fire({ shotLine: active.shotLine === shotPick ? null : shotPick })}
+                    className={`flex-1 px-2 py-2 rounded-lg text-xs font-bold ${active.shotLine === shotPick ? 'bg-amber-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-amber-100 hover:text-amber-800'}`}>
+                    Lower Third
+                  </button>
+                  <button onClick={() => fire({ full: active.full === 'shotchart' && active.shotFilter === shotPick ? null : 'shotchart', shotFilter: shotPick })}
+                    className={`flex-1 px-2 py-2 rounded-lg text-xs font-bold ${active.full === 'shotchart' && active.shotFilter === shotPick ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-blue-100 hover:text-blue-800'}`}>
+                    Full Chart
+                  </button>
+                </div>
+              </div>
+
               <div className="border-t border-gray-100 pt-3 space-y-2">
                 <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Substitution</span>
                 <div className="flex items-center gap-1.5 flex-wrap">
