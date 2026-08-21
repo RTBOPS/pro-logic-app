@@ -53,6 +53,8 @@ export interface TeamBox {
   color: string;
   homeAway: 'home' | 'away';
   score: string;
+  record?: string;           // e.g. "24-34" (live/pre games)
+  fouls?: string;            // total team fouls this game
   linescores?: string[];     // points per period (fills in as the game advances)
   stats: { label: string; value: string }[];
   athletes: Athlete[];
@@ -66,6 +68,7 @@ export interface Summary {
   period: number;
   home: TeamBox;
   away: TeamBox;
+  venue?: string;            // "TD Garden · Boston, MA"
 }
 
 export function periodLabel(period: number, statusDetail?: string): string {
@@ -273,10 +276,13 @@ export function normalizeSummary(json: any): Summary | null {
   const st = comp.status || {};
   const scores: Record<string, string> = {};
   const lines: Record<string, string[]> = {};
+  const recs: Record<string, string> = {};
   (comp.competitors || []).forEach((c: any) => {
     const id = String(c.team?.id ?? c.id);
     scores[id] = String(c.score ?? '');
     lines[id] = (c.linescores || []).map((l: any) => String(l.displayValue ?? l.value ?? ''));
+    recs[id] = typeof c.record === 'string' ? c.record
+      : (c.records || []).find((r: any) => r.type === 'total')?.summary || (c.records || [])[0]?.summary || '';
   });
 
   const teamsRaw = json?.boxscore?.teams || [];
@@ -322,6 +328,8 @@ export function normalizeSummary(json: any): Summary | null {
       color: hex(t.color),
       homeAway: (tRaw?.homeAway || 'home') as 'home' | 'away',
       score: scores[String(t.id)] || '',
+      record: recs[String(t.id)] || '',
+      fouls: (tRaw?.statistics || []).find((s: any) => (s.label || s.name || '').toLowerCase() === 'fouls')?.displayValue || '',
       linescores: lines[String(t.id)] || [],
       stats: (tRaw?.statistics || []).map((s: any) => ({
         label: s.label || s.abbreviation || '',
@@ -343,6 +351,11 @@ export function normalizeSummary(json: any): Summary | null {
     period: st.period || 0,
     home: buildTeam(homeRaw),
     away: buildTeam(awayRaw),
+    venue: (() => {
+      const v = json?.gameInfo?.venue || {};
+      const city = [v.address?.city, v.address?.state].filter(Boolean).join(', ');
+      return v.fullName ? (city ? `${v.fullName} · ${city}` : v.fullName) : '';
+    })(),
   };
 }
 

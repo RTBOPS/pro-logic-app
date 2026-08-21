@@ -27,7 +27,7 @@ interface BannerItem { id: string; url: string; name: string }
 interface GfxState {
   bug: boolean;
   lowerId: string | null;
-  full: 'teamstats' | 'lineups' | 'leaders' | 'matchup' | 'linescore' | 'shotchart' | 'assists' | 'alerts' | 'trivia' | 'nextgame' | null;
+  full: 'teamstats' | 'lineups' | 'leaders' | 'matchup' | 'linescore' | 'shotchart' | 'assists' | 'alerts' | 'trivia' | 'nextgame' | 'matchupbanner' | null;
   shotFilter?: string | null;
   shotLine?: string | null;
   banner: string | null;
@@ -79,7 +79,7 @@ function ControlInner() {
   const [logoScale, setLogoScale] = useState(1);      // team logos on bug & headers
   const [brandScale, setBrandScale] = useState(1);    // company logo chip
   const [badgeSec, setBadgeSec] = useState(4.5);      // seconds each badge-roll logo holds
-  const [bugStyle, setBugStyle] = useState<'classic' | 'bar' | 'strip' | 'stack'>('classic');
+  const [bugStyle, setBugStyle] = useState<'classic' | 'bar' | 'strip' | 'stack' | 'arena'>('classic');
   const [motionFx, setMotionFx] = useState(false);    // breathing logos + shine sweep
   const [bugPos, setBugPos] = useState<'left' | 'center' | 'right'>('left');
   const [lowerPos, setLowerPos] = useState<'left' | 'center' | 'right'>('left');
@@ -861,7 +861,7 @@ function ControlInner() {
               <div className="flex items-center gap-1.5">
                 <span className="text-[10px] text-gray-400 uppercase tracking-wide">Bug style</span>
                 <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5 ml-auto">
-                  {(['classic', 'bar', 'strip', 'stack'] as const).map(s => (
+                  {(['classic', 'bar', 'strip', 'stack', 'arena'] as const).map(s => (
                     <button key={s} onClick={() => setBugStyle(s)}
                       className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase ${bugStyle === s ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500'}`}>
                       {s}
@@ -911,7 +911,8 @@ function ControlInner() {
                 ['shotchart', 'Shot Chart'],
                 ['assists', 'Assist Leaders'],
                 ['alerts', 'Game Alerts'],
-              ] as ['teamstats' | 'lineups' | 'leaders' | 'matchup' | 'linescore' | 'shotchart' | 'assists' | 'alerts', string][]).map(([kind, label]) => (
+                ['matchupbanner', 'Matchup Banner'],
+              ] as ['teamstats' | 'lineups' | 'leaders' | 'matchup' | 'linescore' | 'shotchart' | 'assists' | 'alerts' | 'matchupbanner', string][]).map(([kind, label]) => (
                 <button key={kind} onClick={() => fire({ full: active.full === kind ? null : kind })}
                   className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-medium ${active.full === kind ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
                   {label} {active.full === kind ? <Eye size={15} /> : <EyeOff size={15} />}

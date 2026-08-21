@@ -19,7 +19,7 @@ import {
 interface BusState {
   bug?: boolean;
   lowerId?: string | null;
-  full?: 'teamstats' | 'lineups' | 'leaders' | 'matchup' | 'linescore' | 'shotchart' | 'assists' | 'alerts' | 'trivia' | 'nextgame' | null;
+  full?: 'teamstats' | 'lineups' | 'leaders' | 'matchup' | 'linescore' | 'shotchart' | 'assists' | 'alerts' | 'trivia' | 'nextgame' | 'matchupbanner' | null;
   shotFilter?: string | null;   // 'all' | teamId | athleteId (full-screen shot chart)
   shotLine?: string | null;     // 'all' | teamId | athleteId (bottom shooting-splits band)
   banner?: string | null;               // URL of the currently-aired banner
@@ -35,6 +35,7 @@ interface BusState {
 
 interface GfxDoc extends BusState {
   eventId?: string;
+  shotClock?: string;
   updatedAt?: string;
   league?: string;
   sourceMode?: 'feed' | 'manual';       // manual: operator-keyed game data
@@ -369,8 +370,9 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
                 <span className="text-zinc-300 text-xs font-bold uppercase text-center leading-tight px-1">{summary.statusDetail}</span>
               )
             );
+            const wrapCls = bugStyle === 'arena' ? 'left-0 right-0 items-center' : posCls;
             return (
-              <div className={`absolute bottom-8 flex flex-col gap-2 ${posCls}`}
+              <div className={`absolute bottom-8 flex flex-col gap-2 ${wrapCls}`}
                 style={{ fontVariantNumeric: 'tabular-nums', animation: 'plg-rise 0.5s cubic-bezier(0.34, 1.3, 0.64, 1) both' }}>
 
                 {/* Callout pill above the bug */}
@@ -511,6 +513,55 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
                         </div>
                       )}
                       <div className="flex-1 plg-panel text-center py-1">{summary.home.abbr}</div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Faceted full-width arena bug — angled team panels, big scores,
+                   records in the outer corners, a black clock strip below. */}
+                {bugStyle === 'arena' && (
+                  <div className="relative text-white" style={{ width: 'min(1080px, 96vw)' }}>
+                    <div className="relative flex items-stretch h-[92px] rounded-md overflow-hidden shadow-2xl">
+                      {shine}
+                      {/* away angled panel */}
+                      <div className="relative flex-1 flex items-center pl-5 pr-24"
+                        style={{ background: `linear-gradient(100deg, ${awayColor}, ${awayColor} 55%, #0b0b0f 140%)`, clipPath: 'polygon(0 0, 100% 0, calc(100% - 30px) 100%, 0 100%)' }}>
+                        {summary.away.logo && <img src={summary.away.logo} className="drop-shadow-lg object-contain"
+                          style={{ width: 72 * logoScale, height: 72 * logoScale, animation: motionOn ? 'plg-float-logo 3s ease-in-out infinite' : undefined }} alt="" />}
+                        <div className="absolute top-1.5 left-4 flex items-center gap-3 text-[11px] font-black tracking-wide">
+                          {summary.away.record && <span>{summary.away.record}</span>}
+                          {summary.away.fouls && summary.state === 'in' && <span className="text-white/80">FOULS: {summary.away.fouls}</span>}
+                        </div>
+                      </div>
+                      {/* home angled panel */}
+                      <div className="relative flex-1 flex items-center justify-end pr-5 pl-24"
+                        style={{ background: `linear-gradient(260deg, ${homeColor}, ${homeColor} 55%, #0b0b0f 140%)`, clipPath: 'polygon(30px 0, 100% 0, 100% 100%, 0 100%)' }}>
+                        <div className="absolute top-1.5 right-4 flex items-center gap-3 text-[11px] font-black tracking-wide">
+                          {summary.home.fouls && summary.state === 'in' && <span className="text-white/80">FOULS: {summary.home.fouls}</span>}
+                          {summary.home.record && <span>{summary.home.record}</span>}
+                        </div>
+                        {summary.home.logo && <img src={summary.home.logo} className="drop-shadow-lg object-contain"
+                          style={{ width: 72 * logoScale, height: 72 * logoScale, animation: motionOn ? 'plg-float-logo 3s ease-in-out infinite' : undefined }} alt="" />}
+                      </div>
+                      {/* center scores over the seam */}
+                      <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 flex items-center justify-center z-20 px-10"
+                        style={{ background: 'linear-gradient(90deg, transparent, rgba(0,0,0,0.88) 16%, rgba(0,0,0,0.88) 84%, transparent)', minWidth: 340 }}>
+                        <span key={'a' + summary.away.score} className="text-6xl font-black leading-none w-24 text-right" style={{ animation: 'plg-score-pop 0.6s ease-out both' }}>{summary.away.score}</span>
+                        <span className="mx-4 w-px h-11 bg-white/20 shrink-0" />
+                        <span key={'h' + summary.home.score} className="text-6xl font-black leading-none w-24 text-left text-zinc-300" style={{ animation: 'plg-score-pop 0.6s ease-out both' }}>{summary.home.score}</span>
+                      </div>
+                    </div>
+                    {/* clock strip hanging below center */}
+                    <div className="absolute left-1/2 -translate-x-1/2 -bottom-3.5 z-30 flex items-stretch rounded-md overflow-hidden shadow-xl bg-black text-white text-lg font-black tracking-wide">
+                      {summary.state === 'in' ? (
+                        <>
+                          <span className="px-4 py-1">{periodLabel(summary.period)}</span>
+                          <span className="px-4 py-1 border-l border-white/15">{summary.clock}</span>
+                          {gfx.shotClock && <span className="px-4 py-1 border-l border-white/15 text-yellow-400">{gfx.shotClock}</span>}
+                        </>
+                      ) : (
+                        <span className="px-5 py-1 uppercase text-zinc-200">{summary.statusDetail}</span>
+                      )}
                     </div>
                   </div>
                 )}
@@ -896,8 +947,14 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
           {/* ── LIVE PLAY-BY-PLAY RAIL ── */}
           {bus.pbp && <PlayByPlayRail plays={plays} summary={summary} awayColor={awayColor} homeColor={homeColor} />}
 
+          {/* ── MATCHUP BANNER (full-width lower third) ── */}
+          {bus.full === 'matchupbanner' && (
+            <MatchupBanner summary={summary} sponsor={gfx.leagueBadge || brand?.logo || ''}
+              awayColor={awayColor} homeColor={homeColor} logoScale={logoScale} />
+          )}
+
           {/* ── FULL SCREENS (pure CSS) ── */}
-          {bus.full && (
+          {bus.full && bus.full !== 'matchupbanner' && (
             <div key={bus.full} className="absolute inset-0 flex items-center justify-center"
               style={{ animation: 'plg-full-in 0.3s ease-out both' }}>
               <div className="plg-panel w-[900px] max-w-[92vw] text-white rounded-3xl shadow-2xl overflow-hidden">
@@ -1091,6 +1148,43 @@ function StatChip({ label, value, color, big = false }: { label: string; value: 
       style={big ? { ['--tc' as any]: color || '#7c3aed', ['--dir' as any]: '135deg' } : undefined}>
       <div className="text-lg font-black leading-none">{value || '0'}</div>
       <div className="text-[9px] font-bold text-white/70 tracking-widest">{label}</div>
+    </div>
+  );
+}
+
+/* Full-width matchup lower third: team color halves, big logos bleeding off
+   the edges, tricode + full name, a center sponsor slot and the venue. */
+function MatchupBanner({ summary, sponsor, awayColor, homeColor, logoScale }: {
+  summary: Summary; sponsor: string; awayColor: string; homeColor: string; logoScale: number;
+}) {
+  const [venName, venCity] = (summary.venue || '').split(' · ');
+  const Side = ({ t, color, color2, side }: { t: Summary['home']; color: string; color2: string; side: 'l' | 'r' }) => (
+    <div className={`flex-1 flex items-center gap-5 ${side === 'r' ? 'flex-row-reverse pr-10' : 'pl-10'} overflow-hidden`}
+      style={{ background: `linear-gradient(${side === 'l' ? '100deg' : '260deg'}, ${color}, ${color2})` }}>
+      {t.logo && <img src={t.logo} className="object-contain drop-shadow-2xl shrink-0"
+        style={{ width: 118 * logoScale, height: 118 * logoScale, animation: 'plg-float-logo 3.4s ease-in-out infinite' }} alt="" />}
+      <div className={side === 'r' ? 'text-right' : ''}>
+        <div className="text-5xl font-black leading-none tracking-tight">{t.abbr}</div>
+        <div className="text-sm font-bold uppercase tracking-widest text-white/80 mt-1 whitespace-nowrap">{t.name}</div>
+      </div>
+    </div>
+  );
+  return (
+    <div className="absolute bottom-0 left-0 right-0 h-[132px] flex items-stretch text-white overflow-hidden"
+      style={{ animation: 'plg-rise 0.5s cubic-bezier(0.34, 1.3, 0.64, 1) both' }}>
+      <Side t={summary.away} color={awayColor} color2="#0b0b0f" side="l" />
+      <div className="relative flex flex-col items-center justify-center px-4 bg-black/70 backdrop-blur-sm z-10 min-w-[190px]">
+        {sponsor
+          ? <div className="bg-white rounded-md px-3 py-2 flex items-center"><img src={sponsor} className="h-9 max-w-[130px] object-contain" alt="" /></div>
+          : <div className="text-2xl font-black tracking-widest text-white/40">VS</div>}
+        {venName && (
+          <div className="mt-2 text-center leading-tight">
+            <div className="text-[11px] font-black uppercase tracking-wider">{venName}</div>
+            {venCity && <div className="text-[9px] font-semibold uppercase tracking-widest text-white/60">{venCity}</div>}
+          </div>
+        )}
+      </div>
+      <Side t={summary.home} color={homeColor} color2="#0b0b0f" side="r" />
     </div>
   );
 }
