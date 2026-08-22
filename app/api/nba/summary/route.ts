@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
     }
     const data = await res.json();
     return NextResponse.json(data, {
-      headers: { 'Cache-Control': 'public, s-maxage=3, stale-while-revalidate=10' },
+      headers: { 'Cache-Control': 'public, s-maxage=1, stale-while-revalidate=4' },
     });
   } catch {
     return NextResponse.json({ error: 'NBA data unreachable' }, { status: 502 });

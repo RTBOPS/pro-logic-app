@@ -231,7 +231,7 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
       } catch { /* keep last */ }
     };
     load();
-    const t = setInterval(load, 3000);
+    const t = setInterval(load, 2000);
     return () => { alive = false; clearInterval(t); };
   }, [gfx.eventId, gfx.autoCallouts, gfx.sourceMode, gfx.manual, gfx.league, gfx.photoOverrides]);
 
@@ -253,7 +253,7 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
     if (summary?.state !== 'in' || !a.at) return summary?.clock || '';
     if (!a.running) return fmtClockDisplay(a.sec);
     const elapsed = (Date.now() - a.at) / 1000;
-    return fmtClockDisplay(a.sec - Math.min(elapsed, 6));   // hold if a poll is missed
+    return fmtClockDisplay(a.sec - Math.min(elapsed, 2.4));   // small lead only; resync corrects each poll
   })();
 
   /* Callout queue: show one at a time */
