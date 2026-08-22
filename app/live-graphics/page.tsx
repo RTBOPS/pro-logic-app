@@ -1310,16 +1310,14 @@ function ControlInner() {
             {leaders.length > 0 && (
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
                 <h2 className="text-sm font-semibold text-gray-800 mb-3">Top scorers — one-tap lower third</h2>
-                <div className="space-y-2">
+                <div className="grid grid-cols-3 gap-2">
                   {leaders.map(a => (
                     <button key={a.id} onClick={() => fire({ lowerId: active.lowerId === a.id ? null : a.id })}
-                      className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-left ${active.lowerId === a.id ? 'bg-purple-600 text-white' : 'bg-gray-50 hover:bg-gray-100'}`}>
-                      <PlayerPhoto src={photoOverrides[a.id] || a.headshot} tone="light" className="w-9 h-9 rounded-full object-cover object-top bg-gray-200 shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-semibold truncate">{a.name}</div>
-                        <div className={`text-xs ${active.lowerId === a.id ? 'text-purple-200' : 'text-gray-500'}`}>{a.teamAbbr} · #{a.jersey}</div>
-                      </div>
-                      <div className="text-sm font-bold shrink-0">{a.stats.pts} PTS</div>
+                      className={`flex flex-col items-center gap-1 px-2 py-2.5 rounded-xl text-center ${active.lowerId === a.id ? 'bg-purple-600 text-white' : 'bg-gray-50 hover:bg-gray-100'}`}>
+                      <PlayerPhoto src={photoOverrides[a.id] || a.headshot} tone="light" className="w-11 h-11 rounded-full object-cover object-top bg-gray-200 shrink-0" />
+                      <div className="text-xs font-semibold truncate w-full leading-tight">{a.name}</div>
+                      <div className={`text-[10px] leading-none ${active.lowerId === a.id ? 'text-purple-200' : 'text-gray-500'}`}>{a.teamAbbr} · #{a.jersey}</div>
+                      <div className="text-sm font-black">{a.stats.pts} PTS</div>
                     </button>
                   ))}
                 </div>
