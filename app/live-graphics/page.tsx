@@ -115,7 +115,7 @@ function ControlInner() {
   const [lowerPos, setLowerPos] = useState<'left' | 'center' | 'right'>('left');
   const [ftPos, setFtPos] = useState<'left' | 'right'>('right');
   const [skin, setSkin] = useState('clean');
-  const [monSize, setMonSize] = useState(352);
+  const [monSize, setMonSize] = useState(300);
   useEffect(() => {
     const s = parseInt(localStorage.getItem('plg_mon_size') || '352', 10);
     if (s) setMonSize(s);
@@ -924,33 +924,45 @@ function ControlInner() {
           <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 items-start pb-28">
             {/* Live score header (full-width bar) */}
             <div className="bg-gray-900 text-white rounded-2xl p-3 lg:col-span-2 xl:col-span-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  {summary.away.logo && <img src={summary.away.logo} className="w-8 h-8" alt="" />}
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 shrink-0">
+                  {summary.away.logo && <img src={summary.away.logo} className="w-9 h-9" alt="" />}
                   <span className="font-bold text-lg">{summary.away.abbr}</span>
-                  <span className="font-black text-xl md:text-2xl">{summary.away.score}</span>
+                  <span className="font-black text-2xl">{summary.away.score}</span>
                 </div>
-                <div className="text-center">
-                  <div className="text-yellow-400 font-mono font-bold">{summary.state === 'in' ? `${periodLabel(summary.period)} ${summary.clock}` : ''}</div>
-                  <div className="text-xs text-gray-400">{summary.statusDetail}</div>
-                  <div className="flex items-center justify-center gap-1 mt-1">
-                    <span className="text-[9px] text-gray-500 uppercase tracking-wide mr-1">Clock sync</span>
+                <div className="flex-1 flex flex-col items-center gap-1.5 min-w-0">
+                  {leaders.length > 0 && (
+                    <div className="flex items-center gap-2 flex-wrap justify-center">
+                      {leaders.map(a => (
+                        <button key={a.id} onClick={() => fire({ lowerId: active.lowerId === a.id ? null : a.id })}
+                          title={`Fire lower third · ${a.name} · ${a.stats.pts} PTS`}
+                          className={`flex items-center gap-1.5 pl-1 pr-2.5 py-1 rounded-full ${active.lowerId === a.id ? 'bg-purple-600 text-white' : 'bg-white/10 hover:bg-white/20 text-white'}`}>
+                          <PlayerPhoto src={photoOverrides[a.id] || a.headshot} tone="dark" className="w-6 h-6 rounded-full object-cover object-top bg-black/30 shrink-0" />
+                          <span className="text-xs font-semibold whitespace-nowrap">{a.shortName || a.name}</span>
+                          <span className="text-xs font-black">{a.stats.pts}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  <div className="flex items-center justify-center gap-1">
+                    <span className="text-yellow-400 font-mono font-bold text-sm">{summary.state === 'in' ? `${periodLabel(summary.period)} ${summary.clock}` : summary.statusDetail}</span>
+                    <span className="text-[9px] text-gray-500 uppercase tracking-wide ml-2 mr-0.5">Sync</span>
                     <button onClick={() => setClockOffset(v => Math.round((v - 1) * 10) / 10)} className="px-1.5 py-0.5 rounded bg-white/10 text-[11px] font-bold hover:bg-white/20">−1s</button>
-                    <span className="text-[11px] font-mono w-9 text-center tabular-nums">{clockOffset > 0 ? '+' : ''}{clockOffset}s</span>
+                    <span className="text-[11px] font-mono w-8 text-center tabular-nums">{clockOffset > 0 ? '+' : ''}{clockOffset}s</span>
                     <button onClick={() => setClockOffset(v => Math.round((v + 1) * 10) / 10)} className="px-1.5 py-0.5 rounded bg-white/10 text-[11px] font-bold hover:bg-white/20">+1s</button>
                     {clockOffset !== 0 && <button onClick={() => setClockOffset(0)} className="px-1.5 py-0.5 rounded bg-white/10 text-[10px] hover:bg-white/20">reset</button>}
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="font-black text-xl md:text-2xl">{summary.home.score}</span>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="font-black text-2xl">{summary.home.score}</span>
                   <span className="font-bold text-lg">{summary.home.abbr}</span>
-                  {summary.home.logo && <img src={summary.home.logo} className="w-8 h-8" alt="" />}
+                  {summary.home.logo && <img src={summary.home.logo} className="w-9 h-9" alt="" />}
                 </div>
               </div>
             </div>
 
             {/* Graphics triggers */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-3">
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-3 xl:col-span-2">
               <h2 className="text-sm font-semibold text-gray-800">Fire graphics</h2>
               <div className="relative flex items-stretch gap-1">
                 <button onClick={() => fire({ bug: !active.bug })}
@@ -1039,7 +1051,7 @@ function ControlInner() {
                 className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-medium ${active.pbpTicker ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
                 Play Ticker (on bug) {active.pbpTicker ? <Eye size={15} /> : <EyeOff size={15} />}
               </button>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 xl:grid-cols-3 gap-2">
               {([
                 ['teamstats', 'Team Stats'],
                 ['lineups', 'Lineups'],
@@ -1315,24 +1327,6 @@ function ControlInner() {
                 ))}
               </div>
             </div>
-
-            {/* Leaders quick-fire */}
-            {leaders.length > 0 && (
-              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-                <h2 className="text-sm font-semibold text-gray-800 mb-3">Top scorers — one-tap lower third</h2>
-                <div className="grid grid-cols-3 gap-2">
-                  {leaders.map(a => (
-                    <button key={a.id} onClick={() => fire({ lowerId: active.lowerId === a.id ? null : a.id })}
-                      className={`flex flex-col items-center gap-1 px-2 py-2.5 rounded-xl text-center ${active.lowerId === a.id ? 'bg-purple-600 text-white' : 'bg-gray-50 hover:bg-gray-100'}`}>
-                      <PlayerPhoto src={photoOverrides[a.id] || a.headshot} tone="light" className="w-11 h-11 rounded-full object-cover object-top bg-gray-200 shrink-0" />
-                      <div className="text-xs font-semibold truncate w-full leading-tight">{a.name}</div>
-                      <div className={`text-[10px] leading-none ${active.lowerId === a.id ? 'text-purple-200' : 'text-gray-500'}`}>{a.teamAbbr} · #{a.jersey}</div>
-                      <div className="text-sm font-black">{a.stats.pts} PTS</div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
 
           {/* ── Player roster — right hamburger drawer, ready to fire lower thirds ── */}
