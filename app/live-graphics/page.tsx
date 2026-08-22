@@ -11,7 +11,7 @@ import { UpgradeGate } from '@/components/UpgradeGate';
 import {
   MonitorPlay, Copy, ExternalLink, Loader2, RefreshCw, Eye, EyeOff, Search,
   Upload, Trash2, Zap, Plus, Play, Pause,
-  Palette, HelpCircle, Flame, Mic, Star, Calendar, ClipboardList,
+  Palette, HelpCircle, Flame, Mic, Star, Calendar, ClipboardList, Users, X,
 } from 'lucide-react';
 import {
   normalizeScoreboard, normalizeSummary, normalizeTeams, gameLeaders, periodLabel, buildCallout, detectCallouts, detectRichCallouts, advanceManualPeriod,
@@ -27,7 +27,9 @@ interface BannerItem { id: string; url: string; name: string }
 interface GfxState {
   bug: boolean;
   lowerId: string | null;
-  full: 'teamstats' | 'lineups' | 'leaders' | 'matchup' | 'linescore' | 'shotchart' | 'assists' | 'alerts' | 'trivia' | 'nextgame' | 'matchupbanner' | null;
+  full: 'teamstats' | 'lineups' | 'leaders' | 'matchup' | 'linescore' | 'shotchart' | 'assists' | 'alerts' | 'trivia' | 'nextgame' | 'matchupbanner' | 'compare' | 'statline' | 'taletape' | null;
+  compareA?: string; compareB?: string;
+  statLineId?: string;
   shotFilter?: string | null;
   shotLine?: string | null;
   banner: string | null;
@@ -54,6 +56,8 @@ function ControlInner() {
   const [token, setToken] = useState('');
   const [copied, setCopied] = useState(false);
   const [playerQuery, setPlayerQuery] = useState('');
+  const [rosterOpen, setRosterOpen] = useState(false);
+  const [savedNote, setSavedNote] = useState('');
   const pushing = useRef(false);
   const company = useCompany();
 
@@ -73,6 +77,10 @@ function ControlInner() {
   /* Branding & presentation settings */
   const [showBrand, setShowBrand] = useState(true);
   const [autoCallouts, setAutoCallouts] = useState(true);
+  const [autoFt, setAutoFt] = useState(false);
+  const autoFtRef = useRef(false);
+  const ftSeenRef = useRef('');
+  const ftPrimedRef = useRef(false);
   const [useTeamColors, setUseTeamColors] = useState(true);
   const [c1, setC1] = useState('#7c3aed');
   const [c2, setC2] = useState('#0ea5e9');
@@ -80,6 +88,11 @@ function ControlInner() {
   const [brandScale, setBrandScale] = useState(1);    // company logo chip
   const [badgeSec, setBadgeSec] = useState(4.5);      // seconds each badge-roll logo holds
   const [bugStyle, setBugStyle] = useState<'classic' | 'bar' | 'strip' | 'stack' | 'arena'>('classic');
+  const [bugScale, setBugScale] = useState(1);
+  const [matchup3d, setMatchup3d] = useState(false);
+  const [gfxScale, setGfxScale] = useState(1);   // global size of all output graphics
+  const [texture, setTexture] = useState('diamond');
+  const [textureIntensity, setTextureIntensity] = useState(1);
   const [motionFx, setMotionFx] = useState(false);    // breathing logos + shine sweep
   const [bugPos, setBugPos] = useState<'left' | 'center' | 'right'>('left');
   const [lowerPos, setLowerPos] = useState<'left' | 'center' | 'right'>('left');
@@ -117,8 +130,12 @@ function ControlInner() {
   const [subIn, setSubIn] = useState('');
   const [calloutWho, setCalloutWho] = useState('auto');   // auto | generic | athleteId
   const [shotPick, setShotPick] = useState('all');   // all | teamId | athleteId (shooting graphics)
+  const [cmpA, setCmpA] = useState('');
+  const [cmpB, setCmpB] = useState('');
+  const [statPick, setStatPick] = useState('');
   const [suggestions, setSuggestions] = useState<(Callout & { ts: number })[]>([]);
   const prevSumRef = useRef<Summary | null>(null);
+  useEffect(() => { autoFtRef.current = autoFt; }, [autoFt]);
   const seenPlaysRef = useRef<Set<string>>(new Set());   // play ids already turned into suggestions
   const playsPrimedRef = useRef(false);                  // first poll seeds the set, emits nothing
   const suggest = (s: Summary | null, json?: any) => {
@@ -188,6 +205,11 @@ function ControlInner() {
         if (d.theme.skin) setSkin(d.theme.skin);
         if (d.theme.badgeSec) setBadgeSec(d.theme.badgeSec);
         if (d.theme.bugStyle) setBugStyle(d.theme.bugStyle);
+        if (d.theme.bugScale) setBugScale(d.theme.bugScale);
+        if (d.theme.matchup3d) setMatchup3d(true);
+        if (d.theme.gfxScale) setGfxScale(d.theme.gfxScale);
+        if (d.theme.texture) setTexture(d.theme.texture);
+        if (d.theme.textureIntensity != null) setTextureIntensity(d.theme.textureIntensity);
       }
       if (d.trivia) setTrivia({ question: '', options: ['', '', ''], correct: 0, sponsor: '', reveal: false, ...d.trivia });
       if (d.portalCfg) setPortalCfg({ x: 50, y: 30, size: 1, logo: '', video: '', content: 'logo', ...d.portalCfg });
@@ -235,6 +257,7 @@ function ControlInner() {
     seenPlaysRef.current = new Set();
     playsPrimedRef.current = false;
     prevSumRef.current = null;
+    ftSeenRef.current = ''; ftPrimedRef.current = false;
     let alive = true;
     const load = async () => {
       try {
@@ -244,6 +267,18 @@ function ControlInner() {
           const s = normalizeSummary(json);
           suggest(s, json);
           setSummary(s);
+          // Auto free-throw spotlight: when a shooter reaches the line, target them
+          if (autoFtRef.current) {
+            const fts = (json?.plays || []).filter((p: any) => /free throw/i.test(p.text || ''));
+            const last = fts[fts.length - 1];
+            const pid = last ? String(last.id || last.sequenceNumber || '') : '';
+            const shooter = last ? String(last.participants?.[0]?.athlete?.id || '') : '';
+            if (pid && pid !== ftSeenRef.current && shooter) {
+              ftSeenRef.current = pid;
+              if (ftPrimedRef.current) { setGfx(g => ({ ...g, ftId: shooter })); pushDoc({ ftId: shooter }); }
+              else ftPrimedRef.current = true;
+            }
+          }
         }
       } catch { /* keep last */ }
     };
@@ -263,7 +298,7 @@ function ControlInner() {
         sourceMode: source, league,
         brand: { logo: company?.logo_url || '', name: company?.name || '' },
         showBrand, autoCallouts,
-        theme: { useTeamColors, c1, c2, logoScale, brandScale, motion: motionFx, bugPos, skin, lowerPos, ftPos, badgeSec, bugStyle },
+        theme: { useTeamColors, c1, c2, logoScale, brandScale, motion: motionFx, bugPos, skin, lowerPos, ftPos, badgeSec, bugStyle, bugScale, matchup3d, gfxScale, texture, textureIntensity },
         trivia,
         portalCfg,
         talentCfg: { list: talentList },
@@ -304,7 +339,7 @@ function ControlInner() {
   /* Re-push settings when branding/theme changes (only once a game is loaded) */
   useEffect(() => {
     if ((eventId || source === 'manual') && token) pushDoc({});
-  }, [showBrand, autoCallouts, useTeamColors, c1, c2, banners, logoScale, brandScale, badgeSec, bugStyle, motionFx, trivia, portalCfg, talentList, mentionCfg, bugPos, skin, lowerPos, ftPos, photoOverrides, leagueBadge, league, source, extraBadges, nextGameCfg, coachCfg]);
+  }, [showBrand, autoCallouts, useTeamColors, c1, c2, banners, logoScale, brandScale, badgeSec, bugStyle, bugScale, matchup3d, gfxScale, texture, textureIntensity, motionFx, trivia, portalCfg, talentList, mentionCfg, bugPos, skin, lowerPos, ftPos, photoOverrides, leagueBadge, league, source, extraBadges, nextGameCfg, coachCfg]);
 
   /* Fire a play callout for the on-air player (or top scorer) */
   const calloutTarget: Athlete | null = useMemo(() => {
@@ -531,6 +566,16 @@ function ControlInner() {
   const allAthletes = useMemo(() => summary
     ? [...summary.away.athletes, ...summary.home.athletes].filter(a => a.played)
     : [], [summary]);
+  /* Seed player pickers with sensible defaults when the game changes */
+  useEffect(() => {
+    if (!summary) return;
+    const aTop = [...summary.away.athletes].filter(a => a.played).sort((x, y) => parseInt(y.stats.pts || '0') - parseInt(x.stats.pts || '0'))[0];
+    const hTop = [...summary.home.athletes].filter(a => a.played).sort((x, y) => parseInt(y.stats.pts || '0') - parseInt(x.stats.pts || '0'))[0];
+    setCmpA(prev => prev || aTop?.id || '');
+    setCmpB(prev => prev || hTop?.id || '');
+    setStatPick(prev => prev || aTop?.id || '');
+  }, [summary?.eventId]);
+
   /* Selection pointing at a player who isn't in this game drops to generic */
   useEffect(() => {
     if (calloutWho !== 'auto' && calloutWho !== 'generic' && !allAthletes.some(a => a.id === calloutWho)) {
@@ -551,9 +596,46 @@ function ControlInner() {
 
   const fireBtn = 'px-3 py-1.5 rounded-lg text-xs font-medium transition-colors';
 
+  /* Save the pre-game setup as a restorable snapshot (branding, themes, sizes,
+     textures, next game, coaches, trivia…). Live on-air toggles are excluded. */
+  const savePreset = async () => {
+    if (!token) return;
+    try {
+      const snap = await getDoc(doc(db, 'live_graphics', token));
+      if (!snap.exists()) { setSavedNote('Nothing to save yet'); setTimeout(() => setSavedNote(''), 2500); return; }
+      const d = snap.data() as any;
+      const { bug, full, callout, preview, lowerId, ftId, sub, coach, banner, portal, talent, mention, pbp, pbpTicker, shotLine, updatedAt, ...preset } = d;
+      await setDoc(doc(db, 'live_graphics', token), { savedPreset: preset }, { merge: true });
+      localStorage.setItem('plg_cg_preset_' + token, JSON.stringify(preset));
+      setSavedNote('Setup saved ✓'); setTimeout(() => setSavedNote(''), 2500);
+    } catch { setSavedNote('Save failed'); setTimeout(() => setSavedNote(''), 2500); }
+  };
+  const restorePreset = async () => {
+    if (!token) return;
+    let preset: any = null;
+    try { const raw = localStorage.getItem('plg_cg_preset_' + token); if (raw) preset = JSON.parse(raw); } catch { /* ignore */ }
+    if (!preset) { try { const snap = await getDoc(doc(db, 'live_graphics', token)); preset = (snap.data() as any)?.savedPreset; } catch { /* ignore */ } }
+    if (!preset) { setSavedNote('No saved setup'); setTimeout(() => setSavedNote(''), 2500); return; }
+    await setDoc(doc(db, 'live_graphics', token), preset, { merge: true });
+    window.location.reload();
+  };
+
   return (
     <div className="p-4 md:p-8 pb-24">
       <PageHeader title="Live Graphics" subtitle="NBA broadcast graphics driven by the live game feed — capture the output page in OBS / vMix / ATEM">
+        {savedNote && <span className="text-xs font-semibold text-green-600 self-center mr-1">{savedNote}</span>}
+        <button onClick={savePreset} title="Save your whole setup so you can restore it if anything gets moved"
+          className="flex items-center gap-2 bg-gray-900 text-white px-3 py-2 rounded-xl text-sm hover:bg-black">
+          <Copy size={14} /> Save setup
+        </button>
+        <button onClick={restorePreset} title="Restore the last saved setup"
+          className="flex items-center gap-2 border border-gray-200 text-gray-700 px-3 py-2 rounded-xl text-sm hover:bg-gray-50">
+          <RefreshCw size={14} /> Restore
+        </button>
+        <button onClick={() => setRosterOpen(v => !v)}
+          className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm ${rosterOpen ? 'bg-purple-600 text-white' : 'border border-gray-200 text-gray-700 hover:bg-gray-50'}`}>
+          <Users size={14} /> Players
+        </button>
         <button onClick={() => loadGames(date)} className="flex items-center gap-2 border border-gray-200 text-gray-700 px-3 py-2 rounded-xl text-sm hover:bg-gray-50">
           <RefreshCw size={14} className={loadingGames ? 'animate-spin' : ''} /> Refresh
         </button>
@@ -805,9 +887,9 @@ function ControlInner() {
       {!summary ? (
         eventId ? <div className="text-sm text-gray-400 flex items-center gap-2"><Loader2 size={14} className="animate-spin" /> Loading boxscore…</div> : null
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* ── Fire panel ── */}
-          <div className="space-y-5">
+        <div>
+          {/* ── Fire panel — cards flow across columns to fill the width; roster lives in the right drawer ── */}
+          <div className="columns-1 lg:columns-2 xl:columns-3 gap-4 pb-28 [&>*]:mb-4 [&>*]:break-inside-avoid">
             {/* Live score header */}
             <div className="bg-gray-900 text-white rounded-2xl p-4">
               <div className="flex items-center justify-between">
@@ -869,6 +951,12 @@ function ControlInner() {
                   ))}
                 </div>
               </div>
+              <label className="flex items-center gap-2 text-[10px] text-gray-400 uppercase tracking-wide">
+                <span>Bug size</span>
+                <input type="range" min={0.6} max={1.8} step={0.05} value={bugScale}
+                  onChange={e => setBugScale(parseFloat(e.target.value))} className="flex-1" />
+                <span className="w-9 text-right tabular-nums text-gray-600">{bugScale.toFixed(2)}×</span>
+              </label>
               <div className="flex items-center gap-1.5">
                 <span className="text-[10px] text-gray-400 uppercase tracking-wide">Bug position</span>
                 <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5 ml-auto">
@@ -902,6 +990,7 @@ function ControlInner() {
                   ))}
                 </div>
               </div>
+              <div className="grid grid-cols-2 gap-2">
               {([
                 ['teamstats', 'Team Stats'],
                 ['lineups', 'Lineups'],
@@ -912,12 +1001,72 @@ function ControlInner() {
                 ['assists', 'Assist Leaders'],
                 ['alerts', 'Game Alerts'],
                 ['matchupbanner', 'Matchup Banner'],
-              ] as ['teamstats' | 'lineups' | 'leaders' | 'matchup' | 'linescore' | 'shotchart' | 'assists' | 'alerts' | 'matchupbanner', string][]).map(([kind, label]) => (
+                ['taletape', 'Tale of the Tape'],
+              ] as ['teamstats' | 'lineups' | 'leaders' | 'matchup' | 'linescore' | 'shotchart' | 'assists' | 'alerts' | 'matchupbanner' | 'taletape', string][]).map(([kind, label]) => (
                 <button key={kind} onClick={() => fire({ full: active.full === kind ? null : kind })}
-                  className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-medium ${active.full === kind ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
-                  {label} {active.full === kind ? <Eye size={15} /> : <EyeOff size={15} />}
+                  className={`flex items-center justify-between gap-1 px-3 py-2 rounded-lg text-xs font-medium ${active.full === kind ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
+                  <span className="truncate">{label}</span> {active.full === kind ? <Eye size={13} className="shrink-0" /> : <EyeOff size={13} className="shrink-0" />}
                 </button>
               ))}
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] text-gray-400 uppercase tracking-wide">Matchup logos</span>
+                <button onClick={() => setMatchup3d(v => !v)}
+                  className={`ml-auto text-xs px-2.5 py-1 rounded-full font-medium ${matchup3d ? 'bg-pink-100 text-pink-700' : 'bg-gray-100 text-gray-500'}`}>
+                  {matchup3d ? '3D ON' : '3D OFF'}
+                </button>
+              </div>
+
+              {/* Player comparison + stat line */}
+              <div className="border-t border-gray-100 pt-3 space-y-2">
+                <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Player comparison</span>
+                <div className="flex items-center gap-1.5">
+                  <select value={cmpA} onChange={e => setCmpA(e.target.value)}
+                    className="flex-1 min-w-0 border border-gray-200 rounded-lg px-2 py-1.5 text-xs bg-white">
+                    {[summary?.away, summary?.home].map(t => t && (
+                      <optgroup key={t.id} label={t.name}>
+                        {t.athletes.filter(a => a.played).slice().sort(byJerseyThenName).map(a => (
+                          <option key={a.id} value={a.id}>{a.jersey ? `#${a.jersey} ` : ''}{a.name}</option>
+                        ))}
+                      </optgroup>
+                    ))}
+                  </select>
+                  <span className="text-[10px] font-black text-gray-400">VS</span>
+                  <select value={cmpB} onChange={e => setCmpB(e.target.value)}
+                    className="flex-1 min-w-0 border border-gray-200 rounded-lg px-2 py-1.5 text-xs bg-white">
+                    {[summary?.away, summary?.home].map(t => t && (
+                      <optgroup key={t.id} label={t.name}>
+                        {t.athletes.filter(a => a.played).slice().sort(byJerseyThenName).map(a => (
+                          <option key={a.id} value={a.id}>{a.jersey ? `#${a.jersey} ` : ''}{a.name}</option>
+                        ))}
+                      </optgroup>
+                    ))}
+                  </select>
+                </div>
+                <button onClick={() => fire({ full: active.full === 'compare' ? null : 'compare', compareA: cmpA, compareB: cmpB })}
+                  disabled={!cmpA || !cmpB}
+                  className={`w-full px-2 py-2 rounded-lg text-xs font-bold disabled:opacity-40 ${active.full === 'compare' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-blue-100 hover:text-blue-800'}`}>
+                  Player Comparison
+                </button>
+                <div className="flex items-center gap-1.5 pt-1">
+                  <span className="text-[10px] text-gray-400 uppercase tracking-wide shrink-0">Stat line</span>
+                  <select value={statPick} onChange={e => setStatPick(e.target.value)}
+                    className="flex-1 min-w-0 border border-gray-200 rounded-lg px-2 py-1.5 text-xs bg-white">
+                    {[summary?.away, summary?.home].map(t => t && (
+                      <optgroup key={t.id} label={t.name}>
+                        {t.athletes.filter(a => a.played).slice().sort(byJerseyThenName).map(a => (
+                          <option key={a.id} value={a.id}>{a.jersey ? `#${a.jersey} ` : ''}{a.name}</option>
+                        ))}
+                      </optgroup>
+                    ))}
+                  </select>
+                  <button onClick={() => fire({ full: active.full === 'statline' ? null : 'statline', statLineId: statPick })}
+                    disabled={!statPick}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold disabled:opacity-40 ${active.full === 'statline' ? 'bg-blue-600 text-white' : 'bg-gray-900 text-white hover:bg-gray-700'}`}>
+                    {active.full === 'statline' ? 'HIDE' : 'FIRE'}
+                  </button>
+                </div>
+              </div>
               {active.full === 'shotchart' && (
                 <div className="flex items-center gap-1.5">
                   <span className="text-[10px] text-gray-400 uppercase tracking-wide shrink-0">Shot filter</span>
@@ -1019,6 +1168,10 @@ function ControlInner() {
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-3">
               <div className="flex items-center justify-between">
                 <h2 className="text-sm font-semibold text-gray-800">Play callouts</h2>
+                <button onClick={() => setAutoFt(v => !v)}
+                  className={`text-[11px] px-2.5 py-1 rounded-full font-bold mr-2 ${autoFt ? 'bg-amber-500 text-white' : 'bg-gray-100 text-gray-500'}`}>
+                  Auto FT {autoFt ? 'ON' : 'OFF'}
+                </button>
                 <button onClick={() => setAutoCallouts(v => !v)}
                   className={`text-xs px-2.5 py-1 rounded-full font-medium ${autoCallouts ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
                   <Zap size={10} className="inline mr-1" />Detect {autoCallouts ? 'ON' : 'OFF'}
@@ -1093,17 +1246,18 @@ function ControlInner() {
             )}
           </div>
 
-          {/* ── Player roster (fire lower thirds) ── */}
-          <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-            <div className="px-5 py-3 border-b bg-gray-50 flex items-center gap-3">
-              <h2 className="text-sm font-semibold text-gray-800">Players — click to fire lower third</h2>
+          {/* ── Player roster — right hamburger drawer, ready to fire lower thirds ── */}
+          <div className={`fixed top-0 right-0 h-screen w-[460px] max-w-[94vw] z-50 bg-white shadow-2xl border-l border-gray-200 flex flex-col transition-transform duration-300 ${rosterOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+            <div className="px-4 py-3 border-b bg-gray-50 flex items-center gap-3 shrink-0">
+              <h2 className="text-sm font-semibold text-gray-800">Players — tap to fire lower third</h2>
               <div className="relative ml-auto">
                 <Search size={13} className="absolute left-2.5 top-2 text-gray-400" />
                 <input value={playerQuery} onChange={e => setPlayerQuery(e.target.value)} placeholder="Search player"
-                  className="border border-gray-200 rounded-lg pl-7 pr-2 py-1 text-xs w-44 focus:outline-none" />
+                  className="border border-gray-200 rounded-lg pl-7 pr-2 py-1 text-xs w-36 focus:outline-none" />
               </div>
+              <button onClick={() => setRosterOpen(false)} className="text-gray-400 hover:text-gray-700 shrink-0"><X size={18} /></button>
             </div>
-            <div className="overflow-x-auto">
+            <div className="flex-1 overflow-y-auto">
               <table className="w-full text-xs">
                 <thead className="bg-gray-50 text-gray-500 uppercase sticky top-0">
                   <tr>
@@ -1308,6 +1462,27 @@ function ControlInner() {
                   <input type="range" min={2} max={10} step={0.5} value={badgeSec}
                     onChange={e => setBadgeSec(parseFloat(e.target.value))} className="flex-1" />
                   <span className="w-10 text-right tabular-nums">{badgeSec.toFixed(1)}s</span>
+                </label>
+                <label className="flex items-center gap-2 text-xs text-gray-700 font-semibold pt-1 border-t border-gray-100">
+                  <span className="w-14">All GFX</span>
+                  <input type="range" min={0.6} max={1.8} step={0.05} value={gfxScale}
+                    onChange={e => setGfxScale(parseFloat(e.target.value))} className="flex-1" />
+                  <span className="w-10 text-right tabular-nums">{gfxScale.toFixed(2)}×</span>
+                </label>
+                <div className="flex items-center gap-2 text-xs text-gray-500">
+                  <span className="w-14">Texture</span>
+                  <select value={texture} onChange={e => setTexture(e.target.value)}
+                    className="flex-1 border border-gray-200 rounded-lg px-2 py-1 text-xs bg-white">
+                    {['diamond', 'mesh', 'grid', 'lines', 'carbon', 'chevron', 'none'].map(t => (
+                      <option key={t} value={t}>{t[0].toUpperCase() + t.slice(1)}</option>
+                    ))}
+                  </select>
+                </div>
+                <label className="flex items-center gap-2 text-xs text-gray-500">
+                  <span className="w-14">Intensity</span>
+                  <input type="range" min={0.2} max={2.5} step={0.1} value={textureIntensity}
+                    onChange={e => setTextureIntensity(parseFloat(e.target.value))} className="flex-1" disabled={texture === 'none'} />
+                  <span className="w-10 text-right tabular-nums">{textureIntensity.toFixed(1)}×</span>
                 </label>
               </div>
 
