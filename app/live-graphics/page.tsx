@@ -89,6 +89,7 @@ function ControlInner() {
   const [badgeSec, setBadgeSec] = useState(4.5);      // seconds each badge-roll logo holds
   const [bugStyle, setBugStyle] = useState<'classic' | 'bar' | 'strip' | 'stack' | 'arena'>('classic');
   const [bugScale, setBugScale] = useState(1);
+  const [clockOffset, setClockOffset] = useState(0);
   const [matchup3d, setMatchup3d] = useState(false);
   const [gfxScale, setGfxScale] = useState(1);   // global size of all output graphics
   const [texture, setTexture] = useState('diamond');
@@ -206,6 +207,7 @@ function ControlInner() {
         if (d.theme.badgeSec) setBadgeSec(d.theme.badgeSec);
         if (d.theme.bugStyle) setBugStyle(d.theme.bugStyle);
         if (d.theme.bugScale) setBugScale(d.theme.bugScale);
+        if (typeof d.theme.clockOffset === 'number') setClockOffset(d.theme.clockOffset);
         if (d.theme.matchup3d) setMatchup3d(true);
         if (d.theme.gfxScale) setGfxScale(d.theme.gfxScale);
         if (d.theme.texture) setTexture(d.theme.texture);
@@ -298,7 +300,7 @@ function ControlInner() {
         sourceMode: source, league,
         brand: { logo: company?.logo_url || '', name: company?.name || '' },
         showBrand, autoCallouts,
-        theme: { useTeamColors, c1, c2, logoScale, brandScale, motion: motionFx, bugPos, skin, lowerPos, ftPos, badgeSec, bugStyle, bugScale, matchup3d, gfxScale, texture, textureIntensity },
+        theme: { useTeamColors, c1, c2, logoScale, brandScale, motion: motionFx, bugPos, skin, lowerPos, ftPos, badgeSec, bugStyle, bugScale, matchup3d, gfxScale, texture, textureIntensity, clockOffset },
         trivia,
         portalCfg,
         talentCfg: { list: talentList },
@@ -339,7 +341,7 @@ function ControlInner() {
   /* Re-push settings when branding/theme changes (only once a game is loaded) */
   useEffect(() => {
     if ((eventId || source === 'manual') && token) pushDoc({});
-  }, [showBrand, autoCallouts, useTeamColors, c1, c2, banners, logoScale, brandScale, badgeSec, bugStyle, bugScale, matchup3d, gfxScale, texture, textureIntensity, motionFx, trivia, portalCfg, talentList, mentionCfg, bugPos, skin, lowerPos, ftPos, photoOverrides, leagueBadge, league, source, extraBadges, nextGameCfg, coachCfg]);
+  }, [showBrand, autoCallouts, useTeamColors, c1, c2, banners, logoScale, brandScale, badgeSec, bugStyle, bugScale, matchup3d, gfxScale, texture, textureIntensity, clockOffset, motionFx, trivia, portalCfg, talentList, mentionCfg, bugPos, skin, lowerPos, ftPos, photoOverrides, leagueBadge, league, source, extraBadges, nextGameCfg, coachCfg]);
 
   /* Fire a play callout for the on-air player (or top scorer) */
   const calloutTarget: Athlete | null = useMemo(() => {
@@ -901,6 +903,13 @@ function ControlInner() {
                 <div className="text-center">
                   <div className="text-yellow-400 font-mono font-bold">{summary.state === 'in' ? `${periodLabel(summary.period)} ${summary.clock}` : ''}</div>
                   <div className="text-xs text-gray-400">{summary.statusDetail}</div>
+                  <div className="flex items-center justify-center gap-1 mt-1">
+                    <span className="text-[9px] text-gray-500 uppercase tracking-wide mr-1">Clock sync</span>
+                    <button onClick={() => setClockOffset(v => Math.round((v - 1) * 10) / 10)} className="px-1.5 py-0.5 rounded bg-white/10 text-[11px] font-bold hover:bg-white/20">−1s</button>
+                    <span className="text-[11px] font-mono w-9 text-center tabular-nums">{clockOffset > 0 ? '+' : ''}{clockOffset}s</span>
+                    <button onClick={() => setClockOffset(v => Math.round((v + 1) * 10) / 10)} className="px-1.5 py-0.5 rounded bg-white/10 text-[11px] font-bold hover:bg-white/20">+1s</button>
+                    {clockOffset !== 0 && <button onClick={() => setClockOffset(0)} className="px-1.5 py-0.5 rounded bg-white/10 text-[10px] hover:bg-white/20">reset</button>}
+                  </div>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="font-black text-xl md:text-2xl">{summary.home.score}</span>

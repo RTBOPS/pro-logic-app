@@ -90,7 +90,7 @@ interface GfxDoc extends BusState {
   showBrand?: boolean;
   autoCallouts?: boolean;
   callout?: Callout | null;             // manual fire from the control panel
-  theme?: { useTeamColors?: boolean; c1?: string; c2?: string; logoScale?: number; brandScale?: number; motion?: boolean; bugPos?: 'left' | 'center' | 'right'; skin?: string; lowerPos?: 'left' | 'center' | 'right'; ftPos?: 'left' | 'right'; badgeSec?: number; bugStyle?: string; bugScale?: number; matchup3d?: boolean; gfxScale?: number; texture?: string; textureIntensity?: number } | null;
+  theme?: { useTeamColors?: boolean; c1?: string; c2?: string; logoScale?: number; brandScale?: number; motion?: boolean; bugPos?: 'left' | 'center' | 'right'; skin?: string; lowerPos?: 'left' | 'center' | 'right'; ftPos?: 'left' | 'right'; badgeSec?: number; bugStyle?: string; bugScale?: number; matchup3d?: boolean; gfxScale?: number; texture?: string; textureIntensity?: number; clockOffset?: number } | null;
   trivia?: { question?: string; options?: string[]; correct?: number; sponsor?: string; reveal?: boolean } | null;
   portalCfg?: { x?: number; y?: number; size?: number; logo?: string; video?: string; content?: 'logo' | 'trivia' } | null;
   talentCfg?: { list?: { id: string; name: string; role: string; photo: string }[] } | null;
@@ -249,11 +249,12 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
     return () => clearInterval(t);
   }, []);
   const liveClock = (() => {
+    const off = gfx.theme?.clockOffset || 0;   // operator sync nudge (seconds) to match the arena/Courtside clock
     const a = clockRef.current;
     if (summary?.state !== 'in' || !a.at) return summary?.clock || '';
-    if (!a.running) return fmtClockDisplay(a.sec);
     const elapsed = (Date.now() - a.at) / 1000;
-    return fmtClockDisplay(a.sec - Math.min(elapsed, 2.4));   // small lead only; resync corrects each poll
+    const base = a.running ? a.sec - Math.min(elapsed, 2.4) : a.sec;
+    return fmtClockDisplay(base + off);
   })();
 
   /* Callout queue: show one at a time */
