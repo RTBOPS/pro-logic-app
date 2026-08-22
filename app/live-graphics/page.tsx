@@ -59,6 +59,7 @@ function ControlInner() {
   const [playerQuery, setPlayerQuery] = useState('');
   const [rosterOpen, setRosterOpen] = useState(false);
   const [rosterWidth, setRosterWidth] = useState(460);
+  const [pickerOpen, setPickerOpen] = useState(true);
   useEffect(() => { const w = parseInt(localStorage.getItem('plg_roster_w') || '', 10); if (w >= 320 && w <= 1000) setRosterWidth(w); }, []);
   const startResizeRoster = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -686,7 +687,7 @@ function ControlInner() {
 
       {/* ── PVW / PGM monitors + TAKE ── */}
       {token && summary && (
-        <div className="mb-4 bg-zinc-950 rounded-2xl p-3 flex flex-nowrap items-center justify-center gap-4 overflow-x-auto">
+        <div className="mb-4 bg-zinc-950 rounded-2xl p-3 flex flex-nowrap items-center justify-center gap-4">
           <Monitor label="PREVIEW" color="text-yellow-400" width={monSize}
             src={`/graphics-out/${token}?mode=preview&bg=dark`} />
           <div className="flex flex-col items-center gap-2">
@@ -702,22 +703,25 @@ function ControlInner() {
               className={`w-24 py-1.5 rounded-lg text-[10px] font-bold ${mode === 'preview' ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-600/40' : 'bg-red-500/20 text-red-400 border border-red-600/40'}`}>
               {mode === 'preview' ? 'PVW → TAKE' : 'CUT DIRECT'}
             </button>
-            <div className="flex gap-1">
-              {([['S', 352], ['M', 512], ['L', 700]] as [string, number][]).map(([l, w]) => (
-                <button key={l} onClick={() => pickMonSize(w)}
-                  className={`w-7 py-1 rounded text-[10px] font-bold ${monSize === w ? 'bg-zinc-600 text-white' : 'bg-zinc-800 text-zinc-500 hover:text-zinc-300'}`}>
-                  {l}
-                </button>
-              ))}
-            </div>
+            <input type="range" min={240} max={620} step={10} value={monSize}
+              onChange={e => pickMonSize(parseInt(e.target.value, 10))} className="w-24 accent-zinc-400" title="Resize monitors" />
           </div>
           <Monitor label="PROGRAM" color="text-red-500" width={monSize}
             src={`/graphics-out/${token}?bg=dark`} />
         </div>
       )}
 
-      {/* Data source: feed (by league) or manual ingest */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 mb-6">
+      {/* Data source: feed (by league) or manual ingest — collapsible; only needed at setup */}
+      {token && summary && !pickerOpen && (
+        <button onClick={() => setPickerOpen(true)}
+          className="mb-4 text-xs font-medium text-gray-500 hover:text-gray-800 flex items-center gap-1.5">
+          ▸ Feed & games {summary ? `· ${summary.away.abbr} @ ${summary.home.abbr}` : ''}
+        </button>
+      )}
+      {pickerOpen && (
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 mb-6 relative">
+        <button onClick={() => setPickerOpen(false)} title="Collapse"
+          className="absolute top-2.5 right-3 text-[11px] font-medium text-gray-400 hover:text-gray-700">Hide ▲</button>
         <div className="flex flex-wrap items-center gap-3 mb-4">
           <div className="flex gap-1 bg-gray-100 rounded-xl p-1">
             <button onClick={() => switchSource('feed')}
@@ -907,6 +911,7 @@ function ControlInner() {
           </div>
         )}
       </div>
+      )}
 
       {!summary ? (
         eventId ? <div className="text-sm text-gray-400 flex items-center gap-2"><Loader2 size={14} className="animate-spin" /> Loading boxscore…</div> : null
