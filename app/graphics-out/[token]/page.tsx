@@ -53,7 +53,9 @@ function parseClockSec(str?: string): number | null {
 }
 function fmtClockDisplay(sec: number): string {
   sec = Math.max(0, sec);
-  if (sec >= 60) { const m = Math.floor(sec / 60), s = Math.floor(sec % 60); return `${m}:${String(s).padStart(2, '0')}`; }
+  // Above a minute, broadcast clocks round the seconds UP (a clock reads "6:20"
+  // until it drops below 6:19.0), so ceil to match the arena/Courtside display.
+  if (sec >= 60) { const total = Math.ceil(sec); const m = Math.floor(total / 60), s = total % 60; return `${m}:${String(s).padStart(2, '0')}`; }
   return sec.toFixed(1);
 }
 
