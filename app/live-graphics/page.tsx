@@ -27,9 +27,10 @@ interface BannerItem { id: string; url: string; name: string }
 interface GfxState {
   bug: boolean;
   lowerId: string | null;
-  full: 'teamstats' | 'lineups' | 'leaders' | 'matchup' | 'linescore' | 'shotchart' | 'assists' | 'alerts' | 'trivia' | 'nextgame' | 'matchupbanner' | 'compare' | 'statline' | 'taletape' | null;
+  full: 'teamstats' | 'lineups' | 'leaders' | 'matchup' | 'linescore' | 'shotchart' | 'assists' | 'alerts' | 'trivia' | 'nextgame' | 'matchupbanner' | 'compare' | 'statline' | 'taletape' | 'boxscore' | null;
   compareA?: string; compareB?: string;
   statLineId?: string;
+  boxTeam?: 'away' | 'home';
   shotFilter?: string | null;
   shotLine?: string | null;
   banner: string | null;
@@ -1017,6 +1018,17 @@ function ControlInner() {
                   <span className="truncate">{label}</span> {active.full === kind ? <Eye size={13} className="shrink-0" /> : <EyeOff size={13} className="shrink-0" />}
                 </button>
               ))}
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] text-gray-400 uppercase tracking-wide shrink-0">Boxscore</span>
+                <button onClick={() => fire({ full: active.full === 'boxscore' && active.boxTeam === 'away' ? null : 'boxscore', boxTeam: 'away' })}
+                  className={`flex-1 px-2 py-1.5 rounded-lg text-xs font-bold ${active.full === 'boxscore' && active.boxTeam === 'away' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
+                  {summary?.away.abbr || 'Away'}
+                </button>
+                <button onClick={() => fire({ full: active.full === 'boxscore' && active.boxTeam === 'home' ? null : 'boxscore', boxTeam: 'home' })}
+                  className={`flex-1 px-2 py-1.5 rounded-lg text-xs font-bold ${active.full === 'boxscore' && active.boxTeam === 'home' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
+                  {summary?.home.abbr || 'Home'}
+                </button>
               </div>
               <div className="flex items-center gap-1.5">
                 <span className="text-[10px] text-gray-400 uppercase tracking-wide">Matchup logos</span>

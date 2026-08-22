@@ -62,7 +62,8 @@ function fmtClockDisplay(sec: number): string {
 interface BusState {
   bug?: boolean;
   lowerId?: string | null;
-  full?: 'teamstats' | 'lineups' | 'leaders' | 'matchup' | 'linescore' | 'shotchart' | 'assists' | 'alerts' | 'trivia' | 'nextgame' | 'matchupbanner' | 'compare' | 'statline' | 'taletape' | null;
+  full?: 'teamstats' | 'lineups' | 'leaders' | 'matchup' | 'linescore' | 'shotchart' | 'assists' | 'alerts' | 'trivia' | 'nextgame' | 'matchupbanner' | 'compare' | 'statline' | 'taletape' | 'boxscore' | null;
+  boxTeam?: 'away' | 'home';
   compareA?: string; compareB?: string;   // player-comparison athlete ids
   statLineId?: string;                     // stat-line banner athlete id
   shotFilter?: string | null;   // 'all' | teamId | athleteId (full-screen shot chart)
@@ -983,8 +984,13 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
             <TaleOfTape summary={summary} awayColor={awayColor} homeColor={homeColor} />
           )}
 
+          {/* ── FULL BOXSCORE (one team, all columns) ── */}
+          {bus.full === 'boxscore' && (
+            <BoxscoreFull summary={summary} teamKey={bus.boxTeam || 'away'} awayColor={awayColor} homeColor={homeColor} />
+          )}
+
           {/* ── FULL SCREENS (pure CSS) ── */}
-          {bus.full && bus.full !== 'matchupbanner' && bus.full !== 'compare' && bus.full !== 'statline' && bus.full !== 'taletape' && (
+          {bus.full && bus.full !== 'matchupbanner' && bus.full !== 'compare' && bus.full !== 'statline' && bus.full !== 'taletape' && bus.full !== 'boxscore' && (
             <div key={bus.full} className="absolute inset-0 flex items-center justify-center"
               style={{ animation: 'plg-full-in 0.3s ease-out both' }}>
               <div className="plg-panel w-[900px] max-w-[92vw] text-white rounded-3xl shadow-2xl overflow-hidden">
@@ -1272,6 +1278,73 @@ function StatLineBanner({ summary, id, awayColor, homeColor }: {
             <div className="text-xs font-bold uppercase tracking-widest text-zinc-400 mt-1.5">{l}</div>
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+/* Full boxscore for one team — every column, with a team totals row. */
+function BoxscoreFull({ summary, teamKey, awayColor, homeColor }: {
+  summary: Summary; teamKey: 'away' | 'home'; awayColor: string; homeColor: string;
+}) {
+  const t = teamKey === 'home' ? summary.home : summary.away;
+  const color = teamKey === 'home' ? homeColor : awayColor;
+  const players = t.athletes.filter(a => a.played);
+  const cols: [string, keyof Athlete['stats']][] = [
+    ['MIN', 'min'], ['FG', 'fg'], ['3PT', 'tp'], ['FT', 'ft'], ['OREB', 'oreb'], ['DREB', 'dreb'],
+    ['REB', 'reb'], ['AST', 'ast'], ['PF', 'pf'], ['STL', 'stl'], ['TO', 'to'], ['BLK', 'blk'], ['+/-', 'plusMinus'], ['PTS', 'pts'],
+  ];
+  const n = (s: string) => parseInt(s || '0', 10) || 0;
+  const sumMadeAtt = (k: keyof Athlete['stats']) => {
+    let m = 0, a = 0;
+    for (const p of players) { const [pm, pa] = (p.stats[k] || '0-0').split('-'); m += n(pm); a += n(pa); }
+    return `${m}-${a}`;
+  };
+  const total = (label: string, k: keyof Athlete['stats']) => {
+    if (['fg', 'tp', 'ft'].includes(k as string)) return sumMadeAtt(k);
+    if (k === 'min' || k === 'plusMinus') return '';
+    return String(players.reduce((s, p) => s + n(p.stats[k]), 0));
+  };
+  return (
+    <div className="absolute inset-0 flex items-center justify-center" style={{ animation: 'plg-full-in 0.3s ease-out both' }}>
+      <div className="plg-panel w-[1040px] max-w-[96vw] text-white rounded-3xl shadow-2xl overflow-hidden" style={{ fontVariantNumeric: 'tabular-nums' }}>
+        <div className="flex items-center gap-4 px-7 py-4" style={{ background: `linear-gradient(90deg, ${color}dd, #18181b 80%)` }}>
+          {t.logo && <img src={t.logo} className="w-14 h-14 object-contain drop-shadow" alt="" />}
+          <div className="flex-1">
+            <div className="text-2xl font-black leading-none">{t.name}</div>
+            <div className="text-[11px] font-bold uppercase tracking-widest text-white/70 mt-1">
+              {t.record ? `${t.record} · ` : ''}{t.fouls ? `FOULS ${t.fouls} · ` : ''}BOX SCORE
+            </div>
+          </div>
+          <div className="text-5xl font-black">{t.score}</div>
+        </div>
+        <table className="w-full text-[13px]">
+          <thead>
+            <tr className="text-[10px] font-black uppercase tracking-wider text-zinc-400 border-b border-white/15">
+              <th className="text-left pl-6 py-2">Player</th>
+              {cols.map(([lab]) => <th key={lab} className="py-2 px-1.5 text-right w-[52px]">{lab}</th>)}
+            </tr>
+          </thead>
+          <tbody>
+            {players.map((p, i) => (
+              <tr key={p.id} className="border-b border-white/5"
+                style={{ animation: `plg-lower-in 0.4s cubic-bezier(0.3,1.15,0.6,1) ${Math.min(i * 0.035, 0.7)}s both` }}>
+                <td className="pl-6 py-1.5">
+                  <span className="text-white/50 mr-2">{p.jersey}</span>
+                  <span className="font-bold">{p.name}</span>
+                  {p.starter && <span className="text-[9px] text-zinc-500 ml-1.5">S</span>}
+                </td>
+                {cols.map(([lab, k]) => (
+                  <td key={lab} className={`py-1.5 px-1.5 text-right ${k === 'pts' ? 'font-black' : 'text-zinc-300'}`}>{p.stats[k] || '0'}</td>
+                ))}
+              </tr>
+            ))}
+            <tr className="font-black" style={{ background: 'rgba(255,255,255,0.06)' }}>
+              <td className="pl-6 py-2 text-[10px] uppercase tracking-widest text-zinc-400">Team Totals</td>
+              {cols.map(([lab, k]) => <td key={lab} className="py-2 px-1.5 text-right">{total(lab, k)}</td>)}
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
   );

@@ -27,7 +27,7 @@ export interface Game {
 export interface AthleteStats {
   min: string; pts: string; fg: string; tp: string; ft: string;
   reb: string; ast: string; to: string; stl: string; blk: string;
-  pf: string; plusMinus: string;
+  pf: string; plusMinus: string; oreb: string; dreb: string;
 }
 
 export interface Athlete {
@@ -168,7 +168,7 @@ export function manualToSummary(m: ManualGame, nowMs = Date.now()): Summary {
       stats: {
         min: '', pts: String(p.pts || 0), fg: '', tp: '', ft: '',
         reb: String(p.reb || 0), ast: String(p.ast || 0), to: '',
-        stl: '0', blk: '0', pf: '', plusMinus: '',
+        stl: '0', blk: '0', pf: '', plusMinus: '', oreb: '0', dreb: '0',
       },
     })),
   });
@@ -267,6 +267,7 @@ function statIdx(keys: string[]) {
     reb: find('rebounds'), ast: find('assists'), to: find('turnovers'),
     stl: find('steals'), blk: find('blocks'), pf: find('fouls'),
     plusMinus: find('plusMinus'),
+    oreb: find('offensiveRebounds'), dreb: find('defensiveRebounds'),
   };
 }
 
@@ -316,6 +317,7 @@ export function normalizeSummary(json: any): Summary | null {
             tp: get(s, idx.tp), ft: get(s, idx.ft), reb: get(s, idx.reb),
             ast: get(s, idx.ast), to: get(s, idx.to), stl: get(s, idx.stl),
             blk: get(s, idx.blk), pf: get(s, idx.pf), plusMinus: get(s, idx.plusMinus),
+            oreb: get(s, idx.oreb), dreb: get(s, idx.dreb),
           },
         };
       });
