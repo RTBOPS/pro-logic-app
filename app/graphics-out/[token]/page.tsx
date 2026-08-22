@@ -79,6 +79,7 @@ interface BusState {
 interface GfxDoc extends BusState {
   eventId?: string;
   shotClock?: string;
+  nbaClock?: { clock?: string; sec?: number | null; period?: number; status?: string; running?: boolean; ts?: number } | null;
   awayFouls?: string; homeFouls?: string;
   awayBonus?: boolean; homeBonus?: boolean;
   updatedAt?: string;
@@ -249,11 +250,17 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
     return () => clearInterval(t);
   }, []);
   const liveClock = (() => {
-    const off = gfx.theme?.clockOffset || 0;   // operator sync nudge (seconds) to match the arena/Courtside clock
+    const off = gfx.theme?.clockOffset || 0;   // operator sync nudge (seconds)
+    const now = Date.now();
+    // Prefer the NBA's own clock from the local agent when it's fresh (matches the arena/Courtside)
+    const nba = gfx.nbaClock;
+    if (nba && typeof nba.sec === 'number' && now - (nba.ts || 0) < 6000) {
+      const base = nba.running ? nba.sec - Math.min((now - (nba.ts || 0)) / 1000, 2.4) : nba.sec;
+      return fmtClockDisplay(base + off);
+    }
     const a = clockRef.current;
     if (summary?.state !== 'in' || !a.at) return summary?.clock || '';
-    const elapsed = (Date.now() - a.at) / 1000;
-    const base = a.running ? a.sec - Math.min(elapsed, 2.4) : a.sec;
+    const base = a.running ? a.sec - Math.min((now - a.at) / 1000, 2.4) : a.sec;
     return fmtClockDisplay(base + off);
   })();
 
