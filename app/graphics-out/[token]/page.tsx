@@ -94,7 +94,7 @@ interface GfxDoc extends BusState {
   showBrand?: boolean;
   autoCallouts?: boolean;
   callout?: Callout | null;             // manual fire from the control panel
-  theme?: { useTeamColors?: boolean; c1?: string; c2?: string; logoScale?: number; brandScale?: number; motion?: boolean; bugPos?: 'left' | 'center' | 'right'; skin?: string; lowerPos?: 'left' | 'center' | 'right'; ftPos?: 'left' | 'right'; badgeSec?: number; bugStyle?: string; bugScale?: number; matchup3d?: boolean; gfxScale?: number; texture?: string; textureIntensity?: number; clockOffset?: number } | null;
+  theme?: { useTeamColors?: boolean; c1?: string; c2?: string; logoScale?: number; brandScale?: number; motion?: boolean; bugPos?: 'left' | 'center' | 'right'; skin?: string; lowerPos?: 'left' | 'center' | 'right'; ftPos?: 'left' | 'right'; badgeSec?: number; bugStyle?: string; bugScale?: number; matchup3d?: boolean; gfxScale?: number; texture?: string; textureIntensity?: number; clockOffset?: number; fullScale?: number; atlScale?: number } | null;
   trivia?: { question?: string; options?: string[]; correct?: number; sponsor?: string; reveal?: boolean } | null;
   portalCfg?: { x?: number; y?: number; size?: number; logo?: string; video?: string; content?: 'logo' | 'trivia' } | null;
   talentCfg?: { list?: { id: string; name: string; role: string; photo: string }[] } | null;
@@ -956,7 +956,7 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
 
           {/* ── FREE THROW SPOTLIGHT (side panel, animated FT gauge) ── */}
           {ftPlayer && (
-            <AtTheLine a={ftPlayer} shots={shots} custom={custom} awayColor={awayColor} posCls={ftPosCls} brand={brand} />
+            <AtTheLine a={ftPlayer} shots={shots} custom={custom} awayColor={awayColor} posCls={ftPosCls} brand={brand} scale={gfx.theme?.atlScale || 1} />
           )}
 
           {/* ── LIVE PLAY-BY-PLAY RAIL ── */}
@@ -971,7 +971,7 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
 
           {/* ── PLAYER COMPARISON (head-to-head) ── */}
           {bus.full === 'compare' && (
-            <PlayerCompare summary={summary} aId={gfx.compareA || ''} bId={gfx.compareB || ''} awayColor={awayColor} homeColor={homeColor} brand={brand} />
+            <PlayerCompare summary={summary} aId={gfx.compareA || ''} bId={gfx.compareB || ''} awayColor={awayColor} homeColor={homeColor} brand={brand} scale={gfx.theme?.fullScale || 1} />
           )}
 
           {/* ── PLAYER STAT LINE (full-width banner) ── */}
@@ -981,18 +981,18 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
 
           {/* ── TALE OF THE TAPE (team comparison) ── */}
           {bus.full === 'taletape' && (
-            <TaleOfTape summary={summary} awayColor={awayColor} homeColor={homeColor} />
+            <TaleOfTape summary={summary} awayColor={awayColor} homeColor={homeColor} scale={gfx.theme?.fullScale || 1} />
           )}
 
           {/* ── FULL BOXSCORE (one team, all columns) ── */}
           {bus.full === 'boxscore' && (
-            <BoxscoreFull summary={summary} teamKey={bus.boxTeam || 'away'} awayColor={awayColor} homeColor={homeColor} />
+            <BoxscoreFull summary={summary} teamKey={bus.boxTeam || 'away'} awayColor={awayColor} homeColor={homeColor} scale={gfx.theme?.fullScale || 1} />
           )}
 
           {/* ── FULL SCREENS (pure CSS) ── */}
           {bus.full && bus.full !== 'matchupbanner' && bus.full !== 'compare' && bus.full !== 'statline' && bus.full !== 'taletape' && bus.full !== 'boxscore' && (
             <div key={bus.full} className="absolute inset-0 flex items-center justify-center"
-              style={{ animation: 'plg-full-in 0.3s ease-out both' }}>
+              style={{ animation: 'plg-full-in 0.3s ease-out both', zoom: gfx.theme?.fullScale || 1 }}>
               <div className="plg-panel w-[900px] max-w-[92vw] text-white rounded-3xl shadow-2xl overflow-hidden">
                 <div className="flex items-center justify-between px-8 py-4"
                   style={{ background: `linear-gradient(90deg, ${awayColor}cc, #18181b 45%, #18181b 55%, ${homeColor}cc)` }}>
@@ -1192,8 +1192,8 @@ function StatChip({ label, value, color, big = false }: { label: string; value: 
 
 /* Head-to-head player comparison — mugshots on the sides in team color,
    a center column of stats, the leader per row highlighted. */
-function PlayerCompare({ summary, aId, bId, awayColor, homeColor, brand }: {
-  summary: Summary; aId: string; bId: string; awayColor: string; homeColor: string; brand: { logo?: string; name?: string } | null;
+function PlayerCompare({ summary, aId, bId, awayColor, homeColor, brand, scale }: {
+  summary: Summary; aId: string; bId: string; awayColor: string; homeColor: string; brand: { logo?: string; name?: string } | null; scale: number;
 }) {
   const all = [...summary.away.athletes, ...summary.home.athletes];
   const A = all.find(x => x.id === aId), B = all.find(x => x.id === bId);
@@ -1218,7 +1218,7 @@ function PlayerCompare({ summary, aId, bId, awayColor, homeColor, brand }: {
     </div>
   );
   return (
-    <div className="absolute inset-0 flex items-center justify-center" style={{ animation: 'plg-full-in 0.3s ease-out both' }}>
+    <div className="absolute inset-0 flex items-center justify-center" style={{ animation: 'plg-full-in 0.3s ease-out both', zoom: scale }}>
       <div className="relative flex items-stretch w-[940px] max-w-[94vw] h-[420px] rounded-3xl overflow-hidden shadow-2xl text-white plg-panel">
         <Player p={A} color={aColor} side="l" />
         <div className="flex-1 flex flex-col items-center justify-center px-6">
@@ -1284,8 +1284,8 @@ function StatLineBanner({ summary, id, awayColor, homeColor }: {
 }
 
 /* Full boxscore for one team — every column, with a team totals row. */
-function BoxscoreFull({ summary, teamKey, awayColor, homeColor }: {
-  summary: Summary; teamKey: 'away' | 'home'; awayColor: string; homeColor: string;
+function BoxscoreFull({ summary, teamKey, awayColor, homeColor, scale }: {
+  summary: Summary; teamKey: 'away' | 'home'; awayColor: string; homeColor: string; scale: number;
 }) {
   const t = teamKey === 'home' ? summary.home : summary.away;
   const color = teamKey === 'home' ? homeColor : awayColor;
@@ -1306,7 +1306,7 @@ function BoxscoreFull({ summary, teamKey, awayColor, homeColor }: {
     return String(players.reduce((s, p) => s + n(p.stats[k]), 0));
   };
   return (
-    <div className="absolute inset-0 flex items-center justify-center" style={{ animation: 'plg-full-in 0.3s ease-out both' }}>
+    <div className="absolute inset-0 flex items-center justify-center" style={{ animation: 'plg-full-in 0.3s ease-out both', zoom: scale }}>
       <div className="plg-panel w-[1040px] max-w-[96vw] text-white rounded-3xl shadow-2xl overflow-hidden" style={{ fontVariantNumeric: 'tabular-nums' }}>
         <div className="flex items-center gap-4 px-7 py-4" style={{ background: `linear-gradient(90deg, ${color}dd, #18181b 80%)` }}>
           {t.logo && <img src={t.logo} className="w-14 h-14 object-contain drop-shadow" alt="" />}
@@ -1352,8 +1352,8 @@ function BoxscoreFull({ summary, teamKey, awayColor, homeColor }: {
 
 /* Tale of the Tape — team-vs-team category comparison with an arrow to the
    leader of each row. Uses this game's team stats. */
-function TaleOfTape({ summary, awayColor, homeColor }: {
-  summary: Summary; awayColor: string; homeColor: string;
+function TaleOfTape({ summary, awayColor, homeColor, scale }: {
+  summary: Summary; awayColor: string; homeColor: string; scale: number;
 }) {
   const stat = (t: Summary['home'], label: string) => t.stats.find(s => s.label === label)?.value || '0';
   const rows = [
@@ -1374,7 +1374,7 @@ function TaleOfTape({ summary, awayColor, homeColor }: {
     return awayBetter ? -1 : 1;
   };
   return (
-    <div className="absolute inset-0 flex items-center justify-center" style={{ animation: 'plg-full-in 0.3s ease-out both' }}>
+    <div className="absolute inset-0 flex items-center justify-center" style={{ animation: 'plg-full-in 0.3s ease-out both', zoom: scale }}>
       <div className="plg-panel w-[900px] max-w-[94vw] text-white rounded-3xl shadow-2xl overflow-hidden">
         <div className="flex items-center justify-between px-8 py-4"
           style={{ background: `linear-gradient(90deg, ${awayColor}cc, #18181b 45%, #18181b 55%, ${homeColor}cc)` }}>
@@ -1535,8 +1535,8 @@ function PlayByPlayRail({ plays, summary, awayColor, homeColor, clock }: {
 /* Vertical "At The Line" panel: big mugshot bleeding out the top, the player's
    FT gauge (hot/steady/cold), their shot chart, and FT + points. Sits on the
    side so it can stay up with the score bug — fired at the free-throw line. */
-function AtTheLine({ a, shots, custom, awayColor, posCls, brand }: {
-  a: Athlete; shots: ShotPlay[]; custom: boolean; awayColor: string; posCls: string; brand: { logo?: string; name?: string } | null;
+function AtTheLine({ a, shots, custom, awayColor, posCls, brand, scale }: {
+  a: Athlete; shots: ShotPlay[]; custom: boolean; awayColor: string; posCls: string; brand: { logo?: string; name?: string } | null; scale: number;
 }) {
   const [made, att] = (a.stats.ft || '').split('-').map(n => parseInt(n, 10));
   const hasFt = Number.isFinite(made) && Number.isFinite(att) && att > 0;
@@ -1557,7 +1557,7 @@ function AtTheLine({ a, shots, custom, awayColor, posCls, brand }: {
   const bodyBg = `radial-gradient(135% 90% at 26% -8%, ${color}55, transparent 55%), linear-gradient(180deg, #16161c, #0b0b0f)`;
   return (
     <div className={`absolute top-1/2 -translate-y-1/2 w-[348px] ${posCls}`}
-      style={{ animation: 'plg-slide-r 0.55s cubic-bezier(0.34, 1.3, 0.64, 1) both' }}>
+      style={{ animation: 'plg-slide-r 0.55s cubic-bezier(0.34, 1.3, 0.64, 1) both', zoom: scale }}>
       {/* BIG team logo bleeding out of the top-left corner */}
       {a.teamLogo && <img src={a.teamLogo} className="absolute -top-9 -left-6 w-32 h-32 object-contain z-10"
         style={{ filter: 'drop-shadow(0 6px 12px rgba(0,0,0,0.6))' }} alt="" />}

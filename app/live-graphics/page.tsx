@@ -91,6 +91,9 @@ function ControlInner() {
   const [bugStyle, setBugStyle] = useState<'classic' | 'bar' | 'strip' | 'stack' | 'arena'>('classic');
   const [bugScale, setBugScale] = useState(1);
   const [clockOffset, setClockOffset] = useState(0);
+  const [fullScale, setFullScale] = useState(1);
+  const [atlScale, setAtlScale] = useState(1);
+  const [urlBarOpen, setUrlBarOpen] = useState(false);
   const [matchup3d, setMatchup3d] = useState(false);
   const [gfxScale, setGfxScale] = useState(1);   // global size of all output graphics
   const [texture, setTexture] = useState('diamond');
@@ -209,6 +212,8 @@ function ControlInner() {
         if (d.theme.bugStyle) setBugStyle(d.theme.bugStyle);
         if (d.theme.bugScale) setBugScale(d.theme.bugScale);
         if (typeof d.theme.clockOffset === 'number') setClockOffset(d.theme.clockOffset);
+        if (d.theme.fullScale) setFullScale(d.theme.fullScale);
+        if (d.theme.atlScale) setAtlScale(d.theme.atlScale);
         if (d.theme.matchup3d) setMatchup3d(true);
         if (d.theme.gfxScale) setGfxScale(d.theme.gfxScale);
         if (d.theme.texture) setTexture(d.theme.texture);
@@ -301,7 +306,7 @@ function ControlInner() {
         sourceMode: source, league,
         brand: { logo: company?.logo_url || '', name: company?.name || '' },
         showBrand, autoCallouts,
-        theme: { useTeamColors, c1, c2, logoScale, brandScale, motion: motionFx, bugPos, skin, lowerPos, ftPos, badgeSec, bugStyle, bugScale, matchup3d, gfxScale, texture, textureIntensity, clockOffset },
+        theme: { useTeamColors, c1, c2, logoScale, brandScale, motion: motionFx, bugPos, skin, lowerPos, ftPos, badgeSec, bugStyle, bugScale, matchup3d, gfxScale, texture, textureIntensity, clockOffset, fullScale, atlScale },
         trivia,
         portalCfg,
         talentCfg: { list: talentList },
@@ -342,7 +347,7 @@ function ControlInner() {
   /* Re-push settings when branding/theme changes (only once a game is loaded) */
   useEffect(() => {
     if ((eventId || source === 'manual') && token) pushDoc({});
-  }, [showBrand, autoCallouts, useTeamColors, c1, c2, banners, logoScale, brandScale, badgeSec, bugStyle, bugScale, matchup3d, gfxScale, texture, textureIntensity, clockOffset, motionFx, trivia, portalCfg, talentList, mentionCfg, bugPos, skin, lowerPos, ftPos, photoOverrides, leagueBadge, league, source, extraBadges, nextGameCfg, coachCfg]);
+  }, [showBrand, autoCallouts, useTeamColors, c1, c2, banners, logoScale, brandScale, badgeSec, bugStyle, bugScale, matchup3d, gfxScale, texture, textureIntensity, clockOffset, fullScale, atlScale, motionFx, trivia, portalCfg, talentList, mentionCfg, bugPos, skin, lowerPos, ftPos, photoOverrides, leagueBadge, league, source, extraBadges, nextGameCfg, coachCfg]);
 
   /* Fire a play callout for the on-air player (or top scorer) */
   const calloutTarget: Athlete | null = useMemo(() => {
@@ -644,9 +649,16 @@ function ControlInner() {
         </button>
       </PageHeader>
 
-      {/* Output URL bar */}
-      {token && (
+      {/* Output URL bar (collapsible — it only matters at setup, not during the game) */}
+      {token && !urlBarOpen && (
+        <button onClick={() => setUrlBarOpen(true)}
+          className="mb-4 text-xs text-gray-500 hover:text-gray-800 flex items-center gap-1.5">
+          <MonitorPlay size={13} className="text-green-500" /> Output URL & HDMI tips ▸
+        </button>
+      )}
+      {token && urlBarOpen && (
         <div className="mb-6 bg-gray-900 text-white rounded-2xl px-5 py-3.5 flex flex-wrap items-center gap-3">
+          <button onClick={() => setUrlBarOpen(false)} className="text-gray-400 hover:text-white text-xs">✕</button>
           <MonitorPlay size={16} className="text-green-400 shrink-0" />
           <div className="text-xs text-gray-400">Output (browser source, 1920×1080, transparent):</div>
           <code className="text-xs bg-white/10 rounded-lg px-2.5 py-1.5 flex-1 min-w-[240px] truncate">{outputUrl}</code>
@@ -1489,6 +1501,18 @@ function ControlInner() {
                   <input type="range" min={0.6} max={1.8} step={0.05} value={gfxScale}
                     onChange={e => setGfxScale(parseFloat(e.target.value))} className="flex-1" />
                   <span className="w-10 text-right tabular-nums">{gfxScale.toFixed(2)}×</span>
+                </label>
+                <label className="flex items-center gap-2 text-xs text-gray-500">
+                  <span className="w-14">Full scrn</span>
+                  <input type="range" min={0.6} max={1.6} step={0.05} value={fullScale}
+                    onChange={e => setFullScale(parseFloat(e.target.value))} className="flex-1" />
+                  <span className="w-10 text-right tabular-nums">{fullScale.toFixed(2)}×</span>
+                </label>
+                <label className="flex items-center gap-2 text-xs text-gray-500">
+                  <span className="w-14">At Line</span>
+                  <input type="range" min={0.6} max={1.6} step={0.05} value={atlScale}
+                    onChange={e => setAtlScale(parseFloat(e.target.value))} className="flex-1" />
+                  <span className="w-10 text-right tabular-nums">{atlScale.toFixed(2)}×</span>
                 </label>
                 <div className="flex items-center gap-2 text-xs text-gray-500">
                   <span className="w-14">Texture</span>
