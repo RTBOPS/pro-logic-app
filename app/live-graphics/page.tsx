@@ -952,18 +952,17 @@ function ControlInner() {
             {/* Graphics triggers */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-3">
               <h2 className="text-sm font-semibold text-gray-800">Fire graphics</h2>
-              <button onClick={() => fire({ bug: !active.bug })}
-                className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-medium ${active.bug ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
-                Score Bug {active.bug ? <Eye size={15} /> : <EyeOff size={15} />}
-              </button>
-              <button onClick={() => fire({ pbp: !active.pbp })}
-                className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-medium ${active.pbp ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
-                Play-by-Play Rail {active.pbp ? <Eye size={15} /> : <EyeOff size={15} />}
-              </button>
-              <button onClick={() => fire({ pbpTicker: !active.pbpTicker })}
-                className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-medium ${active.pbpTicker ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
-                Play Ticker (on bug) {active.pbpTicker ? <Eye size={15} /> : <EyeOff size={15} />}
-              </button>
+              <div className="relative flex items-stretch gap-1">
+                <button onClick={() => fire({ bug: !active.bug })}
+                  className={`flex-1 flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-medium ${active.bug ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
+                  Score Bug {active.bug ? <Eye size={15} /> : <EyeOff size={15} />}
+                </button>
+                <button onClick={() => setGfxSettings(s => s === 'bug' ? null : 'bug')} title="Score bug settings"
+                  className={`px-2.5 rounded-xl shrink-0 ${gfxSettings === 'bug' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>
+                  <Settings size={14} />
+                </button>
+                {gfxSettings === 'bug' && (
+                  <div className="absolute z-40 top-full mt-1 left-0 right-0 bg-white border border-gray-200 rounded-xl shadow-2xl p-3 space-y-2.5 max-h-[70vh] overflow-y-auto">
               <div className="flex items-center gap-1.5">
                 <span className="text-[10px] text-gray-400 uppercase tracking-wide">League badge</span>
                 <select value={leagueBadge} onChange={e => setLeagueBadge(e.target.value)}
@@ -1029,6 +1028,17 @@ function ControlInner() {
                   ))}
                 </div>
               </div>
+                  </div>
+                )}
+              </div>
+              <button onClick={() => fire({ pbp: !active.pbp })}
+                className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-medium ${active.pbp ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
+                Play-by-Play Rail {active.pbp ? <Eye size={15} /> : <EyeOff size={15} />}
+              </button>
+              <button onClick={() => fire({ pbpTicker: !active.pbpTicker })}
+                className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-medium ${active.pbpTicker ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
+                Play Ticker (on bug) {active.pbpTicker ? <Eye size={15} /> : <EyeOff size={15} />}
+              </button>
               <div className="grid grid-cols-2 gap-2">
               {([
                 ['teamstats', 'Team Stats'],
