@@ -252,11 +252,12 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
   const liveClock = (() => {
     const off = gfx.theme?.clockOffset || 0;   // operator sync nudge (seconds)
     const now = Date.now();
-    // Prefer the NBA's own clock from the local agent when it's fresh (matches the arena/Courtside)
+    // Prefer the NBA's own clock from the local agent when it's fresh. The agent
+    // writes the exact clock every second, so show it raw — NO interpolation
+    // (interpolating made it flicker when the NBA clock was stopped).
     const nba = gfx.nbaClock;
     if (nba && typeof nba.sec === 'number' && now - (nba.ts || 0) < 6000) {
-      const base = nba.running ? nba.sec - Math.min((now - (nba.ts || 0)) / 1000, 2.4) : nba.sec;
-      return fmtClockDisplay(base + off);
+      return fmtClockDisplay(nba.sec + off);
     }
     const a = clockRef.current;
     if (summary?.state !== 'in' || !a.at) return summary?.clock || '';
