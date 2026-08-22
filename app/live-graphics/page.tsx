@@ -11,7 +11,7 @@ import { UpgradeGate } from '@/components/UpgradeGate';
 import {
   MonitorPlay, Copy, ExternalLink, Loader2, RefreshCw, Eye, EyeOff, Search,
   Upload, Trash2, Zap, Plus, Play, Pause,
-  Palette, HelpCircle, Flame, Mic, Star, Calendar, ClipboardList, Users, X,
+  Palette, HelpCircle, Flame, Mic, Star, Calendar, ClipboardList, Users, X, Settings,
 } from 'lucide-react';
 import {
   normalizeScoreboard, normalizeSummary, normalizeTeams, gameLeaders, periodLabel, buildCallout, detectCallouts, detectRichCallouts, advanceManualPeriod,
@@ -60,6 +60,8 @@ function ControlInner() {
   const [rosterOpen, setRosterOpen] = useState(false);
   const [rosterWidth, setRosterWidth] = useState(460);
   const [pickerOpen, setPickerOpen] = useState(true);
+  const [gfxSettings, setGfxSettings] = useState<string | null>(null);
+  const [gScale, setGScale] = useState<Record<string, number>>({});
   useEffect(() => { const w = parseInt(localStorage.getItem('plg_roster_w') || '', 10); if (w >= 320 && w <= 1000) setRosterWidth(w); }, []);
   const startResizeRoster = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -224,6 +226,7 @@ function ControlInner() {
         if (typeof d.theme.clockOffset === 'number') setClockOffset(d.theme.clockOffset);
         if (d.theme.fullScale) setFullScale(d.theme.fullScale);
         if (d.theme.atlScale) setAtlScale(d.theme.atlScale);
+        if (d.theme.gScale && typeof d.theme.gScale === 'object') setGScale(d.theme.gScale);
         if (d.theme.matchup3d) setMatchup3d(true);
         if (d.theme.gfxScale) setGfxScale(d.theme.gfxScale);
         if (d.theme.texture) setTexture(d.theme.texture);
@@ -316,7 +319,7 @@ function ControlInner() {
         sourceMode: source, league,
         brand: { logo: company?.logo_url || '', name: company?.name || '' },
         showBrand, autoCallouts,
-        theme: { useTeamColors, c1, c2, logoScale, brandScale, motion: motionFx, bugPos, skin, lowerPos, ftPos, badgeSec, bugStyle, bugScale, matchup3d, gfxScale, texture, textureIntensity, clockOffset, fullScale, atlScale },
+        theme: { useTeamColors, c1, c2, logoScale, brandScale, motion: motionFx, bugPos, skin, lowerPos, ftPos, badgeSec, bugStyle, bugScale, matchup3d, gfxScale, texture, textureIntensity, clockOffset, fullScale, atlScale, gScale },
         trivia,
         portalCfg,
         talentCfg: { list: talentList },
@@ -357,7 +360,7 @@ function ControlInner() {
   /* Re-push settings when branding/theme changes (only once a game is loaded) */
   useEffect(() => {
     if ((eventId || source === 'manual') && token) pushDoc({});
-  }, [showBrand, autoCallouts, useTeamColors, c1, c2, banners, logoScale, brandScale, badgeSec, bugStyle, bugScale, matchup3d, gfxScale, texture, textureIntensity, clockOffset, fullScale, atlScale, motionFx, trivia, portalCfg, talentList, mentionCfg, bugPos, skin, lowerPos, ftPos, photoOverrides, leagueBadge, league, source, extraBadges, nextGameCfg, coachCfg]);
+  }, [showBrand, autoCallouts, useTeamColors, c1, c2, banners, logoScale, brandScale, badgeSec, bugStyle, bugScale, matchup3d, gfxScale, texture, textureIntensity, clockOffset, fullScale, atlScale, gScale, motionFx, trivia, portalCfg, talentList, mentionCfg, bugPos, skin, lowerPos, ftPos, photoOverrides, leagueBadge, league, source, extraBadges, nextGameCfg, coachCfg]);
 
   /* Fire a play callout for the on-air player (or top scorer) */
   const calloutTarget: Athlete | null = useMemo(() => {
@@ -1039,10 +1042,41 @@ function ControlInner() {
                 ['matchupbanner', 'Matchup Banner'],
                 ['taletape', 'Tale of the Tape'],
               ] as ['teamstats' | 'lineups' | 'leaders' | 'matchup' | 'linescore' | 'shotchart' | 'assists' | 'alerts' | 'matchupbanner' | 'taletape', string][]).map(([kind, label]) => (
-                <button key={kind} onClick={() => fire({ full: active.full === kind ? null : kind })}
-                  className={`flex items-center justify-between gap-1 px-3 py-2 rounded-lg text-xs font-medium ${active.full === kind ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
-                  <span className="truncate">{label}</span> {active.full === kind ? <Eye size={13} className="shrink-0" /> : <EyeOff size={13} className="shrink-0" />}
-                </button>
+                <div key={kind} className="relative flex items-stretch gap-1">
+                  <button onClick={() => fire({ full: active.full === kind ? null : kind })}
+                    className={`flex-1 min-w-0 flex items-center justify-between gap-1 px-3 py-2 rounded-lg text-xs font-medium ${active.full === kind ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
+                    <span className="truncate">{label}</span> {active.full === kind ? <Eye size={13} className="shrink-0" /> : <EyeOff size={13} className="shrink-0" />}
+                  </button>
+                  <button onClick={() => setGfxSettings(s => s === kind ? null : kind)} title={`Modify ${label}`}
+                    className={`px-2 rounded-lg shrink-0 ${gfxSettings === kind ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>
+                    <Settings size={13} />
+                  </button>
+                  {gfxSettings === kind && (
+                    <div className="absolute z-30 top-full mt-1 right-0 w-60 bg-white border border-gray-200 rounded-xl shadow-2xl p-3 space-y-2.5">
+                      <div className="text-[10px] font-black uppercase tracking-widest text-gray-400">{label}</div>
+                      <label className="flex items-center gap-2 text-xs text-gray-500">
+                        <span className="w-12 shrink-0">Size</span>
+                        <input type="range" min={0.6} max={1.8} step={0.05} value={gScale[kind] ?? 1}
+                          onChange={e => setGScale(m => ({ ...m, [kind]: parseFloat(e.target.value) }))} className="flex-1" />
+                        <span className="w-9 text-right tabular-nums">{(gScale[kind] ?? 1).toFixed(2)}×</span>
+                      </label>
+                      <div className="flex items-center gap-2 text-xs text-gray-500">
+                        <span className="w-12 shrink-0">Texture</span>
+                        <select value={texture} onChange={e => setTexture(e.target.value)}
+                          className="flex-1 min-w-0 border border-gray-200 rounded-lg px-2 py-1 text-xs bg-white">
+                          {['diamond', 'mesh', 'grid', 'lines', 'carbon', 'chevron', 'none'].map(t => <option key={t} value={t}>{t}</option>)}
+                        </select>
+                      </div>
+                      {texture !== 'none' && (
+                        <label className="flex items-center gap-2 text-xs text-gray-500">
+                          <span className="w-12 shrink-0">Intensity</span>
+                          <input type="range" min={0.2} max={2.5} step={0.1} value={textureIntensity}
+                            onChange={e => setTextureIntensity(parseFloat(e.target.value))} className="flex-1" />
+                        </label>
+                      )}
+                    </div>
+                  )}
+                </div>
               ))}
               </div>
               <div className="flex items-center gap-1.5">

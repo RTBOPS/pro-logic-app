@@ -94,7 +94,7 @@ interface GfxDoc extends BusState {
   showBrand?: boolean;
   autoCallouts?: boolean;
   callout?: Callout | null;             // manual fire from the control panel
-  theme?: { useTeamColors?: boolean; c1?: string; c2?: string; logoScale?: number; brandScale?: number; motion?: boolean; bugPos?: 'left' | 'center' | 'right'; skin?: string; lowerPos?: 'left' | 'center' | 'right'; ftPos?: 'left' | 'right'; badgeSec?: number; bugStyle?: string; bugScale?: number; matchup3d?: boolean; gfxScale?: number; texture?: string; textureIntensity?: number; clockOffset?: number; fullScale?: number; atlScale?: number } | null;
+  theme?: { useTeamColors?: boolean; c1?: string; c2?: string; logoScale?: number; brandScale?: number; motion?: boolean; bugPos?: 'left' | 'center' | 'right'; skin?: string; lowerPos?: 'left' | 'center' | 'right'; ftPos?: 'left' | 'right'; badgeSec?: number; bugStyle?: string; bugScale?: number; matchup3d?: boolean; gfxScale?: number; texture?: string; textureIntensity?: number; clockOffset?: number; fullScale?: number; atlScale?: number; gScale?: Record<string, number> } | null;
   trivia?: { question?: string; options?: string[]; correct?: number; sponsor?: string; reveal?: boolean } | null;
   portalCfg?: { x?: number; y?: number; size?: number; logo?: string; video?: string; content?: 'logo' | 'trivia' } | null;
   talentCfg?: { list?: { id: string; name: string; role: string; photo: string }[] } | null;
@@ -964,35 +964,39 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
 
           {/* ── MATCHUP BANNER (full-width lower third) ── */}
           {bus.full === 'matchupbanner' && (
-            <MatchupBanner summary={summary} sponsor={gfx.leagueBadge || brand?.logo || ''}
-              awayColor={awayColor} homeColor={homeColor} logoScale={logoScale} logo3d={!!gfx.theme?.matchup3d}
-              tex={buildTexture(gfx.theme?.texture, gfx.theme?.textureIntensity ?? 1)} />
+            <div style={{ zoom: gfx.theme?.gScale?.matchupbanner || gfx.theme?.fullScale || 1 }}>
+              <MatchupBanner summary={summary} sponsor={gfx.leagueBadge || brand?.logo || ''}
+                awayColor={awayColor} homeColor={homeColor} logoScale={logoScale} logo3d={!!gfx.theme?.matchup3d}
+                tex={buildTexture(gfx.theme?.texture, gfx.theme?.textureIntensity ?? 1)} />
+            </div>
           )}
 
           {/* ── PLAYER COMPARISON (head-to-head) ── */}
           {bus.full === 'compare' && (
-            <PlayerCompare summary={summary} aId={gfx.compareA || ''} bId={gfx.compareB || ''} awayColor={awayColor} homeColor={homeColor} brand={brand} scale={gfx.theme?.fullScale || 1} />
+            <PlayerCompare summary={summary} aId={gfx.compareA || ''} bId={gfx.compareB || ''} awayColor={awayColor} homeColor={homeColor} brand={brand} scale={gfx.theme?.gScale?.compare || gfx.theme?.fullScale || 1} />
           )}
 
           {/* ── PLAYER STAT LINE (full-width banner) ── */}
           {bus.full === 'statline' && (
-            <StatLineBanner summary={summary} id={gfx.statLineId || ''} awayColor={awayColor} homeColor={homeColor} />
+            <div style={{ zoom: gfx.theme?.gScale?.statline || gfx.theme?.fullScale || 1 }}>
+              <StatLineBanner summary={summary} id={gfx.statLineId || ''} awayColor={awayColor} homeColor={homeColor} />
+            </div>
           )}
 
           {/* ── TALE OF THE TAPE (team comparison) ── */}
           {bus.full === 'taletape' && (
-            <TaleOfTape summary={summary} awayColor={awayColor} homeColor={homeColor} scale={gfx.theme?.fullScale || 1} />
+            <TaleOfTape summary={summary} awayColor={awayColor} homeColor={homeColor} scale={gfx.theme?.gScale?.taletape || gfx.theme?.fullScale || 1} />
           )}
 
           {/* ── FULL BOXSCORE (one team, all columns) ── */}
           {bus.full === 'boxscore' && (
-            <BoxscoreFull summary={summary} teamKey={bus.boxTeam || 'away'} awayColor={awayColor} homeColor={homeColor} scale={gfx.theme?.fullScale || 1} />
+            <BoxscoreFull summary={summary} teamKey={bus.boxTeam || 'away'} awayColor={awayColor} homeColor={homeColor} scale={gfx.theme?.gScale?.boxscore || gfx.theme?.fullScale || 1} />
           )}
 
           {/* ── FULL SCREENS (pure CSS) ── */}
           {bus.full && bus.full !== 'matchupbanner' && bus.full !== 'compare' && bus.full !== 'statline' && bus.full !== 'taletape' && bus.full !== 'boxscore' && (
             <div key={bus.full} className="absolute inset-0 flex items-center justify-center"
-              style={{ animation: 'plg-full-in 0.3s ease-out both', zoom: gfx.theme?.fullScale || 1 }}>
+              style={{ animation: 'plg-full-in 0.3s ease-out both', zoom: gfx.theme?.gScale?.[bus.full as string] || gfx.theme?.fullScale || 1 }}>
               <div className="plg-panel w-[900px] max-w-[92vw] text-white rounded-3xl shadow-2xl overflow-hidden">
                 <div className="flex items-center justify-between px-8 py-4"
                   style={{ background: `linear-gradient(90deg, ${awayColor}cc, #18181b 45%, #18181b 55%, ${homeColor}cc)` }}>
