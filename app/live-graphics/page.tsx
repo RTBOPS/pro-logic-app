@@ -629,7 +629,7 @@ function ControlInner() {
   };
 
   return (
-    <div className="p-4 md:p-8 pb-24">
+    <div className={`p-4 md:p-8 pb-24 transition-[margin] duration-300 ${rosterOpen ? 'lg:mr-[470px]' : ''}`}>
       <PageHeader title="Live Graphics" subtitle="NBA broadcast graphics driven by the live game feed — capture the output page in OBS / vMix / ATEM">
         {savedNote && <span className="text-xs font-semibold text-green-600 self-center mr-1">{savedNote}</span>}
         <button onClick={savePreset} title="Save your whole setup so you can restore it if anything gets moved"
@@ -1357,7 +1357,7 @@ function ControlInner() {
       )}
 
       {/* ── Pre-game setup dock ── */}
-      <div className="fixed bottom-0 left-0 md:left-16 right-0 z-40 bg-zinc-950/95 backdrop-blur border-t border-zinc-800">
+      <div className={`fixed bottom-0 left-0 md:left-16 z-40 bg-zinc-950/95 backdrop-blur border-t border-zinc-800 transition-[right] duration-300 ${rosterOpen ? 'lg:right-[470px] right-0' : 'right-0'}`}>
         <div className="max-w-3xl mx-auto flex items-center justify-center gap-1.5 px-3 py-2.5 overflow-x-auto">
           {([
             ['branding', Palette, 'Branding'],
