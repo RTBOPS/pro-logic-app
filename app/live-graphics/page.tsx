@@ -58,6 +58,15 @@ function ControlInner() {
   const [copied, setCopied] = useState(false);
   const [playerQuery, setPlayerQuery] = useState('');
   const [rosterOpen, setRosterOpen] = useState(false);
+  const [rosterWidth, setRosterWidth] = useState(460);
+  useEffect(() => { const w = parseInt(localStorage.getItem('plg_roster_w') || '', 10); if (w >= 320 && w <= 1000) setRosterWidth(w); }, []);
+  const startResizeRoster = (e: React.MouseEvent) => {
+    e.preventDefault();
+    let lastW = rosterWidth;
+    const onMove = (ev: MouseEvent) => { lastW = Math.min(1000, Math.max(320, window.innerWidth - ev.clientX)); setRosterWidth(lastW); };
+    const onUp = () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); localStorage.setItem('plg_roster_w', String(Math.round(lastW))); };
+    window.addEventListener('mousemove', onMove); window.addEventListener('mouseup', onUp);
+  };
   const [savedNote, setSavedNote] = useState('');
   const pushing = useRef(false);
   const company = useCompany();
@@ -629,7 +638,7 @@ function ControlInner() {
   };
 
   return (
-    <div className={`p-4 md:p-8 pb-24 transition-[margin] duration-300 ${rosterOpen ? 'lg:mr-[470px]' : ''}`}>
+    <div className="p-4 md:p-8 pb-24" style={{ marginRight: rosterOpen ? rosterWidth : 0, transition: 'margin 0.2s' }}>
       <PageHeader title="Live Graphics" subtitle="NBA broadcast graphics driven by the live game feed — capture the output page in OBS / vMix / ATEM">
         {savedNote && <span className="text-xs font-semibold text-green-600 self-center mr-1">{savedNote}</span>}
         <button onClick={savePreset} title="Save your whole setup so you can restore it if anything gets moved"
@@ -677,7 +686,7 @@ function ControlInner() {
 
       {/* ── PVW / PGM monitors + TAKE ── */}
       {token && summary && (
-        <div className="mb-6 bg-zinc-950 rounded-2xl p-4 flex flex-wrap items-center justify-center gap-5">
+        <div className="mb-4 bg-zinc-950 rounded-2xl p-3 flex flex-nowrap items-center justify-center gap-4 overflow-x-auto">
           <Monitor label="PREVIEW" color="text-yellow-400" width={monSize}
             src={`/graphics-out/${token}?mode=preview&bg=dark`} />
           <div className="flex flex-col items-center gap-2">
@@ -904,9 +913,9 @@ function ControlInner() {
       ) : (
         <div>
           {/* ── Fire panel — cards flow across columns to fill the width; roster lives in the right drawer ── */}
-          <div className="columns-1 lg:columns-2 xl:columns-3 gap-4 pb-28 [&>*]:mb-4 [&>*]:break-inside-avoid">
-            {/* Live score header */}
-            <div className="bg-gray-900 text-white rounded-2xl p-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 items-start pb-28">
+            {/* Live score header (full-width bar) */}
+            <div className="bg-gray-900 text-white rounded-2xl p-3 lg:col-span-2 xl:col-span-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   {summary.away.logo && <img src={summary.away.logo} className="w-8 h-8" alt="" />}
@@ -1280,7 +1289,8 @@ function ControlInner() {
           </div>
 
           {/* ── Player roster — right hamburger drawer, ready to fire lower thirds ── */}
-          <div className={`fixed top-0 right-0 h-screen w-[460px] max-w-[94vw] z-50 bg-white shadow-2xl border-l border-gray-200 flex flex-col transition-transform duration-300 ${rosterOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+          <div className={`fixed top-0 right-0 h-screen max-w-[96vw] z-50 bg-white shadow-2xl border-l border-gray-200 flex flex-col ${rosterOpen ? 'translate-x-0' : 'translate-x-full'}`} style={{ width: rosterWidth, transition: 'transform 0.3s' }}>
+            <div onMouseDown={startResizeRoster} title="Drag to resize" className="absolute left-0 top-0 h-full w-1.5 cursor-ew-resize hover:bg-purple-400/40 z-10" />
             <div className="px-4 py-3 border-b bg-gray-50 flex items-center gap-3 shrink-0">
               <h2 className="text-sm font-semibold text-gray-800">Players — tap to fire lower third</h2>
               <div className="relative ml-auto">
@@ -1357,7 +1367,7 @@ function ControlInner() {
       )}
 
       {/* ── Pre-game setup dock ── */}
-      <div className={`fixed bottom-0 left-0 md:left-16 z-40 bg-zinc-950/95 backdrop-blur border-t border-zinc-800 transition-[right] duration-300 ${rosterOpen ? 'lg:right-[470px] right-0' : 'right-0'}`}>
+      <div className="fixed bottom-0 left-0 md:left-16 z-40 bg-zinc-950/95 backdrop-blur border-t border-zinc-800" style={{ right: rosterOpen ? rosterWidth : 0, transition: 'right 0.2s' }}>
         <div className="max-w-3xl mx-auto flex items-center justify-center gap-1.5 px-3 py-2.5 overflow-x-auto">
           {([
             ['branding', Palette, 'Branding'],
