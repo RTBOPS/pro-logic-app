@@ -559,11 +559,13 @@ export function gameLeaders(summary: Summary, n = 3): Athlete[] {
    auto-detected by diffing consecutive live boxscores. */
 export interface Callout {
   id: string;
-  kind: '3pt' | '2pt' | 'ft' | 'ast' | 'dd' | 'td' | 'custom';
+  kind: '3pt' | '2pt' | 'ft' | 'ast' | 'dd' | 'td' | 'custom' | 'sub';
   title: string;
   sub?: string;
   color?: string;
   ms?: number;      // on-air duration override (default 4500)
+  inId?: string;    // kind 'sub': player entering
+  outId?: string;   // kind 'sub': player leaving
 }
 
 const num = (s?: string) => parseInt(s || '0', 10) || 0;
@@ -604,10 +606,27 @@ export function detectRichCallouts(json: any, summary: Summary, seen: Set<string
     return '';
   };
   const out: Callout[] = [];
+  const byName = new Map([...summary.home.athletes, ...summary.away.athletes].map(a => [a.name.toLowerCase(), a]));
   for (const p of plays) {
-    if (!p.scoringPlay) continue;
     const id = String(p.id || p.sequenceNumber || '');
     if (!id || seen.has(id)) continue;
+    const isSub = /substitution/i.test(String(p.type?.text || '')) || /enters the game for/i.test(String(p.text || ''));
+    if (isSub) {
+      seen.add(id);
+      // ESPN lists participants [entering, leaving]; fall back to parsing the text.
+      let pin = byId.get(String(p.participants?.[0]?.athlete?.id || ''));
+      let pout = byId.get(String(p.participants?.[1]?.athlete?.id || ''));
+      if (!pin || !pout) {
+        const m = /^(.+?) enters the game for (.+?)\.?$/i.exec(String(p.text || '').trim());
+        if (m) { pin = pin || byName.get(m[1].trim().toLowerCase()); pout = pout || byName.get(m[2].trim().toLowerCase()); }
+      }
+      if (pin && pout) {
+        out.push({ id: Math.random().toString(36).slice(2, 10), kind: 'sub', title: 'SUB', color: pin.teamColor || '#16a34a',
+          sub: `${pin.shortName} ▲ · ${pout.shortName} ▼`, inId: pin.id, outId: pout.id });
+      }
+      continue;
+    }
+    if (!p.scoringPlay) continue;
     seen.add(id);
     const pa = Number(p.pointsAttempted) || Number(p.scoreValue) || 2;
     const scorer = byId.get(String(p.participants?.[0]?.athlete?.id || ''));

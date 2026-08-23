@@ -94,7 +94,7 @@ interface GfxDoc extends BusState {
   showBrand?: boolean;
   autoCallouts?: boolean;
   callout?: Callout | null;             // manual fire from the control panel
-  theme?: { useTeamColors?: boolean; c1?: string; c2?: string; logoScale?: number; brandScale?: number; motion?: boolean; bugPos?: 'left' | 'center' | 'right'; skin?: string; lowerPos?: 'left' | 'center' | 'right'; ftPos?: 'left' | 'right'; badgeSec?: number; bugStyle?: string; bugScale?: number; matchup3d?: boolean; gfxScale?: number; texture?: string; textureIntensity?: number; clockOffset?: number; fullScale?: number; atlScale?: number; gScale?: Record<string, number> } | null;
+  theme?: { useTeamColors?: boolean; c1?: string; c2?: string; logoScale?: number; brandScale?: number; bugTextScale?: number; motion?: boolean; bugPos?: 'left' | 'center' | 'right'; skin?: string; lowerPos?: 'left' | 'center' | 'right'; ftPos?: 'left' | 'right'; badgeSec?: number; bugStyle?: string; bugScale?: number; matchup3d?: boolean; gfxScale?: number; texture?: string; textureIntensity?: number; clockOffset?: number; fullScale?: number; atlScale?: number; matchupInset?: number; gScale?: Record<string, number>; logoByGfx?: Record<string, number>; imgByGfx?: Record<string, number>; textByGfx?: Record<string, number>; texByGfx?: Record<string, string>; texIntByGfx?: Record<string, number> } | null;
   trivia?: { question?: string; options?: string[]; correct?: number; sponsor?: string; reveal?: boolean } | null;
   portalCfg?: { x?: number; y?: number; size?: number; logo?: string; video?: string; content?: 'logo' | 'trivia' } | null;
   talentCfg?: { list?: { id: string; name: string; role: string; photo: string }[] } | null;
@@ -279,10 +279,31 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
   /* Which bus this window shows: program (default) or the staged preview */
   const bus: BusState = busMode === 'preview' ? (gfx.preview || {}) : gfx;
 
+  /* Shot Splits L3 view. Mirrors bus.shotLine but lingers ~0.5s after it
+   * clears, flagged `leaving`, so the strip can slide back out to the left
+   * (and the score bug can grow back) instead of vanishing on unmount. */
+  const [slView, setSlView] = useState<{ id: string; leaving: boolean } | null>(null);
+  useEffect(() => {
+    if (bus.shotLine) { setSlView({ id: bus.shotLine, leaving: false }); return; }
+    setSlView(v => (v ? { ...v, leaving: true } : null));
+    const t = setTimeout(() => setSlView(null), 520);
+    return () => clearTimeout(t);
+  }, [bus.shotLine]);
+
+  /* Player lower-third view — same linger trick so the exit can animate: the
+   * lower third sinks out while the score bug slides back up into its slot. */
+  const [lowerView, setLowerView] = useState<{ id: string; leaving: boolean } | null>(null);
+  useEffect(() => {
+    if (bus.lowerId) { setLowerView({ id: bus.lowerId, leaving: false }); return; }
+    setLowerView(v => (v ? { ...v, leaving: true } : null));
+    const t = setTimeout(() => setLowerView(null), 520);
+    return () => clearTimeout(t);
+  }, [bus.lowerId]);
+
   const lower: Athlete | null = useMemo(() => {
-    if (!summary || !bus.lowerId) return null;
-    return [...summary.home.athletes, ...summary.away.athletes].find(a => a.id === bus.lowerId) || null;
-  }, [summary, bus.lowerId]);
+    if (!summary || !lowerView) return null;
+    return [...summary.home.athletes, ...summary.away.athletes].find(a => a.id === lowerView.id) || null;
+  }, [summary, lowerView]);
 
   const ftPlayer: Athlete | null = useMemo(() => {
     if (!summary || !bus.ftId) return null;
@@ -304,14 +325,99 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
   const calloutColor = (c: Callout) => (custom ? awayColor : c.color) || '#7c3aed';
 
   const brand = gfx.showBrand !== false && gfx.brand?.logo ? gfx.brand : null;
-  const lowerPosCls = (gfx.theme?.lowerPos || 'left') === 'center' ? 'left-1/2 -translate-x-1/2'
+  // Center needs w-max: with left-1/2 alone only the right half is available
+  // width, so the box shrink-to-fits and clips names (same fix as the bug).
+  const lowerPosCls = (gfx.theme?.lowerPos || 'left') === 'center' ? 'left-1/2 -translate-x-1/2 w-max max-w-[97vw]'
     : (gfx.theme?.lowerPos || 'left') === 'right' ? 'right-8' : 'left-8';
-  // Lower thirds sit higher when a tall bug (arena) is on air so they never collide
-  const lowerBottomCls = (bus.bug && !bus.full && (gfx.theme?.bugStyle === 'arena')) ? 'bottom-44' : 'bottom-28';
+  // Collision rule: lower thirds always clear the score bug. We estimate the
+  // bug's on-air height from its style, scale and attached ticker, and lift
+  // every bottom lower-third above it (stage bottom-8 = 32px + bug + 16px gap).
+  // Exposed as a CSS var so the (static) Tailwind class below can consume it.
+  const lowerBottomPx = (() => {
+    if (!bus.bug || bus.full) return 112;   // nothing below → default bottom-28
+    const st = gfx.theme?.bugStyle || 'classic';
+    const base = st === 'arena' ? 118 : st === 'stack' ? 110 : st === 'bar' ? 92 : st === 'strip' ? 48 : 72;
+    const ticker = bus.pbpTicker ? 44 : 0;
+    const z = (gfx.theme?.bugScale || 1) * (gfx.theme?.bugTextScale || 1);
+    return Math.round(32 + (base + ticker) * z + 16);
+  })();
   const ftPosCls = (gfx.theme?.ftPos || 'right') === 'left' ? 'left-8' : 'right-8';
   const logoScale = gfx.theme?.logoScale || 1;
   const brandScale = gfx.theme?.brandScale || 1;
+  // Inside the score bug, text is zoomed by bugTextScale; logos divide it back
+  // out so the operator can grow text without the logos growing too.
+  const bugTextScale = gfx.theme?.bugTextScale || 1;
+  const bugLogoScale = logoScale / bugTextScale;
+  const bugBrandScale = brandScale / bugTextScale;
+  // Per-graphic modifiers — each graphic is styled individually. Fall back to the
+  // shared defaults so an untouched graphic still looks right.
+  const texFor = (k: string) => buildTexture(gfx.theme?.texByGfx?.[k] ?? gfx.theme?.texture, gfx.theme?.texIntByGfx?.[k] ?? gfx.theme?.textureIntensity ?? 1);
+  const logoMul = (k: string) => gfx.theme?.logoByGfx?.[k] ?? 1;   // team logos
+  const imgMul = (k: string) => gfx.theme?.imgByGfx?.[k] ?? 1;     // player photos
+  const textMul = (k: string) => gfx.theme?.textByGfx?.[k] ?? 1;
   const motionOn = !!gfx.theme?.motion;
+
+  /* Shot Splits L3 strip (unpositioned). Built once so it can be hosted either
+   * standalone or inside the score bug's bottom row. */
+  const shotLineEl = (summary && slView && !bus.full) ? (() => {
+          const sp = computeSplits(shots, slView.id, summary);
+          // per-graphic dials; logo/photo divide out the text zoom so they hold size
+          const tmS = textMul('shotline');
+          const lzS = 56 * logoMul('shotline') / tmS;
+          const pzS = 44 * imgMul('shotline') / tmS;
+          // Share the bottom row with the bug: cap the strip's zoom while the bug is
+          // up so both fit side by side, and divide `bottom` by the zoom (CSS zoom
+          // scales offsets too) so both baselines land on the same 32px stage line.
+          // While the bug is up, cap the strip so both fit on the shared bottom row.
+          const l3zRaw = (gfx.theme?.gScale?.shotline || 1) * tmS;
+          const l3z = bus.bug ? Math.min(l3zRaw, 1.45) : l3zRaw;
+          return (
+            <div key={slView.id} style={{ animation: slView.leaving ? 'plg-slide-out-l 0.45s ease-in both' : 'plg-slide-in-l 0.55s cubic-bezier(0.3, 1.15, 0.6, 1) both',
+                zoom: l3z }}>
+              {/* overflow-visible so the logo/photo can bleed OUT of the strip as it grows
+                 (extra size spills up/down/left via negative margins, not inward) */}
+              <div className="flex flex-col rounded-xl overflow-visible shadow-2xl text-white">
+                {/* content row — logo/photo can bleed out; texts centered */}
+                <div className="flex items-stretch">
+                  <div className="plg-accent relative flex items-center gap-3 pr-4 py-2.5 rounded-tl-xl"
+                    style={{ ['--tc' as any]: sp.color, ['--dir' as any]: '135deg', paddingLeft: sp.isPlayer ? pzS + 20 : 16 }}>
+                    {texFor('shotline') && <div className="absolute inset-0 pointer-events-none rounded-tl-xl" style={{ backgroundImage: texFor('shotline') }} />}
+                    {/* mugshot: absolutely positioned and bottom-anchored, so it only bleeds
+                       UPWARD as it grows and never pushes the text or the chips around */}
+                    {sp.isPlayer && (
+                      <PlayerPhoto src={sp.headshot} className="absolute bottom-0 left-2 rounded-t-xl object-cover object-top bg-black/30 shadow-2xl z-20"
+                        style={{ width: pzS, height: pzS * 1.25 }} />
+                    )}
+                    {/* team logo sits in the middle of the strip, vertically centered */}
+                    {sp.logo && <img src={sp.logo} className="relative object-contain drop-shadow-2xl shrink-0" style={{ width: lzS, height: lzS, marginBlock: -(lzS - 56) / 2 }} alt="" />}
+                    <div className="relative flex-1 text-center px-2">
+                      <div className="text-lg font-black leading-tight whitespace-nowrap">{sp.label}</div>
+                      <div className="text-[9px] font-bold uppercase tracking-widest opacity-80">
+                        {sp.isPlayer ? `${sp.teamAbbr}${sp.jersey ? ' · #' + sp.jersey : ''} · Shooting` : 'Team Shooting'}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-stretch rounded-tr-xl overflow-hidden">
+                    <StatChip label="FG" value={`${sp.fgm}/${sp.fga}`} color={sp.color} big />
+                    <StatChip label="FG%" value={`${sp.pct}%`} />
+                    <StatChip label="3PT" value={`${sp.tpm}/${sp.tpa}`} />
+                  </div>
+                </div>
+                {/* footer — company + pro-logic, same as the full-screen cards */}
+                <div className="plg-panel px-4 py-1.5 flex items-center justify-between gap-4 rounded-b-xl border-t border-white/10">
+                  <div className="flex items-center gap-2 min-w-0">
+                    {brand?.logo && <img src={brand.logo} className="h-4 max-w-[80px] object-contain brightness-0 invert opacity-80" alt="" />}
+                    {brand?.name && <span className="text-[9px] font-semibold text-zinc-400 truncate">{brand.name}</span>}
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <span className="text-[8px] uppercase tracking-widest text-zinc-500">Live Graphics by</span>
+                    <img src="/logo-white.svg" className="h-6 object-contain" alt="" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+  })() : null;
 
   return (
     <div className={`fixed inset-0 overflow-hidden font-sans skin-${gfx.theme?.skin || 'clean'}`}
@@ -328,6 +434,11 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
         @keyframes plg-score-pop { 0% { transform: scale(1.45); text-shadow: 0 0 14px rgba(253, 224, 71, 0.95); } 100% { transform: scale(1); text-shadow: none; } }
         @keyframes plg-pop { from { opacity: 0; transform: translateY(16px) scale(0.9); } to { opacity: 1; transform: translateY(0) scale(1); } }
         @keyframes plg-lower-in { from { opacity: 0; transform: translateX(-420px); } to { opacity: 1; transform: translateX(0); } }
+        @keyframes plg-drop-in { from { opacity: 0; transform: translateY(-60px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes plg-rise-in-b { from { opacity: 0; transform: translateY(120%); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes plg-sink-out-b { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(120%); } }
+        @keyframes plg-slide-in-l { from { opacity: 0; transform: translateX(-120%); } to { opacity: 1; transform: translateX(0); } }
+        @keyframes plg-slide-out-l { from { opacity: 1; transform: translateX(0); } to { opacity: 0; transform: translateX(-120%); } }
         @keyframes plg-full-in { from { opacity: 0; transform: scale(0.955); } to { opacity: 1; transform: scale(1); } }
         @keyframes plg-shine { 0% { transform: translateX(-130%); } 26% { transform: translateX(430%); } 100% { transform: translateX(430%); } }
         @keyframes plg-float-logo { 0%, 100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-2.5px) scale(1.05); } }
@@ -433,9 +544,19 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
         <div className="absolute inset-0" style={{ transform: `scale(${gfx.theme?.gfxScale || 1})`, transformOrigin: 'center center' }}>
           {/* ── SCORE BUG (pure CSS — rAF-proof) ── */}
           {bus.bug && !bus.full && (() => {
-            const pos = gfx.theme?.bugPos || 'left';
+            // Shot Splits L3 on air → the bug tucks to the right and shrinks so the
+            // strip can enter from the left on the same baseline; reverses on exit.
+            const shrunk = !!slView && !slView.leaving;
+            // Player lower third on air → the bug slides DOWN off the stage so the
+            // lower third can rise into its slot; slides back up when it leaves.
+            const tuckDown = !!lowerView && !lowerView.leaving;
+            const pos = shrunk ? 'right' : (gfx.theme?.bugPos || 'left');
             const bugStyle = gfx.theme?.bugStyle || 'classic';
-            const posCls = pos === 'center' ? 'left-1/2 -translate-x-1/2 items-center'
+            // Center: left-1/2 alone leaves only the right half as available width,
+            // so the shrink-to-fit box clamps and the bug implodes once scaled up.
+            // w-max forces the box to its content width (like the left/right cases)
+            // and translate-x-1/2 then centers it cleanly under zoom.
+            const posCls = pos === 'center' ? 'left-1/2 -translate-x-1/2 w-max max-w-[97vw] items-center'
               : pos === 'right' ? 'right-8 items-end' : 'left-8 items-start';
             const badgeSecs = gfx.theme?.badgeSec || 4.5;
             const badges = [brand?.logo || '', gfx.leagueBadge || '', ...(gfx.extraBadges || [])].filter(Boolean);
@@ -453,10 +574,21 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
                 <span className="text-zinc-300 text-xs font-bold uppercase text-center leading-tight px-1">{summary.statusDetail}</span>
               )
             );
-            const wrapCls = bugStyle === 'arena' ? 'left-0 right-0 items-center' : posCls;
+            // Position lives on an UNZOOMED outer div so the bug's baseline is an exact
+            // 32px from the stage bottom regardless of scale (CSS zoom does not scale
+            // offsets reliably). The zoomed inner div owns the flex layout + entry anim.
+            const wrapPos = bugStyle === 'arena' ? 'left-0 right-0'
+              : pos === 'center' ? 'left-1/2 -translate-x-1/2 w-max max-w-[97vw]' : pos === 'right' ? 'right-8' : 'left-8';
+            const wrapItems = (bugStyle === 'arena' || pos === 'center') ? 'items-center' : pos === 'right' ? 'items-end' : 'items-start';
             return (
-              <div className={`absolute bottom-8 flex flex-col gap-2 ${wrapCls}`}
-                style={{ fontVariantNumeric: 'tabular-nums', zoom: gfx.theme?.bugScale || 1, animation: 'plg-rise 0.5s cubic-bezier(0.34, 1.3, 0.64, 1) both' }}>
+              <div className={`absolute bottom-8 flex items-end gap-3 ${wrapPos}`}>
+                {slView && shotLineEl}
+              <div className={`flex flex-col gap-2 ${wrapItems}`}
+                style={{ fontVariantNumeric: 'tabular-nums', zoom: (gfx.theme?.bugScale || 1) * bugTextScale, animation: 'plg-rise 0.5s cubic-bezier(0.34, 1.3, 0.64, 1) both' }}>
+                {/* inner shell carries the tuck/shrink transform (the div above owns the
+                   entry animation's transform, so they must not share one) */}
+                <div className={`flex flex-col gap-2 w-full ${wrapItems}`}
+                  style={{ transform: `${tuckDown ? 'translateY(140%)' : ''} ${shrunk ? 'scale(0.62)' : ''}`.trim() || 'none', transformOrigin: 'bottom right', transition: 'transform 0.5s cubic-bezier(0.3, 1.15, 0.6, 1)' }}>
 
                 {/* Callout pill above the bug */}
                 {busMode === 'program' && current && (
@@ -474,21 +606,21 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
                   </div>
                 )}
 
-                {bus.pbpTicker && <PlayTicker plays={plays} summary={summary} awayColor={awayColor} homeColor={homeColor} />}
+                {bus.pbpTicker && <div style={{ zoom: gfx.theme?.gScale?.ticker || 1 }}><PlayTicker plays={plays} summary={summary} awayColor={awayColor} homeColor={homeColor} tex={texFor('ticker')} /></div>}
 
                 {bugStyle === 'classic' && (
                   <div className="relative flex items-stretch rounded-xl overflow-hidden shadow-2xl text-white">
                     {shine}
                     {badges.length > 0 && (
                       <div className="bg-white px-2.5 flex items-center">
-                        <BadgeRoll logos={badges} scale={brandScale} secs={badgeSecs} />
+                        <BadgeRoll logos={badges} scale={bugBrandScale} secs={badgeSecs} />
                       </div>
                     )}
-                    <TeamCell team={summary.away} color={awayColor} scale={logoScale} float={motionOn} />
+                    <TeamCell team={summary.away} color={awayColor} scale={bugLogoScale} float={motionOn} />
                     <div className="plg-panel px-4 flex flex-col items-center justify-center min-w-[92px]">
                       {clockCol}
                     </div>
-                    <TeamCell team={summary.home} color={homeColor} scale={logoScale} float={motionOn} reverse />
+                    <TeamCell team={summary.home} color={homeColor} scale={bugLogoScale} float={motionOn} reverse />
                   </div>
                 )}
 
@@ -501,7 +633,7 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
                         const first = i === 0;
                         const cells = [
                           t.logo && <img key="l" src={t.logo} className="drop-shadow object-contain" alt=""
-                            style={{ width: 34 * logoScale, height: 34 * logoScale, animation: motionOn ? 'plg-float-logo 3s ease-in-out infinite' : undefined }} />,
+                            style={{ width: 34 * bugLogoScale, height: 34 * bugLogoScale, animation: motionOn ? 'plg-float-logo 3s ease-in-out infinite' : undefined }} />,
                           <span key="a" className="font-black text-lg tracking-wide">{t.abbr}</span>,
                           <Score key="s" value={t.score} />,
                         ];
@@ -518,7 +650,7 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
                     {badges.length > 0 && (
                       <div className="plg-panel border-t border-white/15 flex items-center justify-center py-1">
                         {/* Broadcast-style sponsor strip: every logo as a white silhouette */}
-                        <BadgeRoll logos={badges} scale={brandScale * 0.75} secs={badgeSecs} mono />
+                        <BadgeRoll logos={badges} scale={bugBrandScale * 0.75} secs={badgeSecs} mono />
                       </div>
                     )}
                   </div>
@@ -531,13 +663,13 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
                       {shine}
                       {badges.length > 0 && (
                         <div className="bg-white px-2 flex items-center">
-                          <BadgeRoll logos={badges} scale={brandScale * 0.85} secs={badgeSecs} />
+                          <BadgeRoll logos={badges} scale={bugBrandScale * 0.85} secs={badgeSecs} />
                         </div>
                       )}
                       {([summary.away, summary.home] as const).map((t, i) => (
                         <div key={t.id} className="plg-panel flex items-center gap-2 pl-3 pr-4 py-1.5"
                           style={{ boxShadow: `inset 4px 0 0 ${i === 0 ? awayColor : homeColor}` }}>
-                          {t.logo && <img src={t.logo} className="object-contain" alt="" style={{ width: 26 * logoScale, height: 26 * logoScale }} />}
+                          {t.logo && <img src={t.logo} className="object-contain" alt="" style={{ width: 26 * bugLogoScale, height: 26 * bugLogoScale }} />}
                           <span className="font-black text-base tracking-wide">{t.abbr}</span>
                           <span key={t.score} className="font-black text-2xl ml-1" style={{ animation: 'plg-score-pop 0.6s ease-out both' }}>{t.score}</span>
                         </div>
@@ -581,7 +713,7 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
                             style={{ ['--tc' as any]: first ? awayColor : homeColor, ['--dir' as any]: first ? '90deg' : '270deg' }}>
                             {t.logo
                               ? <img src={t.logo} className="drop-shadow object-contain" alt=""
-                                  style={{ width: 34 * logoScale, height: 34 * logoScale, animation: motionOn ? 'plg-float-logo 3s ease-in-out infinite' : undefined }} />
+                                  style={{ width: 34 * bugLogoScale, height: 34 * bugLogoScale, animation: motionOn ? 'plg-float-logo 3s ease-in-out infinite' : undefined }} />
                               : <span className="font-black text-base">{t.abbr}</span>}
                             <Score value={t.score} />
                           </div>
@@ -592,7 +724,7 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
                       <div className="flex-1 plg-panel text-center py-1">{summary.away.abbr}</div>
                       {badges.length > 0 && (
                         <div className="bg-white px-2 flex items-center">
-                          <BadgeRoll logos={badges} scale={brandScale * 0.65} secs={badgeSecs} />
+                          <BadgeRoll logos={badges} scale={bugBrandScale * 0.65} secs={badgeSecs} />
                         </div>
                       )}
                       <div className="flex-1 plg-panel text-center py-1">{summary.home.abbr}</div>
@@ -609,7 +741,7 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
                   const texRaw = buildTexture(gfx.theme?.texture, gfx.theme?.textureIntensity ?? 1);
                   const tex = texRaw ? texRaw + ', ' : '';
                   const gloss = 'inset 0 40px 55px -30px rgba(255,255,255,0.22), inset 0 -26px 44px -18px rgba(0,0,0,0.65)';
-                  const lsz = 128 * logoScale;
+                  const lsz = 128 * bugLogoScale;
                   return (
                   <div className="relative text-white" style={{ width: 'min(1180px, 97vw)', height: 118 }}>
                     {/* AWAY faceted panel */}
@@ -663,6 +795,8 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
                   </div>
                   );
                 })()}
+                </div>
+              </div>
               </div>
             );
           })()}
@@ -676,22 +810,35 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
           )}
 
           {/* ── PLAYER LOWER THIRD (pure CSS) ── */}
-          {lower && (
-            <div key={lower.id} className={`absolute ${lowerBottomCls} flex items-end ${lowerPosCls}`}
-              style={{ animation: 'plg-lower-in 0.5s cubic-bezier(0.3, 1.15, 0.6, 1) both' }}>
-              <div className="w-36 h-36 rounded-2xl overflow-hidden shadow-2xl relative"
-                style={{ background: `linear-gradient(160deg, ${custom ? awayColor : lower.teamColor}, #111)` }}>
-                <PlayerPhoto src={lower.headshot} className="absolute inset-0 w-full h-full object-cover object-top" />
+          {lower && !bus.full && (() => {
+            // per-graphic dials: photo/logo divide out the text zoom so they hold size;
+            // the photo is bottom-anchored (flex items-end) so growing it bleeds UPWARD.
+            const tmL = textMul('lower');
+            const phL = 144 * imgMul('lower') / tmL;
+            const lgL = 56 * logoMul('lower') / tmL;
+            const texL = texFor('lower');
+            return (
+            <div key={lower.id} className={`absolute ${lowerPosCls}`} style={{ bottom: bus.bug ? 32 : lowerBottomPx }}>
+            <div className="flex items-end"
+              style={{ animation: lowerView?.leaving
+                  ? 'plg-sink-out-b 0.45s ease-in both'
+                  : bus.bug ? 'plg-rise-in-b 0.55s cubic-bezier(0.3, 1.15, 0.6, 1) 0.15s both' : 'plg-lower-in 0.5s cubic-bezier(0.3, 1.15, 0.6, 1) both',
+                zoom: (gfx.theme?.gScale?.lower || 1) * tmL }}>
+              <div className="rounded-2xl overflow-hidden shadow-2xl relative shrink-0"
+                style={{ width: phL, height: phL, backgroundImage: `${texL ? texL + ', ' : ''}linear-gradient(160deg, ${custom ? awayColor : lower.teamColor}, #111)` }}>
+                <PlayerPhoto src={lower.headshot} className="absolute inset-0 w-full h-full object-cover" style={{ objectPosition: 'center 18%' }} />
               </div>
               <div className="ml-[-10px] mb-2">
-                <div className="plg-panel text-white pl-6 pr-8 py-3 rounded-tr-2xl shadow-2xl flex items-center gap-4">
+                <div className="plg-panel text-white pl-6 pr-8 py-3 rounded-tr-2xl shadow-2xl flex items-center gap-4"
+                  style={{ backgroundImage: texL || undefined }}>
                   <div>
                     <div className="text-2xl font-black leading-none">{lower.name}</div>
                     <div className="text-xs font-semibold mt-1 text-zinc-400">
                       {lower.teamAbbr} · #{lower.jersey} · {lower.pos}
                     </div>
                   </div>
-                  {lower.teamLogo && <img src={lower.teamLogo} className="w-14 h-14 object-contain drop-shadow shrink-0" alt="" />}
+                  {/* logo grows outward (up/right) past the panel instead of pushing the name */}
+                  {lower.teamLogo && <img src={lower.teamLogo} className="object-contain drop-shadow-2xl shrink-0" style={{ width: lgL, height: lgL, marginBlock: -(lgL - 56) / 2, marginRight: -(lgL - 56) / 2 }} alt="" />}
                 </div>
                 <div className="flex text-white shadow-2xl rounded-br-2xl overflow-hidden">
                   <StatChip label="PTS" value={lower.stats.pts} color={custom ? awayColor : lower.teamColor} big />
@@ -701,7 +848,9 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
                 </div>
               </div>
             </div>
-          )}
+            </div>
+            );
+          })()}
 
           {/* ── HOOP PORTAL (AR-style sponsor/trivia reveal on the backboard cam)
               Pure CSS animations: VP9-alpha decode can starve the JS rAF loop on
@@ -874,73 +1023,61 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
           })()}
 
           {/* ── SHOOTING SPLITS LOWER THIRD ── */}
-          {bus.shotLine && (() => {
-            const sp = computeSplits(shots, bus.shotLine, summary);
-            return (
-              <div key={bus.shotLine} className={`absolute ${lowerBottomCls} ${lowerPosCls}`}
-                style={{ animation: 'plg-lower-in 0.5s cubic-bezier(0.3, 1.15, 0.6, 1) both' }}>
-                <div className="flex items-stretch rounded-xl overflow-hidden shadow-2xl text-white">
-                  <div className="plg-accent flex items-center gap-3 px-4 py-2.5"
-                    style={{ ['--tc' as any]: sp.color, ['--dir' as any]: '135deg' }}>
-                    {sp.isPlayer
-                      ? <PlayerPhoto src={sp.headshot} className="w-11 h-11 rounded-full object-cover object-top bg-black/30 shrink-0" />
-                      : sp.logo && <img src={sp.logo} className="w-14 h-14 object-contain drop-shadow shrink-0" alt="" />}
-                    <div>
-                      <div className="text-lg font-black leading-tight whitespace-nowrap">{sp.label}</div>
-                      <div className="text-[9px] font-bold uppercase tracking-widest opacity-80">
-                        {sp.isPlayer ? `${sp.teamAbbr}${sp.jersey ? ' · #' + sp.jersey : ''} · Shooting` : 'Team Shooting'}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex">
-                    <StatChip label="FG" value={`${sp.fgm}/${sp.fga}`} color={sp.color} big />
-                    <StatChip label="FG%" value={`${sp.pct}%`} />
-                    <StatChip label="3PT" value={`${sp.tpm}/${sp.tpa}`} />
-                  </div>
-                </div>
-              </div>
-            );
-          })()}
+          {/* Shot Splits L3 — standalone (bug off). With the bug ON it rides inside
+             the bug's bottom row instead, glued to the bug's left edge. */}
+          {shotLineEl && !bus.bug && (
+            <div className="absolute left-8" style={{ bottom: lowerBottomPx }}>{shotLineEl}</div>
+          )}
 
           {/* ── SUBSTITUTION ── */}
-          {subPair && (
-            <div className={`absolute ${lowerBottomCls} ${lowerPosCls}`}
-              style={{ animation: 'plg-lower-in 0.5s cubic-bezier(0.3, 1.15, 0.6, 1) both' }}>
+          {subPair && !bus.full && (() => {
+            // per-graphic dials (photos divide out the text zoom so they hold size)
+            const tmU = textMul('sub');
+            const pzU = 36 * imgMul('sub') / tmU;
+            const texU = texFor('sub');
+            // lives at the TOP of the stage (drops in) so it can never collide with the bug
+            return (
+            <div className={`absolute top-8 ${lowerPosCls}`}>
+            <div style={{ animation: 'plg-drop-in 0.5s cubic-bezier(0.3, 1.15, 0.6, 1) both', zoom: (gfx.theme?.gScale?.sub || 1) * tmU }}>
               <div className="flex items-stretch rounded-xl overflow-hidden shadow-2xl text-white">
                 <div className="plg-label px-3 flex items-center text-[10px] font-black uppercase tracking-[0.2em] text-black">
                   Substitution
                 </div>
-                <div className="plg-accent px-4 py-2 flex items-center gap-2.5"
+                <div className="plg-accent relative px-4 py-2 flex items-center gap-2.5"
                   style={{ ['--tc' as any]: '#16a34a', ['--dir' as any]: '135deg' }}>
-                  <span className="text-lg font-black">▲</span>
-                  <PlayerPhoto src={subPair.pin.headshot} className="w-9 h-9 rounded-full object-cover object-top bg-black/30 shrink-0" />
-                  <div>
+                  {texU && <div className="absolute inset-0 pointer-events-none" style={{ backgroundImage: texU }} />}
+                  <span className="relative text-lg font-black">▲</span>
+                  <PlayerPhoto src={subPair.pin.headshot} className="relative rounded-full object-cover bg-black/30 shrink-0" style={{ width: pzU, height: pzU, objectPosition: 'center 20%' }} />
+                  <div className="relative">
                     <div className="font-black leading-tight whitespace-nowrap">{subPair.pin.name}</div>
                     <div className="text-[9px] font-bold uppercase tracking-widest opacity-80">#{subPair.pin.jersey} · IN</div>
                   </div>
                 </div>
-                <div className="plg-accent px-4 py-2 flex items-center gap-2.5"
+                <div className="plg-accent relative px-4 py-2 flex items-center gap-2.5"
                   style={{ ['--tc' as any]: '#dc2626', ['--dir' as any]: '135deg' }}>
-                  <span className="text-lg font-black">▼</span>
-                  <PlayerPhoto src={subPair.pout.headshot} className="w-9 h-9 rounded-full object-cover object-top bg-black/30 shrink-0" />
-                  <div>
+                  {texU && <div className="absolute inset-0 pointer-events-none" style={{ backgroundImage: texU }} />}
+                  <span className="relative text-lg font-black">▼</span>
+                  <PlayerPhoto src={subPair.pout.headshot} className="relative rounded-full object-cover bg-black/30 shrink-0" style={{ width: pzU, height: pzU, objectPosition: 'center 20%' }} />
+                  <div className="relative">
                     <div className="font-black leading-tight whitespace-nowrap">{subPair.pout.name}</div>
                     <div className="text-[9px] font-bold uppercase tracking-widest opacity-80">#{subPair.pout.jersey} · {subPair.pout.stats.pts || '0'} PTS · OUT</div>
                   </div>
                 </div>
               </div>
             </div>
-          )}
+            </div>
+            );
+          })()}
 
           {/* ── HEAD COACH ── */}
-          {bus.coach && (() => {
+          {bus.coach && !bus.full && (() => {
             const team = bus.coach === 'home' ? summary.home : summary.away;
             const name = bus.coach === 'home' ? gfx.coachCfg?.home : gfx.coachCfg?.away;
             const color = bus.coach === 'home' ? homeColor : awayColor;
             if (!name) return null;
             return (
-              <div className={`absolute ${lowerBottomCls} ${lowerPosCls}`}
-                style={{ animation: 'plg-lower-in 0.5s cubic-bezier(0.3, 1.15, 0.6, 1) both' }}>
+              <div className={`absolute ${lowerPosCls}`}
+                style={{ bottom: lowerBottomPx, animation: 'plg-lower-in 0.5s cubic-bezier(0.3, 1.15, 0.6, 1) both', zoom: gfx.theme?.gScale?.coach || 1 }}>
                 <div className="flex items-stretch rounded-xl overflow-hidden shadow-2xl text-white">
                   <div className="plg-accent px-4 flex items-center" style={{ ['--tc' as any]: color, ['--dir' as any]: '135deg' }}>
                     {team.logo ? <img src={team.logo} className="w-12 h-12 object-contain drop-shadow" alt="" /> : <span className="font-black">{team.abbr}</span>}
@@ -956,52 +1093,67 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
 
           {/* ── FREE THROW SPOTLIGHT (side panel, animated FT gauge) ── */}
           {ftPlayer && (
-            <AtTheLine a={ftPlayer} shots={shots} custom={custom} awayColor={awayColor} posCls={ftPosCls} brand={brand} scale={gfx.theme?.atlScale || 1} />
+            <AtTheLine a={ftPlayer} shots={shots} custom={custom} awayColor={awayColor} posCls={ftPosCls} brand={brand}
+              scale={gfx.theme?.gScale?.atl || gfx.theme?.atlScale || 1}
+              tex={texFor('atl')} logoM={logoMul('atl')} textM={textMul('atl')} photoScale={imgMul('atl')} />
           )}
 
           {/* ── LIVE PLAY-BY-PLAY RAIL ── */}
-          {bus.pbp && <PlayByPlayRail plays={plays} summary={summary} awayColor={awayColor} homeColor={homeColor} clock={liveClock} />}
+          {/* Rail auto-hides while a full-screen card is up so the two never collide */}
+          {bus.pbp && !bus.full && <div style={{ zoom: gfx.theme?.gScale?.pbp || 1 }}><PlayByPlayRail plays={plays} summary={summary} awayColor={awayColor} homeColor={homeColor} clock={liveClock} tex={texFor('pbp')} /></div>}
 
           {/* ── MATCHUP BANNER (full-width lower third) ── */}
           {bus.full === 'matchupbanner' && (
-            <div style={{ zoom: gfx.theme?.gScale?.matchupbanner || gfx.theme?.fullScale || 1 }}>
+            <div style={{ zoom: (gfx.theme?.gScale?.matchupbanner || gfx.theme?.fullScale || 1) * textMul('matchupbanner') }}>
               <MatchupBanner summary={summary} sponsor={gfx.leagueBadge || brand?.logo || ''}
-                awayColor={awayColor} homeColor={homeColor} logoScale={logoScale} logo3d={!!gfx.theme?.matchup3d}
-                tex={buildTexture(gfx.theme?.texture, gfx.theme?.textureIntensity ?? 1)} />
+                awayColor={awayColor} homeColor={homeColor} logoScale={logoScale * logoMul('matchupbanner') / textMul('matchupbanner')} logo3d={!!gfx.theme?.matchup3d}
+                inset={gfx.theme?.matchupInset || 0} tex={texFor('matchupbanner')} />
             </div>
           )}
 
           {/* ── PLAYER COMPARISON (head-to-head) ── */}
           {bus.full === 'compare' && (
-            <PlayerCompare summary={summary} aId={gfx.compareA || ''} bId={gfx.compareB || ''} awayColor={awayColor} homeColor={homeColor} brand={brand} scale={gfx.theme?.gScale?.compare || gfx.theme?.fullScale || 1} />
+            <PlayerCompare summary={summary} aId={gfx.compareA || ''} bId={gfx.compareB || ''} awayColor={awayColor} homeColor={homeColor} brand={brand} scale={gfx.theme?.gScale?.compare || gfx.theme?.fullScale || 1}
+            tex={texFor('compare')} logoM={logoMul('compare')} textM={textMul('compare')} />
           )}
 
           {/* ── PLAYER STAT LINE (full-width banner) ── */}
           {bus.full === 'statline' && (
-            <div style={{ zoom: gfx.theme?.gScale?.statline || gfx.theme?.fullScale || 1 }}>
-              <StatLineBanner summary={summary} id={gfx.statLineId || ''} awayColor={awayColor} homeColor={homeColor} />
+            <div style={{ zoom: (gfx.theme?.gScale?.statline || gfx.theme?.fullScale || 1) * textMul('statline') }}>
+              <StatLineBanner summary={summary} id={gfx.statLineId || ''} awayColor={awayColor} homeColor={homeColor}
+                tex={texFor('statline')} photoScale={imgMul('statline')} logoM={logoMul('statline')} />
             </div>
           )}
 
           {/* ── TALE OF THE TAPE (team comparison) ── */}
           {bus.full === 'taletape' && (
-            <TaleOfTape summary={summary} awayColor={awayColor} homeColor={homeColor} scale={gfx.theme?.gScale?.taletape || gfx.theme?.fullScale || 1} />
+            <TaleOfTape summary={summary} awayColor={awayColor} homeColor={homeColor} scale={gfx.theme?.gScale?.taletape || gfx.theme?.fullScale || 1}
+              tex={texFor('taletape')} logoM={logoMul('taletape')} textM={textMul('taletape')} />
           )}
 
           {/* ── FULL BOXSCORE (one team, all columns) ── */}
           {bus.full === 'boxscore' && (
-            <BoxscoreFull summary={summary} teamKey={bus.boxTeam || 'away'} awayColor={awayColor} homeColor={homeColor} scale={gfx.theme?.gScale?.boxscore || gfx.theme?.fullScale || 1} />
+            <BoxscoreFull summary={summary} teamKey={bus.boxTeam || 'away'} awayColor={awayColor} homeColor={homeColor} scale={gfx.theme?.gScale?.boxscore || gfx.theme?.fullScale || 1}
+              tex={texFor('boxscore')} logoM={logoMul('boxscore')} textM={textMul('boxscore')} />
           )}
 
           {/* ── FULL SCREENS (pure CSS) ── */}
-          {bus.full && bus.full !== 'matchupbanner' && bus.full !== 'compare' && bus.full !== 'statline' && bus.full !== 'taletape' && bus.full !== 'boxscore' && (
+          {bus.full && bus.full !== 'matchupbanner' && bus.full !== 'compare' && bus.full !== 'statline' && bus.full !== 'taletape' && bus.full !== 'boxscore' && (() => {
+            const fk = bus.full as string;
+            const fTex = texFor(fk);
+            const fText = textMul(fk);
+            // logos hold their own size: multiplied by this graphic's logo dial and
+            // divided by its text dial (which zooms the whole card) so text can grow alone.
+            const fLogo = 56 * logoScale * logoMul(fk) / fText;
+            return (
             <div key={bus.full} className="absolute inset-0 flex items-center justify-center"
-              style={{ animation: 'plg-full-in 0.3s ease-out both', zoom: gfx.theme?.gScale?.[bus.full as string] || gfx.theme?.fullScale || 1 }}>
-              <div className="plg-panel w-[900px] max-w-[92vw] text-white rounded-3xl shadow-2xl overflow-hidden">
-                <div className="flex items-center justify-between px-8 py-4"
-                  style={{ background: `linear-gradient(90deg, ${awayColor}cc, #18181b 45%, #18181b 55%, ${homeColor}cc)` }}>
+              style={{ animation: 'plg-full-in 0.3s ease-out both', zoom: (gfx.theme?.gScale?.[fk] || gfx.theme?.fullScale || 1) * fText }}>
+              <div className="plg-panel w-[900px] max-w-[92vw] text-white rounded-3xl shadow-2xl overflow-visible"
+                style={{ backgroundImage: fTex || undefined }}>
+                <div className="relative flex items-center justify-between px-8 py-4 rounded-t-3xl"
+                  style={{ backgroundImage: `${fTex ? fTex + ', ' : ''}linear-gradient(90deg, ${awayColor}cc, #18181b 45%, #18181b 55%, ${homeColor}cc)` }}>
                   <div className="flex items-center gap-3">
-                    {summary.away.logo && <img src={summary.away.logo} style={{ width: 56 * logoScale, height: 56 * logoScale }} alt="" />}
+                    {summary.away.logo && <img src={summary.away.logo} className="drop-shadow-2xl" style={{ width: fLogo, height: fLogo, marginBlock: -(fLogo - 56) / 2 }} alt="" />}
                     <span className="text-2xl font-black">{summary.away.abbr}</span>
                     <Score value={summary.away.score} />
                   </div>
@@ -1010,24 +1162,24 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
                       <img src={gfx.leagueBadge} className="h-7 mx-auto mb-1 object-contain" alt="" />
                     )}
                     <div className="text-sm font-bold text-yellow-400">{summary.state === 'in' ? `${periodLabel(summary.period)} · ${liveClock}` : summary.statusDetail}</div>
-                    <div className="text-[10px] uppercase tracking-widest text-zinc-400 mt-0.5">
+                    <div className="text-base font-black uppercase tracking-widest text-white mt-0.5">
                       {bus.full === 'teamstats' ? 'Team Stats' : bus.full === 'lineups' ? 'Starting Lineups' : bus.full === 'matchup' ? 'Matchup — Top 5' : bus.full === 'linescore' ? (summary.state === 'post' ? 'Final Stats' : 'Quarter Break') : bus.full === 'shotchart' ? 'Shot Chart' : bus.full === 'assists' ? 'Assist Leaders' : bus.full === 'alerts' ? 'Game Alerts' : bus.full === 'trivia' ? 'Trivia' : bus.full === 'nextgame' ? 'Up Next' : 'Top Performers'}
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
                     <Score value={summary.home.score} />
                     <span className="text-2xl font-black">{summary.home.abbr}</span>
-                    {summary.home.logo && <img src={summary.home.logo} style={{ width: 56 * logoScale, height: 56 * logoScale }} alt="" />}
+                    {summary.home.logo && <img src={summary.home.logo} className="drop-shadow-2xl" style={{ width: fLogo, height: fLogo, marginBlock: -(fLogo - 56) / 2 }} alt="" />}
                   </div>
                 </div>
 
                 {bus.full === 'teamstats' && <TeamStats summary={summary} awayColor={awayColor} homeColor={homeColor} />}
-                {bus.full === 'lineups' && <Lineups summary={summary} awayColor={awayColor} homeColor={homeColor} />}
-                {bus.full === 'leaders' && <Leaders summary={summary} custom={custom} awayColor={awayColor} />}
-                {bus.full === 'matchup' && <Matchup summary={summary} awayColor={awayColor} homeColor={homeColor} />}
+                {bus.full === 'lineups' && <Lineups summary={summary} awayColor={awayColor} homeColor={homeColor} photoScale={imgMul('lineups')} />}
+                {bus.full === 'leaders' && <Leaders summary={summary} custom={custom} awayColor={awayColor} photoScale={imgMul('leaders')} />}
+                {bus.full === 'matchup' && <Matchup summary={summary} awayColor={awayColor} homeColor={homeColor} photoScale={imgMul('matchup')} />}
                 {bus.full === 'linescore' && <QuarterBreak summary={summary} awayColor={awayColor} homeColor={homeColor} nextGame={gfx.nextGameCfg || null} />}
-                {bus.full === 'shotchart' && <ShotChart summary={summary} shots={shots} filter={gfx.shotFilter || 'all'} awayColor={awayColor} homeColor={homeColor} />}
-                {bus.full === 'assists' && <AssistBoard summary={summary} links={assists} awayColor={awayColor} homeColor={homeColor} />}
+                {bus.full === 'shotchart' && <ShotChart summary={summary} shots={shots} filter={gfx.shotFilter || 'all'} awayColor={awayColor} homeColor={homeColor} photoScale={imgMul('shotchart')} />}
+                {bus.full === 'assists' && <AssistBoard summary={summary} links={assists} awayColor={awayColor} homeColor={homeColor} photoScale={imgMul('assists')} />}
                 {bus.full === 'alerts' && <AlertsBoard summary={summary} alerts={alerts} awayColor={awayColor} homeColor={homeColor} />}
                 {bus.full === 'trivia' && <Trivia trivia={gfx.trivia || {}} sponsorFallback={brand?.logo || ''} accent={awayColor} />}
                 {bus.full === 'nextgame' && (() => {
@@ -1079,19 +1231,19 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
                   );
                 })()}
 
-                <div className="px-8 py-2.5 bg-black/40 flex items-center justify-between">
+                <div className="px-8 py-2.5 bg-black/40 flex items-center justify-between rounded-b-3xl">
                   <div className="flex items-center gap-2">
                     {brand && <img src={brand.logo} className="h-5 max-w-[90px] object-contain brightness-0 invert opacity-80" alt="" />}
                     {brand?.name && <span className="text-[10px] font-semibold text-zinc-400">{brand.name}</span>}
                   </div>
                   <div className="flex items-center gap-2">
-                    <img src="/logo-white.svg" className="h-4 object-contain opacity-70" alt="" />
-                    <span className="text-[10px] uppercase tracking-widest text-zinc-500">Live Graphics</span>
+                    <span className="text-[10px] uppercase tracking-widest text-zinc-500">Live Graphics by</span>
+                    <img src="/logo-white.svg" className="h-8 object-contain opacity-100" alt="" />
                   </div>
                 </div>
               </div>
             </div>
-          )}
+          ); })()}
         </div>
       )}
     </div>
@@ -1186,7 +1338,7 @@ function TeamCell({ team, color, scale = 1, float = false, reverse = false }: { 
 
 function StatChip({ label, value, color, big = false }: { label: string; value: string; color?: string; big?: boolean }) {
   return (
-    <div className={`px-4 py-2 text-center ${big ? 'plg-accent' : 'plg-panel'}`}
+    <div className={`px-4 py-2 text-center flex flex-col justify-center ${big ? 'plg-accent' : 'plg-panel'}`}
       style={big ? { ['--tc' as any]: color || '#7c3aed', ['--dir' as any]: '135deg' } : undefined}>
       <div className="text-lg font-black leading-none">{value || '0'}</div>
       <div className="text-[9px] font-bold text-white/70 tracking-widest">{label}</div>
@@ -1196,13 +1348,14 @@ function StatChip({ label, value, color, big = false }: { label: string; value: 
 
 /* Head-to-head player comparison — mugshots on the sides in team color,
    a center column of stats, the leader per row highlighted. */
-function PlayerCompare({ summary, aId, bId, awayColor, homeColor, brand, scale }: {
-  summary: Summary; aId: string; bId: string; awayColor: string; homeColor: string; brand: { logo?: string; name?: string } | null; scale: number;
+function PlayerCompare({ summary, aId, bId, awayColor, homeColor, brand, scale, tex, logoM = 1, textM = 1 }: {
+  summary: Summary; aId: string; bId: string; awayColor: string; homeColor: string; brand: { logo?: string; name?: string } | null; scale: number; tex?: string; logoM?: number; textM?: number;
 }) {
   const all = [...summary.away.athletes, ...summary.home.athletes];
   const A = all.find(x => x.id === aId), B = all.find(x => x.id === bId);
   if (!A || !B) return null;
   const aColor = A.teamColor || awayColor, bColor = B.teamColor || homeColor;
+  const clsz = 112 * logoM;   // corner team-logo size
   const rows: [string, string, string][] = [
     ['PTS', A.stats.pts || '0', B.stats.pts || '0'],
     ['REB', A.stats.reb || '0', B.stats.reb || '0'],
@@ -1212,9 +1365,9 @@ function PlayerCompare({ summary, aId, bId, awayColor, homeColor, brand, scale }
   ];
   const lead = (a: string, b: string) => { const na = parseInt(a) || 0, nb = parseInt(b) || 0; return na === nb ? 0 : na > nb ? -1 : 1; };
   const Player = ({ p, color, side }: { p: Athlete; color: string; side: 'l' | 'r' }) => (
-    <div className="relative w-[270px] flex flex-col justify-end shrink-0" style={{ background: `linear-gradient(${side === 'l' ? 160 : 200}deg, ${color}, #0b0b0f)` }}>
-      <PlayerPhoto src={p.headshot} className="absolute inset-0 w-full h-full object-cover object-top" />
-      {p.teamLogo && <img src={p.teamLogo} className={`absolute -top-4 ${side === 'l' ? '-left-3' : '-right-3'} w-28 h-28 object-contain z-20`} style={{ filter: 'drop-shadow(0 6px 12px rgba(0,0,0,0.6))' }} alt="" />}
+    <div className={`relative w-[270px] flex flex-col justify-end shrink-0 overflow-hidden ${side === 'l' ? 'rounded-tl-3xl' : 'rounded-tr-3xl'}`}
+      style={{ background: `linear-gradient(${side === 'l' ? 160 : 200}deg, ${color}, #0b0b0f)` }}>
+      <PlayerPhoto src={p.headshot} className="absolute inset-0 w-full h-full object-cover" style={{ objectPosition: 'center 18%' }} />
       <div className={`relative z-10 bg-gradient-to-t from-black via-black/70 to-transparent pt-20 pb-5 px-5 ${side === 'r' ? 'text-right' : ''}`}>
         <div className="text-xs font-bold uppercase tracking-widest text-white/70">{p.teamAbbr} · #{p.jersey}</div>
         <div className="text-3xl font-black leading-none mt-0.5">{p.name}</div>
@@ -1222,60 +1375,76 @@ function PlayerCompare({ summary, aId, bId, awayColor, homeColor, brand, scale }
     </div>
   );
   return (
-    <div className="absolute inset-0 flex items-center justify-center" style={{ animation: 'plg-full-in 0.3s ease-out both', zoom: scale }}>
-      <div className="relative flex items-stretch w-[940px] max-w-[94vw] h-[420px] rounded-3xl overflow-hidden shadow-2xl text-white plg-panel">
-        <Player p={A} color={aColor} side="l" />
-        <div className="flex-1 flex flex-col items-center justify-center px-6">
-          <div className="text-3xl font-black tracking-wide mb-7">PLAYER COMPARISON</div>
-          <div className="w-full space-y-3.5">
-            {rows.map(([label, a, b]) => {
-              const l = lead(a, b);
-              return (
-                <div key={label} className="flex items-center">
-                  <div className={`w-2/5 text-right text-3xl font-black tabular-nums whitespace-nowrap ${l === -1 ? '' : 'text-white/45'}`}>{a}</div>
-                  <div className="w-1/5 text-center text-[11px] font-bold uppercase tracking-widest text-zinc-400">{label}</div>
-                  <div className={`w-2/5 text-left text-3xl font-black tabular-nums whitespace-nowrap ${l === 1 ? '' : 'text-white/45'}`}>{b}</div>
-                </div>
-              );
-            })}
+    <div className="absolute inset-0 flex items-center justify-center" style={{ animation: 'plg-full-in 0.3s ease-out both', zoom: scale * textM }}>
+      <div className="relative flex flex-col w-[940px] max-w-[94vw] h-[420px] rounded-3xl overflow-visible shadow-2xl text-white plg-panel"
+        style={{ backgroundImage: tex || undefined }}>
+        {/* team logos pinned to the OUTER top corners. Their center sits on the
+           corner itself, so growing them expands outward past the card on both
+           axes instead of creeping inward over the faces. */}
+        {A.teamLogo && <img src={A.teamLogo} className="absolute object-contain z-30" style={{ left: -clsz * 0.38, top: -clsz * 0.38, width: clsz, height: clsz, filter: 'drop-shadow(0 8px 16px rgba(0,0,0,0.6))' }} alt="" />}
+        {B.teamLogo && <img src={B.teamLogo} className="absolute object-contain z-30" style={{ right: -clsz * 0.38, top: -clsz * 0.38, width: clsz, height: clsz, filter: 'drop-shadow(0 8px 16px rgba(0,0,0,0.6))' }} alt="" />}
+        <div className="flex-1 flex items-stretch min-h-0">
+          <Player p={A} color={aColor} side="l" />
+          <div className="flex-1 flex flex-col items-center justify-center px-6">
+            <div className="text-3xl font-black tracking-wide mb-7">PLAYER COMPARISON</div>
+            <div className="w-full space-y-3.5">
+              {rows.map(([label, a, b]) => {
+                const l = lead(a, b);
+                return (
+                  <div key={label} className="flex items-center">
+                    <div className={`w-2/5 text-right text-3xl font-black tabular-nums whitespace-nowrap ${l === -1 ? '' : 'text-white/45'}`}>{a}</div>
+                    <div className="w-1/5 text-center text-[11px] font-bold uppercase tracking-widest text-zinc-400">{label}</div>
+                    <div className={`w-2/5 text-left text-3xl font-black tabular-nums whitespace-nowrap ${l === 1 ? '' : 'text-white/45'}`}>{b}</div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
-          <div className="mt-7 flex items-center gap-2.5 opacity-85">
-            {brand?.logo && <img src={brand.logo} className="h-5 max-w-[70px] object-contain" alt="" />}
+          <Player p={B} color={bColor} side="r" />
+        </div>
+        {/* full-width footer — company + pro-logic, like the other graphics */}
+        <div className="px-8 py-2.5 bg-black/40 flex items-center justify-between rounded-b-3xl relative z-20">
+          <div className="flex items-center gap-2">
+            {brand?.logo && <img src={brand.logo} className="h-5 max-w-[90px] object-contain brightness-0 invert opacity-80" alt="" />}
             {brand?.name && <span className="text-[10px] font-semibold text-zinc-400">{brand.name}</span>}
-            <span className="text-zinc-600">·</span>
-            <img src="/logo-white.svg" className="h-4 object-contain opacity-70" alt="" />
-            <span className="text-[9px] font-bold uppercase tracking-widest text-zinc-500">Live Graphics</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] uppercase tracking-widest text-zinc-500">Live Graphics by</span>
+            <img src="/logo-white.svg" className="h-8 object-contain opacity-100" alt="" />
           </div>
         </div>
-        <Player p={B} color={bColor} side="r" />
       </div>
     </div>
   );
 }
 
 /* Full-width player stat line banner — mugshot in team color, full-game line. */
-function StatLineBanner({ summary, id, awayColor, homeColor }: {
-  summary: Summary; id: string; awayColor: string; homeColor: string;
+function StatLineBanner({ summary, id, awayColor, homeColor, tex, photoScale = 1, logoM = 1 }: {
+  summary: Summary; id: string; awayColor: string; homeColor: string; tex?: string; photoScale?: number; logoM?: number;
 }) {
   const p = [...summary.away.athletes, ...summary.home.athletes].find(x => x.id === id);
   if (!p) return null;
   const isHome = summary.home.athletes.some(x => x.id === id);
   const color = p.teamColor || (isHome ? homeColor : awayColor);
+  const phW = 128 * photoScale, phH = 158 * photoScale;
+  const lsz = 96 * logoM;   // team logo — floats above the banner, grows with Team logos
   const cells: [string, string][] = [
     ['PTS', p.stats.pts || '0'], ['REB', p.stats.reb || '0'], ['AST', p.stats.ast || '0'],
     ['STL', p.stats.stl || '0'], ['BLK', p.stats.blk || '0'], ['FG', p.stats.fg || '0-0'], ['3PT', p.stats.tp || '0-0'],
   ];
   return (
-    <div className="absolute bottom-0 left-0 right-0 h-[150px] flex items-stretch text-white overflow-hidden"
+    <div className="absolute bottom-0 left-0 right-0 h-[150px] flex items-stretch text-white"
       style={{ animation: 'plg-rise 0.5s cubic-bezier(0.34, 1.3, 0.64, 1) both' }}>
-      <div className="relative flex items-end gap-4 pl-8 pr-10 shrink-0" style={{ background: `linear-gradient(100deg, ${color}, #0b0b0f)`, minWidth: 330 }}>
-        <PlayerPhoto src={p.headshot} className="h-[158px] w-32 object-cover object-top self-end shrink-0" />
+      <div className="relative flex items-end gap-4 pl-8 pr-10 shrink-0" style={{ backgroundImage: `${tex ? tex + ', ' : ''}linear-gradient(100deg, ${color}, #0b0b0f)`, minWidth: 330 }}>
+        {/* team logo — top-right of the player panel, half above the banner so it grows outward */}
+        {p.teamLogo && <img src={p.teamLogo} className="absolute object-contain z-20" style={{ right: 12, top: -lsz * 0.45, width: lsz, height: lsz, filter: 'drop-shadow(0 8px 16px rgba(0,0,0,0.6))' }} alt="" />}
+        <PlayerPhoto src={p.headshot} className="object-cover self-end shrink-0" style={{ width: phW, height: phH, objectPosition: 'center 18%' }} />
         <div className="pb-4">
           <div className="text-sm font-bold uppercase tracking-widest text-white/70">{p.teamAbbr} · #{p.jersey} · {p.pos}</div>
           <div className="text-4xl font-black leading-none mt-1">{p.name}</div>
         </div>
       </div>
-      <div className="flex-1 flex items-center justify-around bg-black/75 px-6">
+      <div className="flex-1 flex items-center justify-around px-6" style={{ backgroundColor: 'rgba(0,0,0,0.75)', backgroundImage: tex || undefined }}>
         {cells.map(([l, v]) => (
           <div key={l} className="text-center">
             <div className="text-5xl font-black tabular-nums">{v}</div>
@@ -1288,11 +1457,12 @@ function StatLineBanner({ summary, id, awayColor, homeColor }: {
 }
 
 /* Full boxscore for one team — every column, with a team totals row. */
-function BoxscoreFull({ summary, teamKey, awayColor, homeColor, scale }: {
-  summary: Summary; teamKey: 'away' | 'home'; awayColor: string; homeColor: string; scale: number;
+function BoxscoreFull({ summary, teamKey, awayColor, homeColor, scale, tex, logoM = 1, textM = 1 }: {
+  summary: Summary; teamKey: 'away' | 'home'; awayColor: string; homeColor: string; scale: number; tex?: string; logoM?: number; textM?: number;
 }) {
   const t = teamKey === 'home' ? summary.home : summary.away;
   const color = teamKey === 'home' ? homeColor : awayColor;
+  const lsz = 56 * logoM / textM;
   const players = t.athletes.filter(a => a.played);
   const cols: [string, keyof Athlete['stats']][] = [
     ['MIN', 'min'], ['FG', 'fg'], ['3PT', 'tp'], ['FT', 'ft'], ['OREB', 'oreb'], ['DREB', 'dreb'],
@@ -1310,10 +1480,10 @@ function BoxscoreFull({ summary, teamKey, awayColor, homeColor, scale }: {
     return String(players.reduce((s, p) => s + n(p.stats[k]), 0));
   };
   return (
-    <div className="absolute inset-0 flex items-center justify-center" style={{ animation: 'plg-full-in 0.3s ease-out both', zoom: scale }}>
-      <div className="plg-panel w-[1040px] max-w-[96vw] text-white rounded-3xl shadow-2xl overflow-hidden" style={{ fontVariantNumeric: 'tabular-nums' }}>
-        <div className="flex items-center gap-4 px-7 py-4" style={{ background: `linear-gradient(90deg, ${color}dd, #18181b 80%)` }}>
-          {t.logo && <img src={t.logo} className="w-14 h-14 object-contain drop-shadow" alt="" />}
+    <div className="absolute inset-0 flex items-center justify-center" style={{ animation: 'plg-full-in 0.3s ease-out both', zoom: scale * textM }}>
+      <div className="plg-panel w-[1040px] max-w-[96vw] text-white rounded-3xl shadow-2xl overflow-visible" style={{ fontVariantNumeric: 'tabular-nums', backgroundImage: tex || undefined }}>
+        <div className="flex items-center gap-4 px-7 py-4 rounded-t-3xl" style={{ backgroundImage: `${tex ? tex + ', ' : ''}linear-gradient(90deg, ${color}dd, #18181b 80%)` }}>
+          {t.logo && <img src={t.logo} className="object-contain drop-shadow-2xl shrink-0" style={{ width: lsz, height: lsz, marginBlock: -(lsz - 56) / 2, marginLeft: -(lsz - 56) / 2 } as any} alt="" />}
           <div className="flex-1">
             <div className="text-2xl font-black leading-none">{t.name}</div>
             <div className="text-[11px] font-bold uppercase tracking-widest text-white/70 mt-1">
@@ -1322,6 +1492,7 @@ function BoxscoreFull({ summary, teamKey, awayColor, homeColor, scale }: {
           </div>
           <div className="text-5xl font-black">{t.score}</div>
         </div>
+        <div className="rounded-b-3xl overflow-hidden">
         <table className="w-full text-[13px]">
           <thead>
             <tr className="text-[10px] font-black uppercase tracking-wider text-zinc-400 border-b border-white/15">
@@ -1349,6 +1520,7 @@ function BoxscoreFull({ summary, teamKey, awayColor, homeColor, scale }: {
             </tr>
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );
@@ -1356,9 +1528,10 @@ function BoxscoreFull({ summary, teamKey, awayColor, homeColor, scale }: {
 
 /* Tale of the Tape — team-vs-team category comparison with an arrow to the
    leader of each row. Uses this game's team stats. */
-function TaleOfTape({ summary, awayColor, homeColor, scale }: {
-  summary: Summary; awayColor: string; homeColor: string; scale: number;
+function TaleOfTape({ summary, awayColor, homeColor, scale, tex, logoM = 1, textM = 1 }: {
+  summary: Summary; awayColor: string; homeColor: string; scale: number; tex?: string; logoM?: number; textM?: number;
 }) {
+  const lsz = 64 * logoM / textM;   // header logos hold size independent of text zoom
   const stat = (t: Summary['home'], label: string) => t.stats.find(s => s.label === label)?.value || '0';
   const rows = [
     { cat: 'POINTS', a: summary.away.score || '0', h: summary.home.score || '0', lowerWins: false },
@@ -1378,18 +1551,19 @@ function TaleOfTape({ summary, awayColor, homeColor, scale }: {
     return awayBetter ? -1 : 1;
   };
   return (
-    <div className="absolute inset-0 flex items-center justify-center" style={{ animation: 'plg-full-in 0.3s ease-out both', zoom: scale }}>
-      <div className="plg-panel w-[900px] max-w-[94vw] text-white rounded-3xl shadow-2xl overflow-hidden">
-        <div className="flex items-center justify-between px-8 py-4"
-          style={{ background: `linear-gradient(90deg, ${awayColor}cc, #18181b 45%, #18181b 55%, ${homeColor}cc)` }}>
+    <div className="absolute inset-0 flex items-center justify-center" style={{ animation: 'plg-full-in 0.3s ease-out both', zoom: scale * textM }}>
+      <div className="plg-panel w-[900px] max-w-[94vw] text-white rounded-3xl shadow-2xl overflow-visible"
+        style={{ backgroundImage: tex || undefined }}>
+        <div className="flex items-center justify-between px-8 py-4 rounded-t-3xl"
+          style={{ backgroundImage: `${tex ? tex + ', ' : ''}linear-gradient(90deg, ${awayColor}cc, #18181b 45%, #18181b 55%, ${homeColor}cc)` }}>
           <div className="flex items-center gap-3">
-            {summary.away.logo && <img src={summary.away.logo} className="w-16 h-16 object-contain" alt="" />}
+            {summary.away.logo && <img src={summary.away.logo} className="object-contain drop-shadow-2xl" style={{ width: lsz, height: lsz, marginBlock: -(lsz - 64) / 2 }} alt="" />}
             <span className="text-2xl font-black">{summary.away.abbr}</span>
           </div>
           <span className="text-2xl font-black tracking-widest">TALE OF THE TAPE</span>
           <div className="flex items-center gap-3">
             <span className="text-2xl font-black">{summary.home.abbr}</span>
-            {summary.home.logo && <img src={summary.home.logo} className="w-16 h-16 object-contain" alt="" />}
+            {summary.home.logo && <img src={summary.home.logo} className="object-contain drop-shadow-2xl" style={{ width: lsz, height: lsz, marginBlock: -(lsz - 64) / 2 }} alt="" />}
           </div>
         </div>
         <div className="px-10 py-5">
@@ -1414,8 +1588,8 @@ function TaleOfTape({ summary, awayColor, homeColor, scale }: {
 
 /* Full-width matchup lower third: team color halves, big logos bleeding off
    the edges, tricode + full name, a center sponsor slot and the venue. */
-function MatchupBanner({ summary, sponsor, awayColor, homeColor, logoScale, logo3d, tex }: {
-  summary: Summary; sponsor: string; awayColor: string; homeColor: string; logoScale: number; logo3d?: boolean; tex?: string;
+function MatchupBanner({ summary, sponsor, awayColor, homeColor, logoScale, logo3d, tex, inset = 0 }: {
+  summary: Summary; sponsor: string; awayColor: string; homeColor: string; logoScale: number; logo3d?: boolean; tex?: string; inset?: number;
 }) {
   const [venName, venCity] = (summary.venue || '').split(' · ');
   const sz = 210 * logoScale;   // giant — allowed to float past the bar
@@ -1431,14 +1605,14 @@ function MatchupBanner({ summary, sponsor, awayColor, homeColor, logoScale, logo
       {/* GIANT logo — floats above and off the outer edge */}
       {t.logo && (
         <div className="relative z-20 shrink-0"
-          style={{ marginTop: -58, marginBottom: -26, [side === 'l' ? 'marginLeft' : 'marginRight']: -24 } as any}>
+          style={{ marginTop: -58, marginBottom: -26, [side === 'l' ? 'marginLeft' : 'marginRight']: -24 + inset } as any}>
           {logo3d
             ? <Logo3D src={t.logo} size={sz} />
             : <img src={t.logo} className="object-contain" alt=""
                 style={{ width: sz, height: sz, filter: 'drop-shadow(0 10px 16px rgba(0,0,0,0.55))', animation: 'plg-float-logo 3.4s ease-in-out infinite' }} />}
         </div>
       )}
-      <div className={`relative z-10 ${side === 'r' ? 'text-right pr-2' : 'pl-2'}`}>
+      <div className="relative z-10" style={{ textAlign: side === 'r' ? 'right' : 'left', [side === 'r' ? 'paddingRight' : 'paddingLeft']: 8 + inset }}>
         <div className="text-7xl font-black leading-none tracking-tight" style={{ textShadow: '0 3px 10px rgba(0,0,0,0.5)' }}>{t.abbr}</div>
         <div className="text-base font-bold uppercase tracking-widest text-white/85 mt-1 whitespace-nowrap">{t.name}</div>
       </div>
@@ -1466,8 +1640,8 @@ function MatchupBanner({ summary, sponsor, awayColor, homeColor, logoScale, logo
 
 /* Compact latest-play strip that hangs off the score bug and rolls up each
    time a new play lands — the bug-attached counterpart to the side rail. */
-function PlayTicker({ plays, summary, awayColor, homeColor }: {
-  plays: PlayEvent[]; summary: Summary; awayColor: string; homeColor: string;
+function PlayTicker({ plays, summary, awayColor, homeColor, tex }: {
+  plays: PlayEvent[]; summary: Summary; awayColor: string; homeColor: string; tex?: string;
 }) {
   const latest = plays[plays.length - 1];
   if (!latest) return null;
@@ -1479,11 +1653,12 @@ function PlayTicker({ plays, summary, awayColor, homeColor }: {
   return (
     <div className="overflow-hidden rounded-lg shadow-2xl" style={{ maxWidth: 560 }}>
       <style>{`@keyframes plg-tickroll { from { transform: translateY(115%); opacity: 0 } to { transform: translateY(0); opacity: 1 } }`}</style>
-      <div key={latest.id} className="plg-panel flex items-center gap-2.5 pl-3 pr-4 py-2 text-white"
+      <div key={latest.id} className="plg-panel relative overflow-hidden flex items-center gap-2.5 pl-3 pr-4 py-2 text-white"
         style={{ boxShadow: `inset 4px 0 0 ${color}`, animation: 'plg-tickroll 0.45s cubic-bezier(0.3, 1.15, 0.6, 1) both' }}>
-        {logo && <img src={logo} className="w-6 h-6 object-contain shrink-0" alt="" />}
-        <span className="text-[13px] font-semibold leading-tight truncate min-w-0">{latest.text}</span>
-        <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 shrink-0 ml-auto">
+        {tex && <div className="absolute inset-0 pointer-events-none z-0" style={{ backgroundImage: tex }} />}
+        {logo && <img src={logo} className="relative z-10 w-6 h-6 object-contain shrink-0" alt="" />}
+        <span className="relative z-10 text-[13px] font-semibold leading-tight truncate min-w-0">{latest.text}</span>
+        <span className="relative z-10 text-[10px] font-bold uppercase tracking-widest text-zinc-400 shrink-0 ml-auto">
           {abbr}{latest.clock ? ` · ${latest.clock}` : ''}
         </span>
       </div>
@@ -1493,8 +1668,8 @@ function PlayTicker({ plays, summary, awayColor, homeColor }: {
 
 /* Live play-by-play rail — newest plays at the top, scoring plays accented
    in team color. Auto-updates as the feed advances. Sits on the right edge. */
-function PlayByPlayRail({ plays, summary, awayColor, homeColor, clock }: {
-  plays: PlayEvent[]; summary: Summary; awayColor: string; homeColor: string; clock: string;
+function PlayByPlayRail({ plays, summary, awayColor, homeColor, clock, tex }: {
+  plays: PlayEvent[]; summary: Summary; awayColor: string; homeColor: string; clock: string; tex?: string;
 }) {
   const recent = plays.slice(-7).reverse();
   const colorOf = (teamId: string) => (teamId === summary.home.id ? homeColor : teamId === summary.away.id ? awayColor : '#52525b');
@@ -1503,15 +1678,17 @@ function PlayByPlayRail({ plays, summary, awayColor, homeColor, clock }: {
   return (
     <div className="absolute top-8 right-8 w-[340px]"
       style={{ animation: 'plg-lower-in 0.5s cubic-bezier(0.3, 1.15, 0.6, 1) both' }}>
-      <div className="plg-panel rounded-2xl overflow-hidden shadow-2xl text-white">
-        <div className="plg-accent px-4 py-2.5 flex items-center justify-between"
+      <div className="plg-panel relative rounded-2xl overflow-hidden shadow-2xl text-white">
+        {tex && <div className="absolute inset-0 pointer-events-none z-0" style={{ backgroundImage: tex }} />}
+        <div className="plg-accent relative z-10 overflow-hidden px-4 py-2.5 flex items-center justify-between"
           style={{ ['--tc' as any]: '#111827', ['--dir' as any]: '90deg' }}>
-          <span className="text-xs font-black uppercase tracking-[0.2em]">Play by Play</span>
-          <span className="text-[11px] font-bold text-yellow-400">
+          {tex && <div className="absolute inset-0 pointer-events-none" style={{ backgroundImage: tex }} />}
+          <span className="relative z-10 text-xs font-black uppercase tracking-[0.2em]">Play by Play</span>
+          <span className="relative z-10 text-[11px] font-bold text-yellow-400">
             {summary.state === 'in' ? `${periodLabel(summary.period)} · ${clock}` : summary.statusDetail}
           </span>
         </div>
-        <div className="divide-y divide-white/10">
+        <div className="relative z-10 divide-y divide-white/10">
           {recent.map((p, i) => (
             <div key={p.id} className="flex items-center gap-3 px-3.5 py-2.5"
               style={{ boxShadow: `inset 4px 0 0 ${p.scoring ? colorOf(p.teamId) : 'transparent'}`,
@@ -1539,8 +1716,9 @@ function PlayByPlayRail({ plays, summary, awayColor, homeColor, clock }: {
 /* Vertical "At The Line" panel: big mugshot bleeding out the top, the player's
    FT gauge (hot/steady/cold), their shot chart, and FT + points. Sits on the
    side so it can stay up with the score bug — fired at the free-throw line. */
-function AtTheLine({ a, shots, custom, awayColor, posCls, brand, scale }: {
+function AtTheLine({ a, shots, custom, awayColor, posCls, brand, scale, tex, logoM = 1, textM = 1, photoScale = 1 }: {
   a: Athlete; shots: ShotPlay[]; custom: boolean; awayColor: string; posCls: string; brand: { logo?: string; name?: string } | null; scale: number;
+  tex?: string; logoM?: number; textM?: number; photoScale?: number;
 }) {
   const [made, att] = (a.stats.ft || '').split('-').map(n => parseInt(n, 10));
   const hasFt = Number.isFinite(made) && Number.isFinite(att) && att > 0;
@@ -1558,16 +1736,21 @@ function AtTheLine({ a, shots, custom, awayColor, posCls, brand, scale }: {
     <path key={id} d={arc(p1, p2)} fill="none" stroke={c} strokeWidth="9" strokeLinecap="round"
       opacity={zone === id ? 1 : 0.28} style={zone === id ? { filter: `drop-shadow(0 0 5px ${c})` } : undefined} />
   );
-  const bodyBg = `radial-gradient(135% 90% at 26% -8%, ${color}55, transparent 55%), linear-gradient(180deg, #16161c, #0b0b0f)`;
+  const bodyBg = `${tex ? tex + ', ' : ''}radial-gradient(135% 90% at 26% -8%, ${color}55, transparent 55%), linear-gradient(180deg, #16161c, #0b0b0f)`;
+  // Per-graphic dials. Logo/photo divide out textM (which zooms the whole card)
+  // so text can grow alone. The corner logo is anchored so extra size grows
+  // OUTWARD (up/left, past the card), never inward over the face.
+  const lsz = 128 * logoM / textM;
+  const phW = 128 * photoScale / textM, phH = 144 * photoScale / textM;
   return (
     <div className={`absolute top-1/2 -translate-y-1/2 w-[348px] ${posCls}`}
-      style={{ animation: 'plg-slide-r 0.55s cubic-bezier(0.34, 1.3, 0.64, 1) both', zoom: scale }}>
+      style={{ animation: 'plg-slide-r 0.55s cubic-bezier(0.34, 1.3, 0.64, 1) both', zoom: scale * textM }}>
       {/* BIG team logo bleeding out of the top-left corner */}
-      {a.teamLogo && <img src={a.teamLogo} className="absolute -top-9 -left-6 w-32 h-32 object-contain z-10"
-        style={{ filter: 'drop-shadow(0 6px 12px rgba(0,0,0,0.6))' }} alt="" />}
+      {a.teamLogo && <img src={a.teamLogo} className="absolute object-contain z-10"
+        style={{ top: -36 - (lsz - 128) * 0.5, left: -24 - (lsz - 128) * 0.5, width: lsz, height: lsz, filter: 'drop-shadow(0 6px 12px rgba(0,0,0,0.6))' }} alt="" />}
       {/* mugshot below the logo (may overlap it), no frame */}
-      <PlayerPhoto src={a.headshot}
-        className="absolute top-8 left-3 w-32 h-36 rounded-xl object-cover object-top shadow-2xl z-20" />
+      <PlayerPhoto src={a.headshot} className="absolute top-8 left-3 rounded-xl object-cover shadow-2xl z-20"
+        style={{ width: phW, height: phH, objectPosition: 'center 18%' }} />
       <div className="rounded-2xl overflow-hidden shadow-2xl text-white" style={{ background: bodyBg }}>
         <div className="plg-label px-4 py-2.5 text-right text-[12px] font-black uppercase tracking-[0.28em] text-black">At The Line</div>
         {/* header: name + team beside the face/logo stack */}
@@ -1633,13 +1816,14 @@ function AtTheLine({ a, shots, custom, awayColor, posCls, brand, scale }: {
         </div>
         {/* footer: company + Pro-Logic */}
         <div className="px-4 py-2 bg-black/50 flex items-center justify-between border-t border-white/10">
+          {/* same footer treatment as every other card: white company mark + pro-logic */}
           <div className="flex items-center gap-2 min-w-0">
-            {brand?.logo && <img src={brand.logo} className="h-4 max-w-[54px] object-contain" alt="" />}
-            {brand?.name && <span className="text-[9px] font-semibold text-zinc-400 truncate">{brand.name}</span>}
+            {brand?.logo && <img src={brand.logo} className="h-5 max-w-[90px] object-contain brightness-0 invert opacity-80" alt="" />}
+            {brand?.name && <span className="text-[10px] font-semibold text-zinc-400 truncate">{brand.name}</span>}
           </div>
-          <div className="flex items-center gap-1.5 shrink-0">
-            <img src="/logo-white.svg" className="h-3 object-contain opacity-70" alt="" />
-            <span className="text-[8px] uppercase tracking-widest text-zinc-500">Live Graphics</span>
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="text-[10px] uppercase tracking-widest text-zinc-500">Live Graphics by</span>
+            <img src="/logo-white.svg" className="h-8 object-contain opacity-100" alt="" />
           </div>
         </div>
       </div>
@@ -1649,10 +1833,11 @@ function AtTheLine({ a, shots, custom, awayColor, posCls, brand, scale }: {
 
 /* Half-court shot chart. ESPN coords: x 0..50 (25 = center), y = distance
    from baseline (0 at rim). Made = filled dot in team color, miss = hollow. */
-function ShotChart({ summary, shots, filter, awayColor, homeColor }: {
-  summary: Summary; shots: ShotPlay[]; filter: string; awayColor: string; homeColor: string;
+function ShotChart({ summary, shots, filter, awayColor, homeColor, photoScale = 1 }: {
+  summary: Summary; shots: ShotPlay[]; filter: string; awayColor: string; homeColor: string; photoScale?: number;
 }) {
   const W = 500, H = 470, S = 10;   // 50ft x 47ft, 10px/ft
+  const phSz = 76 * photoScale;   // player headshot beside the name (operator-scalable)
   const sel = shots.filter(s =>
     filter === 'all' ? true : (s.teamId === filter || s.athleteId === filter));
   const cx = (x: number) => x * S;
@@ -1662,10 +1847,12 @@ function ShotChart({ summary, shots, filter, awayColor, homeColor }: {
   const eff = sel.length ? Math.round((made.length / sel.length) * 100) : 0;
   const three = sel.filter(s => s.value === 3);
   const threeMade = three.filter(s => s.made).length;
+  const selPlayer = (filter !== 'all' && summary.home.id !== filter && summary.away.id !== filter)
+    ? [...summary.home.athletes, ...summary.away.athletes].find(a => a.id === filter) || null : null;
   const who = filter === 'all' ? 'Both Teams'
     : summary.home.id === filter ? summary.home.name
     : summary.away.id === filter ? summary.away.name
-    : [...summary.home.athletes, ...summary.away.athletes].find(a => a.id === filter)?.name || '';
+    : selPlayer?.name || '';
   return (
     <div className="px-8 py-6 flex gap-6 items-center">
       <div className="shrink-0">
@@ -1692,8 +1879,22 @@ function ShotChart({ summary, shots, filter, awayColor, homeColor }: {
         </svg>
       </div>
       <div className="flex-1 min-w-0">
-        <div className="text-2xl font-black leading-tight mb-1">{who}</div>
-        <div className="text-[11px] font-bold uppercase tracking-widest text-zinc-400 mb-5">Shot Chart</div>
+        <div className="flex items-start gap-3 mb-4">
+          <div className="min-w-0 flex-1">
+            <div className="text-[11px] font-bold uppercase tracking-widest text-zinc-400 mb-1">Shot Chart</div>
+            <div className="text-2xl font-black leading-tight">{who}</div>
+            {selPlayer?.jersey && (
+              <div className="font-black leading-none mt-1 flex items-baseline gap-2" style={{ color: selPlayer.teamColor || awayColor, textShadow: '0 2px 10px rgba(0,0,0,0.5)' }}>
+                <span style={{ fontSize: 52 }}>#{selPlayer.jersey}</span>
+                {selPlayer.pos && <span className="text-base font-bold uppercase tracking-widest text-zinc-400">{selPlayer.pos}</span>}
+              </div>
+            )}
+          </div>
+          {selPlayer?.headshot && (
+            <PlayerPhoto src={selPlayer.headshot} className="rounded-xl object-cover shrink-0 bg-zinc-700 shadow-lg ml-auto"
+              style={{ width: phSz, height: phSz, objectPosition: 'center 20%' }} />
+          )}
+        </div>
         <div className="flex gap-2.5">
           {[['FG', `${made.length}/${sel.length}`], ['FG%', `${eff}%`], ['3PT', `${threeMade}/${three.length}`]].map(([k, v]) => (
             <div key={k} className="flex-1 min-w-0 rounded-xl border border-white/10 px-2 py-3 text-center">
@@ -1702,7 +1903,23 @@ function ShotChart({ summary, shots, filter, awayColor, homeColor }: {
             </div>
           ))}
         </div>
-        <div className="flex items-center gap-5 mt-5 text-xs font-bold text-zinc-300">
+        {sel.length > 0 && (
+          <div className="mt-4">
+            <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest mb-1.5">
+              <span className="text-zinc-400">Efficiency</span>
+              <span style={{ color: eff >= 50 ? '#22c55e' : eff >= 40 ? '#f59e0b' : '#ef4444' }}>
+                {eff >= 50 ? 'HOT' : eff >= 40 ? 'STEADY' : 'COLD'} · {eff}%
+              </span>
+            </div>
+            {/* traffic-light track (red → amber → green) with a marker at the player's FG% */}
+            <div className="relative h-3 rounded-full overflow-hidden shadow-inner"
+              style={{ background: 'linear-gradient(90deg, #ef4444 0%, #f59e0b 45%, #22c55e 70%)' }}>
+              <div className="absolute top-1/2 -translate-y-1/2 w-1.5 h-6 bg-white rounded-full shadow-lg"
+                style={{ left: `calc(${Math.max(0, Math.min(100, eff))}% - 3px)` }} />
+            </div>
+          </div>
+        )}
+        <div className="flex items-center gap-5 mt-4 text-xs font-bold text-zinc-300">
           <span className="flex items-center gap-2"><span className="w-3.5 h-3.5 rounded-full inline-block" style={{ background: awayColor, boxShadow: '0 0 0 1.5px #fff' }} />Made</span>
           <span className="flex items-center gap-1.5"><span className="text-base leading-none" style={{ color: awayColor }}>✕</span>Missed</span>
         </div>
@@ -1712,9 +1929,10 @@ function ShotChart({ summary, shots, filter, awayColor, homeColor }: {
 }
 
 /* Assist leaders — bars per team with the top playmakers by assists dished. */
-function AssistBoard({ summary, links, awayColor, homeColor }: {
-  summary: Summary; links: AssistLink[]; awayColor: string; homeColor: string;
+function AssistBoard({ summary, links, awayColor, homeColor, photoScale = 1 }: {
+  summary: Summary; links: AssistLink[]; awayColor: string; homeColor: string; photoScale?: number;
 }) {
+  const psz = 40 * photoScale;
   const cols: [Summary['home'], string][] = [[summary.away, awayColor], [summary.home, homeColor]];
   const max = Math.max(1, ...cols.flatMap(([t]) => assistLeaders(summary, links, t.id).slice(0, 5).map(x => x.count)));
   return (
@@ -1724,15 +1942,14 @@ function AssistBoard({ summary, links, awayColor, homeColor }: {
         return (
           <div key={t.id}>
             <div className="flex items-center gap-2.5 mb-4">
-              {t.logo && <img src={t.logo} className="w-12 h-12 object-contain" alt="" />}
-              <span className="text-lg font-black">{t.name}</span>
+              <span className="text-lg font-black" style={{ color }}>{t.name}</span>
             </div>
             <div className="space-y-3">
               {rows.length === 0 && <div className="text-sm text-zinc-500">No assists yet</div>}
               {rows.map(({ athlete, count }, i) => (
                 <div key={athlete.id} className="flex items-center gap-3"
                   style={{ animation: `plg-lower-in 0.5s cubic-bezier(0.3,1.15,0.6,1) ${i * 0.1}s both` }}>
-                  <PlayerPhoto src={athlete.headshot} className="w-10 h-10 rounded-full object-cover object-top shrink-0 border border-white/10" />
+                  <PlayerPhoto src={athlete.headshot} className="rounded-full object-cover shrink-0 border border-white/10" style={{ width: psz, height: psz, objectPosition: 'center 20%' }} />
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-black truncate">{athlete.name}</div>
                     <div className="h-2.5 rounded-full mt-1" style={{ width: `${(count / max) * 100}%`, background: color, minWidth: 8 }} />
@@ -1891,8 +2108,9 @@ function TeamStats({ summary, awayColor, homeColor }: { summary: Summary; awayCo
   );
 }
 
-function Lineups({ summary, awayColor, homeColor }: { summary: Summary; awayColor: string; homeColor: string }) {
+function Lineups({ summary, awayColor, homeColor, photoScale = 1 }: { summary: Summary; awayColor: string; homeColor: string; photoScale?: number }) {
   const five = (t: Summary['home']) => t.athletes.filter(a => a.starter).slice(0, 5);
+  const psz = 40 * photoScale;
   return (
     <div className="px-8 py-6 grid grid-cols-2 gap-8">
       {[{ team: summary.away, color: awayColor }, { team: summary.home, color: homeColor }].map(({ team, color }) => (
@@ -1901,7 +2119,7 @@ function Lineups({ summary, awayColor, homeColor }: { summary: Summary; awayColo
           <div className="space-y-2">
             {five(team).map(a => (
               <div key={a.id} className="flex items-center gap-3 bg-zinc-800/60 rounded-xl px-3 py-1.5">
-                <PlayerPhoto src={a.headshot} className="w-10 h-10 rounded-full object-cover object-top bg-zinc-700 shrink-0" />
+                <PlayerPhoto src={a.headshot} className="rounded-full object-cover object-top bg-zinc-700 shrink-0" style={{ width: psz, height: psz }} />
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-bold truncate">{a.name}</div>
                   <div className="text-[10px] text-zinc-400">#{a.jersey} · {a.pos}</div>
@@ -1956,11 +2174,12 @@ function Trivia({ trivia, sponsorFallback, accent }: {
 }
 
 /* Matchup: each team's top five, revealed one by one — away on top, home below */
-function Matchup({ summary, awayColor, homeColor }: { summary: Summary; awayColor: string; homeColor: string }) {
+function Matchup({ summary, awayColor, homeColor, photoScale = 1 }: { summary: Summary; awayColor: string; homeColor: string; photoScale?: number }) {
   const rows = [
     { team: summary.away, color: awayColor, five: topFive(summary.away), delay: 0 },
     { team: summary.home, color: homeColor, five: topFive(summary.home), delay: 0.9 },
   ];
+  const phH = 96 * photoScale;
   return (
     <div className="px-8 py-6 space-y-6">
       {rows.map(({ team, color, five, delay }) => (
@@ -1974,8 +2193,8 @@ function Matchup({ summary, awayColor, homeColor }: { summary: Summary; awayColo
               <div key={a.id}
                 style={{ animation: `plg-rise 0.55s cubic-bezier(0.34, 1.3, 0.64, 1) ${delay + i * 0.18}s both` }}
                 className="rounded-xl overflow-hidden bg-zinc-800/60">
-                <div className="h-24 relative" style={{ background: `linear-gradient(160deg, ${color}, #111)` }}>
-                  <PlayerPhoto src={a.headshot} className="absolute inset-0 w-full h-full object-cover object-top" />
+                <div className="relative" style={{ height: phH, background: `linear-gradient(160deg, ${color}, #111)` }}>
+                  <PlayerPhoto src={a.headshot} className="absolute inset-0 w-full h-full object-cover" style={{ objectPosition: 'center 20%' }} />
                   <div className="absolute top-1.5 left-1.5 bg-black/60 text-[10px] font-bold px-1.5 py-0.5 rounded-full">#{a.jersey}</div>
                 </div>
                 <div className="px-2.5 py-2">
@@ -1993,16 +2212,17 @@ function Matchup({ summary, awayColor, homeColor }: { summary: Summary; awayColo
   );
 }
 
-function Leaders({ summary, custom, awayColor }: { summary: Summary; custom: boolean; awayColor: string }) {
+function Leaders({ summary, custom, awayColor, photoScale = 1 }: { summary: Summary; custom: boolean; awayColor: string; photoScale?: number }) {
   const top = gameLeaders(summary, 3);
+  const phH = 160 * photoScale;
   return (
     <div className="px-8 py-8 grid grid-cols-3 gap-6">
       {top.map((a, i) => {
         const color = custom ? awayColor : a.teamColor;
         return (
           <div key={a.id} className="rounded-2xl overflow-hidden bg-zinc-800/60">
-            <div className="h-40 relative" style={{ background: `linear-gradient(160deg, ${color}, #111)` }}>
-              <PlayerPhoto src={a.headshot} className="absolute inset-0 w-full h-full object-cover object-top" />
+            <div className="relative" style={{ height: phH, background: `linear-gradient(160deg, ${color}, #111)` }}>
+              <PlayerPhoto src={a.headshot} className="absolute inset-0 w-full h-full object-cover" style={{ objectPosition: 'center 20%' }} />
               <div className="absolute top-2 left-2 bg-black/60 text-[10px] font-bold px-2 py-0.5 rounded-full">
                 {i === 0 ? '★ GAME LEADER' : `#${i + 1}`}
               </div>
