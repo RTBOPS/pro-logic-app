@@ -1370,7 +1370,12 @@ function ControlInner() {
                 ['matchupbanner', 'Matchup Banner'],
                 ['taletape', 'Tale of the Tape'],
               ] as ['teamstats' | 'lineups' | 'leaders' | 'matchup' | 'linescore' | 'shotchart' | 'assists' | 'alerts' | 'matchupbanner' | 'taletape', string][])
-                .filter(([kind]) => !(sport === 'soccer' && ['shotchart', 'assists', 'alerts'].includes(kind)))   // no shot coords / assist links in soccer feeds
+                .filter(([kind]) => {
+                  // basketball-only data products; lineups also needs starter flags (absent in NFL/NHL feeds)
+                  if (sport !== 'basketball' && ['shotchart', 'assists', 'alerts'].includes(kind)) return false;
+                  if ((sport === 'football' || sport === 'hockey') && kind === 'lineups') return false;
+                  return true;
+                })
                 .map(([kind, label]) => (
                 <div key={kind} className="relative flex items-stretch gap-1">
                   <button onClick={() => fire({ full: active.full === kind ? null : kind })}
@@ -1501,7 +1506,7 @@ function ControlInner() {
 
               {/* Shooting splits LOWER THIRD — the full chart lives on the Shot Chart
                   button; this cell only fires the compact splits strip. */}
-              <div className={`relative flex items-stretch gap-1 ${sport === 'soccer' ? 'hidden' : ''}`}>
+              <div className={`relative flex items-stretch gap-1 ${sport !== 'basketball' ? 'hidden' : ''}`}>
                 <button onClick={() => fire({ shotLine: active.shotLine ? null : shotPick })}
                   className={`flex-1 min-w-0 flex items-center justify-between gap-1 px-3 py-2 rounded-lg text-xs font-medium ${active.shotLine ? 'bg-amber-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
                   <span className="flex items-center gap-2 min-w-0"><GfxThumb k='shotline' /><span className="truncate">Shot Splits L3</span></span> {active.shotLine ? <Eye size={13} className="shrink-0" /> : <EyeOff size={13} className="shrink-0" />}
@@ -1526,7 +1531,7 @@ function ControlInner() {
               </div>
 
               {/* At The Line — free-throw side panel. Pick the shooter in ⚙, then fire. */}
-              <div className={`relative flex items-stretch gap-1 ${sport === 'soccer' ? 'hidden' : ''}`}>
+              <div className={`relative flex items-stretch gap-1 ${sport !== 'basketball' ? 'hidden' : ''}`}>
                 <button onClick={() => fire({ ftId: active.ftId ? null : ftPick })}
                   disabled={!active.ftId && !ftPick}
                   className={`flex-1 min-w-0 flex items-center justify-between gap-1 px-3 py-2 rounded-lg text-xs font-medium disabled:opacity-40 ${active.ftId ? 'bg-amber-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>

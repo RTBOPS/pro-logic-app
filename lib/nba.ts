@@ -77,6 +77,8 @@ export interface Summary {
 export function periodLabel(period: number, statusDetail?: string, sport?: string): string {
   if (!period) return statusDetail || '';
   if (sport === 'soccer') return period === 1 ? '1ST HALF' : period === 2 ? '2ND HALF' : period <= 4 ? 'EXTRA TIME' : 'PENALTIES';
+  if (sport === 'hockey') return period <= 3 ? `${period === 1 ? '1ST' : period === 2 ? '2ND' : '3RD'} PERIOD` : period === 4 ? 'OT' : 'SO';
+  if (sport === 'baseball') return statusDetail || `INN ${period}`;   // ESPN says "Top 5th"/"Bot 9th"
   return period <= 4 ? `Q${period}` : `OT${period - 4}`;
 }
 
@@ -476,6 +478,7 @@ export function computeSplits(shots: ShotPlay[], filter: string, summary: Summar
 }
 
 export function normalizePlays(json: any): PlayEvent[] {
+  if (!json?.plays && (Array.isArray(json?.drives?.previous) || json?.drives?.current)) return footballPlays(json);
   if (!json?.plays && Array.isArray(json?.keyEvents)) return soccerPlays(json);
   const plays: any[] = json?.plays || [];
   return plays.map(p => ({
@@ -603,6 +606,7 @@ export function buildCallout(a: Athlete, kind: Callout['kind']): Callout {
    `seen` is a persistent Set of play ids so each scoring play fires once. */
 export function detectRichCallouts(json: any, summary: Summary, seen: Set<string>): Callout[] {
   if (summary.sport === 'soccer') return soccerCallouts(json, summary, seen);
+  if (summary.sport && summary.sport !== 'basketball') return keyedCallouts(json, summary, seen);
   const plays: any[] = json?.plays || [];
   const byId = new Map([...summary.home.athletes, ...summary.away.athletes].map(a => [a.id, a]));
   const shotWord = (t: string) => {
@@ -690,10 +694,15 @@ export function detectCallouts(prev: Summary | null, curr: Summary): Callout[] {
 
 /* The team-stat rows worth comparing on air */
 const STAT_LABELS = ['Field Goal %', 'Three Point %', 'Free Throw %', 'Rebounds', 'Assists', 'Turnovers', 'Points in Paint', 'Fast Break Points', 'Largest Lead'];
-const SOCCER_STAT_LABELS = ['Possession', 'SHOTS', 'ON GOAL', 'Corner Kicks', 'Fouls', 'Yellow Cards', 'Red Cards', 'Offsides', 'Saves', 'Accurate Passes'];
+const SPORT_STAT_LABELS: Record<string, string[]> = {
+  soccer: ['Possession', 'SHOTS', 'ON GOAL', 'Corner Kicks', 'Fouls', 'Yellow Cards', 'Red Cards', 'Offsides', 'Saves', 'Accurate Passes'],
+  football: ['1st Downs', 'Total Yards', 'Passing', 'Rushing', 'Yards per Play', '3rd down efficiency', 'Red Zone (Made-Att)', 'Turnovers', 'Penalties', 'Possession'],
+  hockey: ['Shots', 'Power Play Goals', 'Power Play Opportunities', 'Faceoffs Won', 'Hits', 'Blocked Shots', 'Takeaways', 'Giveaways', 'Penalty Minutes'],
+  baseball: ['Runs', 'Hits', 'Home Runs', 'Runs Batted In', 'Walks', 'Strikeouts', 'Batting Average', 'Errors'],
+};
 
 export function comparedTeamStats(summary: Summary): { label: string; away: string; home: string }[] {
-  return (summary.sport === 'soccer' ? SOCCER_STAT_LABELS : STAT_LABELS).map(label => ({
+  return (SPORT_STAT_LABELS[summary.sport || ''] || STAT_LABELS).map(label => ({
     label,
     away: summary.away.stats.find(s => s.label === label)?.value || '—',
     home: summary.home.stats.find(s => s.label === label)?.value || '—',
@@ -825,7 +834,9 @@ export function normalizeSoccerSummary(json: any): Summary | null {
 
 /* Pick the normalizer for the sport behind a league id. */
 export function normalizeAnySummary(json: any, sport: string): Summary | null {
-  return sport === 'soccer' ? normalizeSoccerSummary(json) : normalizeSummary(json);
+  if (sport === 'soccer') return normalizeSoccerSummary(json);
+  if (sport === 'football' || sport === 'hockey' || sport === 'baseball') return normalizeKeyedSummary(json, sport);
+  return normalizeSummary(json);
 }
 
 const SOCCER_GOAL = /goal|penalty - scored|own goal/i;
@@ -872,6 +883,170 @@ function soccerCallouts(json: any, summary: Summary, seen: Set<string>): Callout
     } else if (/yellow card/i.test(type)) {
       out.push({ ...base, kind: 'custom', color: '#eab308', title: 'YELLOW CARD', sub: `${name}${min}` });
     }
+  }
+  return out.slice(-4);
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   FOOTBALL / HOCKEY / BASEBALL (ESPN keyed player blocks) — one shared
+   normalizer into the SAME Summary shape. AthleteStats slots are reused
+   per sport (renderers pick matching labels via summary.sport):
+     football: pts=TDs reb=YDS fg=C/ATT|CAR|REC stl=TKL blk=SACK to=INT pf=FUM
+     hockey:   pts=G ast=A fg=SOG plusMinus reb=SV(goalies) stl=HIT blk=BLK pf=PIM min=TOI
+     baseball: fg=H-AB pts=R reb=RBI ast=HR stl=BB to=K min=IP(pitchers)
+   ═══════════════════════════════════════════════════════════════ */
+type SlotMap = Record<string, Partial<Record<keyof AthleteStats, string>>>;
+const KEYED_SLOTS: Record<string, SlotMap> = {
+  football: {
+    passing:   { fg: 'completions/passingAttempts', reb: 'passingYards', pts: 'passingTouchdowns', to: 'interceptions' },
+    rushing:   { fg: 'rushingAttempts', reb: 'rushingYards', pts: 'rushingTouchdowns' },
+    receiving: { fg: 'receptions', reb: 'receivingYards', pts: 'receivingTouchdowns' },
+    defensive: { stl: 'totalTackles', blk: 'sacks' },
+    fumbles:   { pf: 'fumbles' },
+  },
+  hockey: {
+    forwards: { pts: 'goals', ast: 'assists', fg: 'shotsTotal', plusMinus: 'plusMinus', stl: 'hits', blk: 'blockedShots', pf: 'penaltyMinutes', min: 'timeOnIce' },
+    defenses: { pts: 'goals', ast: 'assists', fg: 'shotsTotal', plusMinus: 'plusMinus', stl: 'hits', blk: 'blockedShots', pf: 'penaltyMinutes', min: 'timeOnIce' },
+    goalies:  { reb: 'saves', to: 'goalsAgainst', min: 'timeOnIce' },
+  },
+  baseball: {
+    batting:  { fg: 'hits-atBats', pts: 'runs', reb: 'RBIs', ast: 'homeRuns', stl: 'walks', to: 'strikeouts' },
+    pitching: { min: 'fullInnings.partInnings', to: 'strikeouts', stl: 'walks', reb: 'earnedRuns' },
+  },
+};
+const EMPTY_STATS: AthleteStats = { min: '', pts: '', fg: '', tp: '', ft: '', reb: '', ast: '', to: '', stl: '', blk: '', pf: '', plusMinus: '', oreb: '', dreb: '' };
+
+export function normalizeKeyedSummary(json: any, sport: string): Summary | null {
+  const comp = json?.header?.competitions?.[0];
+  if (!comp) return null;
+  const st = comp.status || {};
+  const hdr: Record<string, any> = {};
+  (comp.competitors || []).forEach((c: any) => {
+    const id = String(c.team?.id ?? c.id);
+    hdr[id] = {
+      score: String(c.score ?? ''),
+      lines: (c.linescores || []).map((l: any) => String(l.displayValue ?? l.value ?? '')),
+      record: typeof c.record === 'string' ? c.record
+        : (Array.isArray(c.record) ? c.record : c.records || []).find((r: any) => r.type === 'total')?.summary
+          || (Array.isArray(c.record) ? c.record : c.records || [])[0]?.summary
+          || (Array.isArray(c.record) ? c.record[0] : '') || '',
+      logo: c.team?.logos?.[0]?.href || c.team?.logo || '',
+      color: c.team?.color || '', altColor: c.team?.alternateColor || '',
+      homeAway: c.homeAway,
+    };
+  });
+  const teamsRaw: any[] = json?.boxscore?.teams || [];
+  const playersRaw: any[] = json?.boxscore?.players || [];
+  const slots = KEYED_SLOTS[sport] || {};
+
+  const buildTeam = (tRaw: any): TeamBox => {
+    const t = tRaw?.team || {};
+    const id = String(t.id || '');
+    const h = hdr[id] || {};
+    const color = hex(t.color || h.color);
+    const logo = h.logo || t.logos?.[0]?.href || t.logo || '';
+    const abbr = t.abbreviation || '';
+    // team stats: flat list (football/hockey) or grouped (baseball batting/pitching/fielding)
+    const rawStats: any[] = (tRaw?.statistics || []).flatMap((x: any) =>
+      Array.isArray(x?.stats) ? x.stats.map((y: any) => ({ ...y, group: x.name })) : [x]);
+    const stats = rawStats.map((x: any) => ({ label: x.label || x.displayName || x.name || '', value: String(x.displayValue ?? '') }));
+    // merge every keyed block into one Athlete per player
+    const byId = new Map<string, Athlete>();
+    const pl = playersRaw.find((p: any) => String(p.team?.id) === id);
+    for (const block of pl?.statistics || []) {
+      const keys: string[] = block.keys || [];
+      const map = slots[block.name || block.type || ''] || {};   // MLB blocks carry type, not name
+      for (const entry of block.athletes || []) {
+        const ath = entry.athlete || {};
+        const aid = String(ath.id || '');
+        if (!aid) continue;
+        let a = byId.get(aid);
+        if (!a) {
+          a = {
+            id: aid,
+            name: ath.displayName || ath.fullName || '',
+            shortName: ath.shortName || ath.displayName || '',
+            jersey: String(ath.jersey || entry.jersey || ''),
+            pos: (typeof entry.position === 'string' ? entry.position : entry.position?.abbreviation) || ath.position?.abbreviation || '',
+            starter: !!entry.starter,
+            headshot: ath.headshot?.href || '',
+            teamAbbr: abbr, teamColor: color, teamLogo: logo,
+            played: true,
+            stats: { ...EMPTY_STATS },
+          };
+          byId.set(aid, a);
+        }
+        const sv: string[] = entry.stats || [];
+        for (const [slot, keyName] of Object.entries(map)) {
+          const i = keys.indexOf(keyName as string);
+          if (i >= 0 && sv[i] != null && sv[i] !== '') {
+            const prev = a.stats[slot as keyof AthleteStats];
+            // additive slots (a player in passing+rushing sums TDs/yards); others overwrite
+            if (prev && /^\d+$/.test(prev) && /^\d+$/.test(String(sv[i])) && (slot === 'pts' || slot === 'reb')) {
+              a.stats[slot as keyof AthleteStats] = String(parseInt(prev, 10) + parseInt(String(sv[i]), 10));
+            } else if (!prev) {
+              a.stats[slot as keyof AthleteStats] = String(sv[i]);
+            }
+          }
+        }
+      }
+    }
+    return {
+      id, abbr, name: t.shortDisplayName || t.displayName || '', logo, color,
+      altColor: (t.alternateColor || h.altColor) ? hex(t.alternateColor || h.altColor) : undefined,
+      homeAway: (tRaw?.homeAway || h.homeAway || 'home') as 'home' | 'away',
+      score: h.score || '', record: h.record || '',
+      linescores: h.lines || [],
+      stats, athletes: [...byId.values()],
+    };
+  };
+
+  const homeRaw = teamsRaw.find((t: any) => t.homeAway === 'home') || teamsRaw[1];
+  const awayRaw = teamsRaw.find((t: any) => t.homeAway === 'away') || teamsRaw[0];
+  if (!homeRaw || !awayRaw) return null;
+  const v = json?.gameInfo?.venue || {};
+  const city = [v.address?.city, v.address?.state].filter(Boolean).join(', ');
+  return {
+    eventId: String(json?.header?.id || ''),
+    state: (st.type?.state || 'pre') as Summary['state'],
+    statusDetail: st.type?.shortDetail || '',
+    clock: st.displayClock || '',
+    period: st.period || 0,
+    home: buildTeam(homeRaw),
+    away: buildTeam(awayRaw),
+    venue: v.fullName ? (city ? `${v.fullName} · ${city}` : v.fullName) : '',
+    sport,
+  };
+}
+
+/* NFL play stream lives inside drives */
+function footballPlays(json: any): PlayEvent[] {
+  const drives = [...(json.drives?.previous || []), ...(json.drives?.current ? [json.drives.current] : [])];
+  const out: PlayEvent[] = [];
+  for (const d of drives) for (const p of d.plays || []) {
+    out.push({
+      id: String(p.id || ''), text: p.text || '', scoreValue: p.scoringPlay ? 1 : 0, scoring: !!p.scoringPlay,
+      teamId: String(d.team?.id || ''), period: Number(p.period?.number || 0), clock: p.clock?.displayValue || '',
+      awayScore: Number(p.awayScore ?? 0), homeScore: Number(p.homeScore ?? 0), athleteId: '',
+    });
+  }
+  return out;
+}
+
+/* Generic scoring-play chips for football / hockey / baseball */
+function keyedCallouts(json: any, summary: Summary, seen: Set<string>): Callout[] {
+  const plays = normalizePlays(json);
+  const out: Callout[] = [];
+  const title = summary.sport === 'hockey' ? 'GOAL!' : summary.sport === 'baseball' ? 'RUN SCORES' : 'TOUCHDOWN!';
+  for (const p of plays) {
+    if (!p.id || seen.has(p.id)) continue;
+    seen.add(p.id);
+    if (!p.scoring || !p.text) continue;
+    const team = p.teamId === summary.home.id ? summary.home : summary.away;
+    const t = summary.sport === 'football' && !/touchdown/i.test(p.text)
+      ? (/field goal/i.test(p.text) ? 'FIELD GOAL' : /safety/i.test(p.text) ? 'SAFETY' : 'SCORE') : title;
+    out.push({ id: Math.random().toString(36).slice(2, 10), kind: 'custom', color: team?.color || '#f59e0b', title: t, sub: p.text.slice(0, 90), ms: 6000 });
   }
   return out.slice(-4);
 }

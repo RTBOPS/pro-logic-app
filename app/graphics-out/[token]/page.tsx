@@ -20,6 +20,55 @@ import { sportFor } from '@/lib/espn-sports';
 /* Selectable surface textures for the colored panels (arena bug, matchup
    banner). Returns a CSS background-image value layered over the team color;
    `intensity` (default 1) scales how visible the pattern is. */
+/* Per-sport stat labels. Slots reuse the basketball-shaped AthleteStats — see
+ * lib KEYED_SLOTS for the mapping. Basketball is the fallback everywhere. */
+const SPORT_TABLES: Record<string, {
+  chips: [string, keyof import('@/lib/nba').AthleteStats][];
+  statline: [string, keyof import('@/lib/nba').AthleteStats][];
+  compare: [string, keyof import('@/lib/nba').AthleteStats][];
+  leaders: [string, keyof import('@/lib/nba').AthleteStats][];
+  boxCols: [string, keyof import('@/lib/nba').AthleteStats][];
+  tale: { cat: string; label: string; lowerWins?: boolean }[];   // label '' → team score
+  qbCats: [keyof import('@/lib/nba').AthleteStats, string][];
+}> = {
+  soccer: {
+    chips: [['G', 'pts'], ['AST', 'ast'], ['SHOTS', 'fg'], ['FOULS', 'pf']],
+    statline: [['G', 'pts'], ['AST', 'ast'], ['SHOTS', 'fg'], ['FOULS', 'pf'], ['YC', 'oreb'], ['RC', 'dreb'], ['SAVES', 'reb']],
+    compare: [['GOALS', 'pts'], ['ASSISTS', 'ast'], ['SHOTS', 'fg'], ['FOULS', 'pf'], ['YC', 'oreb']],
+    leaders: [['G', 'pts'], ['SH', 'fg'], ['AST', 'ast']],
+    boxCols: [['G', 'pts'], ['A', 'ast'], ['SH (OT-T)', 'fg'], ['FC', 'pf'], ['OFF', 'to'], ['YC', 'oreb'], ['RC', 'dreb'], ['SV', 'reb']],
+    tale: [{ cat: 'GOALS', label: '' }, { cat: 'POSSESSION', label: 'Possession' }, { cat: 'SHOTS', label: 'SHOTS' }, { cat: 'ON TARGET', label: 'ON GOAL' }, { cat: 'CORNERS', label: 'Corner Kicks' }, { cat: 'FOULS', label: 'Fouls', lowerWins: true }, { cat: 'YELLOW CARDS', label: 'Yellow Cards', lowerWins: true }, { cat: 'SAVES', label: 'Saves' }, { cat: 'ACCURATE PASSES', label: 'Accurate Passes' }],
+    qbCats: [['pts', 'Goals'], ['reb', 'Saves'], ['ast', 'Assists']],
+  },
+  football: {
+    chips: [['YDS', 'reb'], ['TD', 'pts'], ['TKL', 'stl'], ['SACK', 'blk']],
+    statline: [['YDS', 'reb'], ['TD', 'pts'], ['C/ATT·CAR·REC', 'fg'], ['INT', 'to'], ['TKL', 'stl'], ['SACK', 'blk'], ['FUM', 'pf']],
+    compare: [['YARDS', 'reb'], ['TOUCHDOWNS', 'pts'], ['ATT/REC', 'fg'], ['TACKLES', 'stl'], ['SACKS', 'blk']],
+    leaders: [['YDS', 'reb'], ['TD', 'pts'], ['TKL', 'stl']],
+    boxCols: [['C/ATT·CAR·REC', 'fg'], ['YDS', 'reb'], ['TD', 'pts'], ['INT', 'to'], ['TKL', 'stl'], ['SACK', 'blk'], ['FUM', 'pf']],
+    tale: [{ cat: 'POINTS', label: '' }, { cat: 'TOTAL YARDS', label: 'Total Yards' }, { cat: 'PASSING', label: 'Passing' }, { cat: 'RUSHING', label: 'Rushing' }, { cat: '1ST DOWNS', label: '1st Downs' }, { cat: '3RD DOWN', label: '3rd down efficiency' }, { cat: 'TURNOVERS', label: 'Turnovers', lowerWins: true }, { cat: 'PENALTIES', label: 'Penalties', lowerWins: true }, { cat: 'POSSESSION', label: 'Possession' }],
+    qbCats: [['reb', 'Yards'], ['pts', 'Touchdowns'], ['stl', 'Tackles']],
+  },
+  hockey: {
+    chips: [['G', 'pts'], ['A', 'ast'], ['SOG', 'fg'], ['PIM', 'pf']],
+    statline: [['G', 'pts'], ['A', 'ast'], ['SOG', 'fg'], ['+/-', 'plusMinus'], ['HITS', 'stl'], ['BLK', 'blk'], ['PIM', 'pf']],
+    compare: [['GOALS', 'pts'], ['ASSISTS', 'ast'], ['SOG', 'fg'], ['HITS', 'stl'], ['PIM', 'pf']],
+    leaders: [['G', 'pts'], ['A', 'ast'], ['SOG', 'fg']],
+    boxCols: [['G', 'pts'], ['A', 'ast'], ['SOG', 'fg'], ['+/-', 'plusMinus'], ['HIT', 'stl'], ['BLK', 'blk'], ['PIM', 'pf'], ['TOI', 'min'], ['SV', 'reb']],
+    tale: [{ cat: 'GOALS', label: '' }, { cat: 'SHOTS', label: 'Shots' }, { cat: 'POWER PLAY G', label: 'Power Play Goals' }, { cat: 'PP CHANCES', label: 'Power Play Opportunities' }, { cat: 'FACEOFFS WON', label: 'Faceoffs Won' }, { cat: 'HITS', label: 'Hits' }, { cat: 'BLOCKED SHOTS', label: 'Blocked Shots' }, { cat: 'GIVEAWAYS', label: 'Giveaways', lowerWins: true }, { cat: 'PENALTY MIN', label: 'Penalty Minutes', lowerWins: true }],
+    qbCats: [['pts', 'Goals'], ['ast', 'Assists'], ['fg', 'Shots']],
+  },
+  baseball: {
+    chips: [['H-AB', 'fg'], ['R', 'pts'], ['RBI', 'reb'], ['HR', 'ast']],
+    statline: [['H-AB', 'fg'], ['R', 'pts'], ['RBI', 'reb'], ['HR', 'ast'], ['BB', 'stl'], ['K', 'to'], ['IP', 'min']],
+    compare: [['H-AB', 'fg'], ['RUNS', 'pts'], ['RBI', 'reb'], ['HR', 'ast'], ['K', 'to']],
+    leaders: [['H-AB', 'fg'], ['RBI', 'reb'], ['HR', 'ast']],
+    boxCols: [['H-AB', 'fg'], ['R', 'pts'], ['RBI', 'reb'], ['HR', 'ast'], ['BB', 'stl'], ['K', 'to'], ['IP', 'min']],
+    tale: [{ cat: 'RUNS', label: '' }, { cat: 'HITS', label: 'Hits' }, { cat: 'HOME RUNS', label: 'Home Runs' }, { cat: 'RBI', label: 'Runs Batted In' }, { cat: 'WALKS', label: 'Walks' }, { cat: 'STRIKEOUTS', label: 'Strikeouts', lowerWins: true }, { cat: 'ERRORS', label: 'Errors', lowerWins: true }],
+    qbCats: [['fg', 'H-AB'], ['reb', 'RBI'], ['ast', 'Home Runs']],
+  },
+};
+
 function buildTexture(name: string | undefined, intensity = 1): string {
   const a = (0.06 * intensity).toFixed(3);
   const d = (0.09 * intensity).toFixed(3);
@@ -257,6 +306,7 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
     const off = gfx.theme?.clockOffset || 0;   // operator sync nudge (seconds)
     const now = Date.now();
     if (summary?.sport === 'soccer') return summary.clock || '';   // ESPN minute string, shown as-is
+    if (summary?.sport === 'baseball') return '';                  // no game clock — the period label says "Bot 9th"
     // Prefer the NBA's own clock from the local agent when it's fresh. The agent
     // writes the exact clock every second, so show it raw — NO interpolation
     // (interpolating made it flicker when the NBA clock was stopped).
@@ -847,10 +897,9 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
                   {lower.teamLogo && <img src={lower.teamLogo} className="object-contain drop-shadow-2xl shrink-0" style={{ width: lgL, height: lgL, marginBlock: -(lgL - 56) / 2, marginRight: -(lgL - 56) / 2 }} alt="" />}
                 </div>
                 <div className="flex text-white shadow-2xl rounded-br-2xl overflow-hidden">
-                  {(summary.sport === 'soccer'
-                    ? [['G', lower.stats.pts], ['AST', lower.stats.ast], ['SHOTS', lower.stats.fg], ['FOULS', lower.stats.pf]]
-                    : [['PTS', lower.stats.pts], ['REB', lower.stats.reb], ['AST', lower.stats.ast], ['FG', lower.stats.fg]]
-                  ).map(([l, v], i) => <StatChip key={l} label={l} value={v} color={custom ? awayColor : lower.teamColor} big={i === 0} />)}
+                  {(SPORT_TABLES[summary.sport || '']?.chips.map(([l, k]) => [l, lower.stats[k]] as [string, string])
+                    ?? [['PTS', lower.stats.pts], ['REB', lower.stats.reb], ['AST', lower.stats.ast], ['FG', lower.stats.fg]]
+                  ).map(([l, v], i) => <StatChip key={l} label={l} value={v || '0'} color={custom ? awayColor : lower.teamColor} big={i === 0} />)}
                 </div>
               </div>
             </div>
@@ -1169,7 +1218,7 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
                     )}
                     <div className="text-sm font-bold text-yellow-400">{summary.state === 'in' ? `${periodLabel(summary.period, summary.statusDetail, summary.sport)} · ${liveClock}` : summary.statusDetail}</div>
                     <div className="text-base font-black uppercase tracking-widest text-white mt-0.5 whitespace-nowrap">
-                      {bus.full === 'teamstats' ? 'Team Stats' : bus.full === 'lineups' ? 'Starting Lineups' : bus.full === 'matchup' ? 'Matchup — Top 5' : bus.full === 'linescore' ? (summary.state === 'post' ? 'Final Stats' : summary.sport === 'soccer' ? 'Halftime' : 'Quarter Break') : bus.full === 'shotchart' ? 'Shot Chart' : bus.full === 'assists' ? 'Assist Leaders' : bus.full === 'alerts' ? 'Game Alerts' : bus.full === 'trivia' ? 'Trivia' : bus.full === 'nextgame' ? 'Up Next' : 'Top Performers'}
+                      {bus.full === 'teamstats' ? 'Team Stats' : bus.full === 'lineups' ? 'Starting Lineups' : bus.full === 'matchup' ? 'Matchup — Top 5' : bus.full === 'linescore' ? (summary.state === 'post' ? 'Final Stats' : summary.sport === 'soccer' ? 'Halftime' : summary.sport === 'hockey' ? 'Intermission' : summary.sport === 'baseball' ? 'Mid-Game' : 'Quarter Break') : bus.full === 'shotchart' ? 'Shot Chart' : bus.full === 'assists' ? 'Assist Leaders' : bus.full === 'alerts' ? 'Game Alerts' : bus.full === 'trivia' ? 'Trivia' : bus.full === 'nextgame' ? 'Up Next' : 'Top Performers'}
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
@@ -1362,13 +1411,10 @@ function PlayerCompare({ summary, aId, bId, awayColor, homeColor, brand, scale, 
   if (!A || !B) return null;
   const aColor = A.teamColor || awayColor, bColor = B.teamColor || homeColor;
   const clsz = 112 * logoM;   // corner team-logo size
-  const rows: [string, string, string][] = summary.sport === 'soccer' ? [
-    ['GOALS', A.stats.pts || '0', B.stats.pts || '0'],
-    ['ASSISTS', A.stats.ast || '0', B.stats.ast || '0'],
-    ['SHOTS', A.stats.fg || '0-0', B.stats.fg || '0-0'],
-    ['FOULS', A.stats.pf || '0', B.stats.pf || '0'],
-    ['CARDS', `${A.stats.oreb || '0'}/${A.stats.dreb || '0'}`, `${B.stats.oreb || '0'}/${B.stats.dreb || '0'}`],
-  ] : [
+  const cmpTable = SPORT_TABLES[summary.sport || '']?.compare;
+  const rows: [string, string, string][] = cmpTable
+    ? cmpTable.map(([l, k]) => [l, A.stats[k] || '0', B.stats[k] || '0'] as [string, string, string])
+    : [
     ['PTS', A.stats.pts || '0', B.stats.pts || '0'],
     ['REB', A.stats.reb || '0', B.stats.reb || '0'],
     ['AST', A.stats.ast || '0', B.stats.ast || '0'],
@@ -1440,10 +1486,10 @@ function StatLineBanner({ summary, id, awayColor, homeColor, tex, photoScale = 1
   const color = p.teamColor || (isHome ? homeColor : awayColor);
   const phW = 128 * photoScale, phH = 158 * photoScale;
   const lsz = 96 * logoM;   // team logo — floats above the banner, grows with Team logos
-  const cells: [string, string][] = summary.sport === 'soccer' ? [
-    ['G', p.stats.pts || '0'], ['AST', p.stats.ast || '0'], ['SHOTS', p.stats.fg || '0-0'], ['FOULS', p.stats.pf || '0'],
-    ['YC', p.stats.oreb || '0'], ['RC', p.stats.dreb || '0'], ['SAVES', p.stats.reb || '0'],
-  ] : [
+  const slTable = SPORT_TABLES[summary.sport || '']?.statline;
+  const cells: [string, string][] = slTable
+    ? slTable.map(([l, k]) => [l, p.stats[k] || '0'] as [string, string])
+    : [
     ['PTS', p.stats.pts || '0'], ['REB', p.stats.reb || '0'], ['AST', p.stats.ast || '0'],
     ['STL', p.stats.stl || '0'], ['BLK', p.stats.blk || '0'], ['FG', p.stats.fg || '0-0'], ['3PT', p.stats.tp || '0-0'],
   ];
@@ -1478,10 +1524,17 @@ function BoxscoreFull({ summary, teamKey, awayColor, homeColor, scale, tex, logo
   const t = teamKey === 'home' ? summary.home : summary.away;
   const color = teamKey === 'home' ? homeColor : awayColor;
   const lsz = 56 * logoM / textM;
-  const players = t.athletes.filter(a => a.played);
-  const cols: [string, keyof Athlete['stats']][] = summary.sport === 'soccer' ? [
-    ['G', 'pts'], ['A', 'ast'], ['SH (OT-T)', 'fg'], ['FC', 'pf'], ['OFF', 'to'], ['YC', 'oreb'], ['RC', 'dreb'], ['SV', 'reb'],
-  ] : [
+  let players = t.athletes.filter(a => a.played);
+  if (summary.sport && summary.sport !== 'basketball') {
+    // keyed sports dress huge rosters (NFL ~50): keep players with real numbers,
+    // sorted by their yardage/points slot, capped to a broadcast-sized table
+    const num = (v: string) => parseFloat(v) || 0;
+    players = players
+      .filter(p => p.stats.pts || p.stats.reb || p.stats.fg || p.stats.ast || p.stats.stl)
+      .sort((x, y) => (num(y.stats.reb) + num(y.stats.pts) * 10) - (num(x.stats.reb) + num(x.stats.pts) * 10))
+      .slice(0, 16);
+  }
+  const cols: [string, keyof Athlete['stats']][] = SPORT_TABLES[summary.sport || '']?.boxCols ?? [
     ['MIN', 'min'], ['FG', 'fg'], ['3PT', 'tp'], ['FT', 'ft'], ['OREB', 'oreb'], ['DREB', 'dreb'],
     ['REB', 'reb'], ['AST', 'ast'], ['PF', 'pf'], ['STL', 'stl'], ['TO', 'to'], ['BLK', 'blk'], ['+/-', 'plusMinus'], ['PTS', 'pts'],
   ];
@@ -1492,7 +1545,15 @@ function BoxscoreFull({ summary, teamKey, awayColor, homeColor, scale, tex, logo
     return `${m}-${a}`;
   };
   const total = (label: string, k: keyof Athlete['stats']) => {
-    if (['fg', 'tp', 'ft'].includes(k as string)) return sumMadeAtt(k);
+    if (k === 'fg') {
+      // fg means different things per sport: made-att pairs sum (basketball "10-12",
+      // soccer "4-7", baseball "1-5"); plain count sums (hockey SOG); mixed
+      // free-text (football "15/24" C/ATT·CAR·REC) has no meaningful total.
+      if (summary.sport === 'football') return '';
+      if (summary.sport === 'hockey') return String(players.reduce((s, p) => s + n(p.stats.fg), 0));
+      return sumMadeAtt(k);
+    }
+    if (['tp', 'ft'].includes(k as string)) return sumMadeAtt(k);
     if (k === 'min' || k === 'plusMinus') return '';
     return String(players.reduce((s, p) => s + n(p.stats[k]), 0));
   };
@@ -1550,17 +1611,13 @@ function TaleOfTape({ summary, awayColor, homeColor, scale, tex, logoM = 1, text
 }) {
   const lsz = 64 * logoM / textM;   // header logos hold size independent of text zoom
   const stat = (t: Summary['home'], label: string) => t.stats.find(s => s.label === label)?.value || '0';
-  const rows = summary.sport === 'soccer' ? [
-    { cat: 'GOALS', a: summary.away.score || '0', h: summary.home.score || '0', lowerWins: false },
-    { cat: 'POSSESSION', a: stat(summary.away, 'Possession'), h: stat(summary.home, 'Possession'), lowerWins: false },
-    { cat: 'SHOTS', a: stat(summary.away, 'SHOTS'), h: stat(summary.home, 'SHOTS'), lowerWins: false },
-    { cat: 'ON TARGET', a: stat(summary.away, 'ON GOAL'), h: stat(summary.home, 'ON GOAL'), lowerWins: false },
-    { cat: 'CORNERS', a: stat(summary.away, 'Corner Kicks'), h: stat(summary.home, 'Corner Kicks'), lowerWins: false },
-    { cat: 'FOULS', a: stat(summary.away, 'Fouls'), h: stat(summary.home, 'Fouls'), lowerWins: true },
-    { cat: 'YELLOW CARDS', a: stat(summary.away, 'Yellow Cards'), h: stat(summary.home, 'Yellow Cards'), lowerWins: true },
-    { cat: 'SAVES', a: stat(summary.away, 'Saves'), h: stat(summary.home, 'Saves'), lowerWins: false },
-    { cat: 'ACCURATE PASSES', a: stat(summary.away, 'Accurate Passes'), h: stat(summary.home, 'Accurate Passes'), lowerWins: false },
-  ] : [
+  const taleTable = SPORT_TABLES[summary.sport || '']?.tale;
+  const rows = taleTable ? taleTable.map(r => ({
+    cat: r.cat,
+    a: r.label ? stat(summary.away, r.label) : (summary.away.score || '0'),
+    h: r.label ? stat(summary.home, r.label) : (summary.home.score || '0'),
+    lowerWins: !!r.lowerWins,
+  })) : [
     { cat: 'POINTS', a: summary.away.score || '0', h: summary.home.score || '0', lowerWins: false },
     { cat: 'REBOUNDS', a: stat(summary.away, 'Rebounds'), h: stat(summary.home, 'Rebounds'), lowerWins: false },
     { cat: 'ASSISTS', a: stat(summary.away, 'Assists'), h: stat(summary.home, 'Assists'), lowerWins: false },
@@ -2024,15 +2081,17 @@ function QuarterBreak({ summary, awayColor, homeColor, nextGame }: {
   nextGame: { awayName?: string; awayLogo?: string; homeName?: string; homeLogo?: string; date?: string; time?: string; venue?: string } | null;
 }) {
   const soccer = summary.sport === 'soccer';
-  // soccer: two halves (+ extra time / penalties as they appear); basketball: 4 quarters + OTs
-  const nP = soccer
-    ? Math.max(2, summary.period, summary.away.linescores?.length || 0, summary.home.linescores?.length || 0)
-    : Math.max(4, summary.period, summary.away.linescores?.length || 0, summary.home.linescores?.length || 0);
+  const sportK = summary.sport || 'basketball';
+  // regulation column count per sport; extras (OT / ET / extra innings) append
+  const baseP = soccer ? 2 : sportK === 'hockey' ? 3 : sportK === 'baseball' ? 9 : 4;
+  const nP = Math.max(baseP, summary.period, summary.away.linescores?.length || 0, summary.home.linescores?.length || 0);
   const cols = Array.from({ length: nP }, (_, i) => i);
   const colLabel = (i: number) => soccer
     ? (i === 0 ? '1H' : i === 1 ? '2H' : i < 4 ? `ET${i - 1}` : 'PK')
+    : sportK === 'hockey' ? (i < 3 ? String(i + 1) : i === 3 ? 'OT' : 'SO')
+    : sportK === 'baseball' ? String(i + 1)
     : (i < 4 ? String(i + 1) : nP > 5 ? `OT${i - 3}` : 'OT');
-  const topBy = (t: Summary['home'], key: 'pts' | 'reb' | 'ast') =>
+  const topBy = (t: Summary['home'], key: keyof Athlete['stats']) =>
     [...t.athletes].filter(a => a.played)
       .sort((a, b) => parseInt(b.stats[key] || '0') - parseInt(a.stats[key] || '0'))[0];
   const ng = nextGame && (nextGame.awayName || nextGame.homeName) ? nextGame : null;
@@ -2048,9 +2107,7 @@ function QuarterBreak({ summary, awayColor, homeColor, nextGame }: {
     const h = parseInt(m[1], 10);
     return `${h % 12 || 12}:${m[2]} ${h < 12 ? 'AM' : 'PM'}`;
   };
-  const CATS: ['pts' | 'reb' | 'ast', string][] = soccer
-    ? [['pts', 'Goals'], ['reb', 'Saves'], ['ast', 'Assists']]
-    : [['pts', 'Points'], ['reb', 'Rebounds'], ['ast', 'Assists']];
+  const CATS = (SPORT_TABLES[sportK]?.qbCats ?? [['pts', 'Points'], ['reb', 'Rebounds'], ['ast', 'Assists']]) as [keyof Athlete['stats'], string][];
   return (
     <div className="px-8 py-6 flex gap-6">
       <div className="flex-1 min-w-0">
@@ -2270,7 +2327,7 @@ function Leaders({ summary, custom, awayColor, photoScale = 1 }: { summary: Summ
                 <span className="text-[10px] font-semibold" style={{ color }}>{a.teamAbbr} · #{a.jersey} · {a.pos}</span>
               </div>
               <div className="flex gap-4 text-center">
-                {(summary.sport === 'soccer' ? [['G', a.stats.pts], ['SH', a.stats.fg], ['AST', a.stats.ast]] : [['PTS', a.stats.pts], ['REB', a.stats.reb], ['AST', a.stats.ast]]).map(([l, v]) => (
+                {(SPORT_TABLES[summary.sport || '']?.leaders.map(([l, k]) => [l, a.stats[k]] as [string, string]) ?? [['PTS', a.stats.pts], ['REB', a.stats.reb], ['AST', a.stats.ast]]).map(([l, v]) => (
                   <div key={l}>
                     <div className="text-xl font-black">{v || '0'}</div>
                     <div className="text-[9px] text-zinc-400 font-bold tracking-widest">{l}</div>
