@@ -51,6 +51,7 @@ export interface TeamBox {
   name: string;
   logo: string;
   color: string;
+  altColor?: string;         // secondary brand color (used when both teams share a primary)
   homeAway: 'home' | 'away';
   score: string;
   record?: string;           // e.g. "24-34" (live/pre games)
@@ -58,6 +59,7 @@ export interface TeamBox {
   linescores?: string[];     // points per period (fills in as the game advances)
   stats: { label: string; value: string }[];
   athletes: Athlete[];
+  formation?: string;        // soccer: e.g. "4-3-3"
 }
 
 export interface Summary {
@@ -69,10 +71,12 @@ export interface Summary {
   home: TeamBox;
   away: TeamBox;
   venue?: string;            // "TD Garden · Boston, MA"
+  sport?: string;            // 'basketball' (default) | 'soccer' | …
 }
 
-export function periodLabel(period: number, statusDetail?: string): string {
+export function periodLabel(period: number, statusDetail?: string, sport?: string): string {
   if (!period) return statusDetail || '';
+  if (sport === 'soccer') return period === 1 ? '1ST HALF' : period === 2 ? '2ND HALF' : period <= 4 ? 'EXTRA TIME' : 'PENALTIES';
   return period <= 4 ? `Q${period}` : `OT${period - 4}`;
 }
 
@@ -84,12 +88,18 @@ export const DEFAULT_PORTAL_VIDEO_HEVC =
   'https://firebasestorage.googleapis.com/v0/b/prologicstudio-4a6f5.firebasestorage.app/o/graphics_assets%2Fportal-fire.mov?alt=media&token=a1b2c3d4-portal-hevc-2026';
 
 /* ESPN league slugs this CG can drive automatically */
-export const LEAGUES: { id: string; label: string; logo: string }[] = [
+export const LEAGUES: { id: string; label: string; logo: string; sport?: string }[] = [
   { id: 'nba', label: 'NBA', logo: 'https://a.espncdn.com/i/teamlogos/leagues/500/nba.png' },
   { id: 'nba-development', label: 'G League', logo: 'https://firebasestorage.googleapis.com/v0/b/prologicstudio-4a6f5.firebasestorage.app/o/graphics_assets%2Fgleague.png?alt=media&token=gleague-logo-2026' },
   { id: 'mens-college-basketball', label: 'NCAA Men', logo: '' },
   { id: 'womens-college-basketball', label: 'NCAA Women', logo: '' },
   { id: 'wnba', label: 'WNBA', logo: 'https://a.espncdn.com/i/teamlogos/leagues/500/wnba.png' },
+  // soccer (ESPN slugs); sport resolved via lib/espn-sports
+  { id: 'mex.1', label: 'Liga MX', logo: 'https://a.espncdn.com/i/leaguelogos/soccer/500/22.png', sport: 'soccer' },
+  { id: 'usa.1', label: 'MLS', logo: 'https://a.espncdn.com/i/leaguelogos/soccer/500/19.png', sport: 'soccer' },
+  { id: 'eng.1', label: 'Premier League', logo: 'https://a.espncdn.com/i/leaguelogos/soccer/500/23.png', sport: 'soccer' },
+  { id: 'esp.1', label: 'LaLiga', logo: 'https://a.espncdn.com/i/leaguelogos/soccer/500/15.png', sport: 'soccer' },
+  { id: 'uefa.champions', label: 'Champions League', logo: 'https://a.espncdn.com/i/leaguelogos/soccer/500/2.png', sport: 'soccer' },
 ];
 
 /* ── Manual game mode ──────────────────────────────────────
@@ -328,6 +338,7 @@ export function normalizeSummary(json: any): Summary | null {
       name: t.shortDisplayName || t.displayName || '',
       logo: t.logo || '',
       color: hex(t.color),
+      altColor: t.alternateColor ? hex(t.alternateColor) : undefined,
       homeAway: (tRaw?.homeAway || 'home') as 'home' | 'away',
       score: scores[String(t.id)] || '',
       record: recs[String(t.id)] || '',
@@ -465,6 +476,7 @@ export function computeSplits(shots: ShotPlay[], filter: string, summary: Summar
 }
 
 export function normalizePlays(json: any): PlayEvent[] {
+  if (!json?.plays && Array.isArray(json?.keyEvents)) return soccerPlays(json);
   const plays: any[] = json?.plays || [];
   return plays.map(p => ({
     id: String(p.id || p.sequenceNumber || ''),
@@ -590,6 +602,7 @@ export function buildCallout(a: Athlete, kind: Callout['kind']): Callout {
    distance and the assisting player — text a boxscore diff can't produce.
    `seen` is a persistent Set of play ids so each scoring play fires once. */
 export function detectRichCallouts(json: any, summary: Summary, seen: Set<string>): Callout[] {
+  if (summary.sport === 'soccer') return soccerCallouts(json, summary, seen);
   const plays: any[] = json?.plays || [];
   const byId = new Map([...summary.home.athletes, ...summary.away.athletes].map(a => [a.id, a]));
   const shotWord = (t: string) => {
@@ -677,8 +690,10 @@ export function detectCallouts(prev: Summary | null, curr: Summary): Callout[] {
 
 /* The team-stat rows worth comparing on air */
 const STAT_LABELS = ['Field Goal %', 'Three Point %', 'Free Throw %', 'Rebounds', 'Assists', 'Turnovers', 'Points in Paint', 'Fast Break Points', 'Largest Lead'];
+const SOCCER_STAT_LABELS = ['Possession', 'SHOTS', 'ON GOAL', 'Corner Kicks', 'Fouls', 'Yellow Cards', 'Red Cards', 'Offsides', 'Saves', 'Accurate Passes'];
+
 export function comparedTeamStats(summary: Summary): { label: string; away: string; home: string }[] {
-  return STAT_LABELS.map(label => ({
+  return (summary.sport === 'soccer' ? SOCCER_STAT_LABELS : STAT_LABELS).map(label => ({
     label,
     away: summary.away.stats.find(s => s.label === label)?.value || '—',
     home: summary.home.stats.find(s => s.label === label)?.value || '—',
@@ -710,4 +725,153 @@ export function normalizeTeams(json: any): LeagueTeam[] {
     abbr: t.team?.abbreviation || '',
     logo: t.team?.logos?.[0]?.href || '',
   })).sort((a: LeagueTeam, b: LeagueTeam) => a.name.localeCompare(b.name));
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   SOCCER (ESPN soccer/{league}) — normalized into the SAME Summary shape so
+   every existing graphic (bug, lineups, lower thirds, sub, coach, boxscore,
+   PBP) renders unchanged; sport-aware labels are handled by the renderers.
+   AthleteStats mapping: pts=goals, ast=assists, fg="onTarget-shots",
+   pf=fouls, oreb=yellow cards, dreb=red cards (slots reused on purpose).
+   ═══════════════════════════════════════════════════════════════ */
+export function normalizeSoccerSummary(json: any): Summary | null {
+  const comp = json?.header?.competitions?.[0];
+  if (!comp) return null;
+  const st = comp.status || {};
+  const hdr: Record<string, any> = {};
+  (comp.competitors || []).forEach((c: any) => {
+    const id = String(c.team?.id ?? c.id);
+    hdr[id] = {
+      score: String(c.score ?? ''),
+      lines: (c.linescores || []).map((l: any) => String(l.displayValue ?? l.value ?? '')),
+      record: (c.record || []).find((r: any) => r.type === 'total')?.displayValue || (c.record || [])[0]?.displayValue || '',
+      logo: c.team?.logos?.[0]?.href || c.team?.logo || '',
+      color: c.team?.color || '',
+      altColor: c.team?.alternateColor || '',
+      abbr: c.team?.abbreviation || '',
+      name: c.team?.shortDisplayName || c.team?.displayName || '',
+      homeAway: c.homeAway,
+    };
+  });
+  const rosters: any[] = json?.rosters || [];
+  const teamsRaw: any[] = json?.boxscore?.teams || [];
+  const statOf = (arr: any[], name: string) => String((arr || []).find((x: any) => x.name === name)?.displayValue ?? '');
+
+  const buildTeam = (tRaw: any): TeamBox => {
+    const t = tRaw?.team || {};
+    const id = String(t.id || '');
+    const h = hdr[id] || {};
+    const ro = rosters.find((r: any) => String(r.team?.id) === id);
+    const color = hex(t.color || h.color);
+    const logo = h.logo || t.logos?.[0]?.href || t.logo || '';
+    const abbr = t.abbreviation || h.abbr || '';
+    const athletes: Athlete[] = (ro?.roster || []).map((p: any) => {
+      const ath = p.athlete || {};
+      const sv = p.stats || [];
+      return {
+        id: String(ath.id || ''),
+        name: ath.displayName || ath.fullName || '',
+        shortName: ath.shortName || ath.displayName || '',
+        jersey: String(p.jersey || ''),
+        pos: p.position?.abbreviation || '',
+        starter: !!p.starter,
+        // ESPN summary omits soccer headshots, but hosts them by athlete id (404 → silhouette fallback)
+        headshot: ath.headshot?.href || (ath.id ? `https://a.espncdn.com/i/headshots/soccer/players/full/${ath.id}.png` : ''),
+        teamAbbr: abbr, teamColor: color, teamLogo: logo,
+        played: !!p.starter || !!p.subbedIn,
+        stats: {
+          min: '', pts: statOf(sv, 'totalGoals') || '0', fg: `${statOf(sv, 'shotsOnTarget') || '0'}-${statOf(sv, 'totalShots') || '0'}`,
+          tp: '', ft: '', reb: statOf(sv, 'saves'), ast: statOf(sv, 'goalAssists') || '0', to: statOf(sv, 'offsides'),
+          stl: '', blk: '', pf: statOf(sv, 'foulsCommitted') || '0', plusMinus: '',
+          oreb: statOf(sv, 'yellowCards') || '0', dreb: statOf(sv, 'redCards') || '0',
+        },
+      };
+    });
+    return {
+      id, abbr, name: t.shortDisplayName || t.displayName || h.name || '', logo, color,
+      altColor: (t.alternateColor || h.altColor) ? hex(t.alternateColor || h.altColor) : undefined,
+      homeAway: (tRaw?.homeAway || h.homeAway || 'home') as 'home' | 'away',
+      score: h.score || '', record: h.record || '',
+      fouls: statOf(tRaw?.statistics, 'foulsCommitted'),
+      linescores: h.lines || [],
+      stats: (tRaw?.statistics || []).map((x: any) => ({
+        label: x.label || x.name || '',
+        // ESPN ships possession as "61.7" — show it the way broadcasts do ("62%")
+        value: x.name === 'possessionPct' ? `${Math.round(parseFloat(x.displayValue) || 0)}%` : (x.displayValue || ''),
+      })),
+      athletes,
+      formation: ro?.formation || '',
+    };
+  };
+
+  const homeRaw = teamsRaw.find((t: any) => t.homeAway === 'home') || teamsRaw[0];
+  const awayRaw = teamsRaw.find((t: any) => t.homeAway === 'away') || teamsRaw[1];
+  if (!homeRaw || !awayRaw) return null;
+  const v = json?.gameInfo?.venue || {};
+  const city = [v.address?.city, v.address?.country].filter(Boolean).join(', ');
+  return {
+    eventId: String(json?.header?.id || ''),
+    state: (st.type?.state || 'pre') as Summary['state'],
+    statusDetail: st.type?.shortDetail || '',
+    clock: st.displayClock || '',
+    period: st.period || 0,
+    home: buildTeam(homeRaw),
+    away: buildTeam(awayRaw),
+    venue: v.fullName ? (city ? `${v.fullName} · ${city}` : v.fullName) : '',
+    sport: 'soccer',
+  };
+}
+
+/* Pick the normalizer for the sport behind a league id. */
+export function normalizeAnySummary(json: any, sport: string): Summary | null {
+  return sport === 'soccer' ? normalizeSoccerSummary(json) : normalizeSummary(json);
+}
+
+const SOCCER_GOAL = /goal|penalty - scored|own goal/i;
+function soccerPlays(json: any): PlayEvent[] {
+  const comp = json?.header?.competitions?.[0] || {};
+  const homeId = String((comp.competitors || []).find((c: any) => c.homeAway === 'home')?.team?.id || '');
+  let hs = 0, as = 0;
+  return (json.keyEvents as any[]).map((k: any) => {
+    const type = String(k.type?.text || '');
+    const scoring = !!k.scoringPlay || (SOCCER_GOAL.test(type) && !/missed|saved/i.test(type));
+    const teamId = String(k.team?.id || '');
+    if (scoring) { if (teamId === homeId) hs++; else as++; }
+    return {
+      id: String(k.id || ''), text: k.text || k.shortText || type, scoreValue: scoring ? 1 : 0, scoring,
+      teamId, period: Number(k.period?.number || k.period || 0), clock: k.clock?.displayValue || '',
+      awayScore: as, homeScore: hs, athleteId: String(k.participants?.[0]?.athlete?.id || ''),
+    };
+  });
+}
+
+function soccerCallouts(json: any, summary: Summary, seen: Set<string>): Callout[] {
+  const byId = new Map([...summary.home.athletes, ...summary.away.athletes].map(a => [a.id, a]));
+  const out: Callout[] = [];
+  for (const k of (json?.keyEvents as any[]) || []) {
+    const id = String(k.id || '');
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    const type = String(k.type?.text || '');
+    const who = byId.get(String(k.participants?.[0]?.athlete?.id || ''));
+    const color = who?.teamColor || '#f59e0b';
+    const name = who?.shortName || String(k.participants?.[0]?.athlete?.displayName || '');
+    const min = k.clock?.displayValue ? ` · ${k.clock.displayValue}` : '';
+    const base = { id: Math.random().toString(36).slice(2, 10), color };
+    if (/substitution/i.test(type)) {
+      const pin = byId.get(String(k.participants?.[0]?.athlete?.id || ''));
+      const pout = byId.get(String(k.participants?.[1]?.athlete?.id || ''));
+      if (pin && pout) out.push({ ...base, kind: 'sub', title: 'SUB', sub: `${pin.shortName} ▲ · ${pout.shortName} ▼`, inId: pin.id, outId: pout.id });
+    } else if (/own goal/i.test(type)) {
+      out.push({ ...base, kind: 'custom', title: 'OWN GOAL', sub: `${name}${min}` });
+    } else if (SOCCER_GOAL.test(type) && !/missed|saved/i.test(type)) {
+      out.push({ ...base, kind: 'custom', title: /penalty/i.test(type) ? 'PENALTY GOAL!' : 'GOAL!', sub: `${name}${min}`, ms: 6000 });
+    } else if (/red card/i.test(type)) {
+      out.push({ ...base, kind: 'custom', color: '#dc2626', title: 'RED CARD', sub: `${name}${min}` });
+    } else if (/yellow card/i.test(type)) {
+      out.push({ ...base, kind: 'custom', color: '#eab308', title: 'YELLOW CARD', sub: `${name}${min}` });
+    }
+  }
+  return out.slice(-4);
 }

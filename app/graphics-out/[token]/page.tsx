@@ -10,11 +10,12 @@ import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import PlayerPhoto from '@/components/PlayerPhoto';
 import {
-  normalizeSummary, gameLeaders, comparedTeamStats, periodLabel,
+  normalizeSummary, normalizeAnySummary, gameLeaders, comparedTeamStats, periodLabel,
   manualToSummary, topFive, applyPhotoOverrides, DEFAULT_PORTAL_VIDEO, DEFAULT_PORTAL_VIDEO_HEVC, type ManualGame,
   normalizeShots, normalizePlays, normalizeAssists, assistLeaders, computeAlerts, computeSplits,
   type Summary, type Athlete, type Callout, type ShotPlay, type PlayEvent, type AssistLink, type GameAlert, type ShotSplit,
 } from '@/lib/nba';
+import { sportFor } from '@/lib/espn-sports';
 
 /* Selectable surface textures for the colored panels (arena bug, matchup
    banner). Returns a CSS background-image value layered over the team color;
@@ -221,10 +222,10 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
     const league = gfx.league || 'nba';
     const load = async () => {
       try {
-        const res = await fetch(`/api/nba/summary?event=${eventId}&league=${league}`);
+        const res = await fetch(`/api/nba/summary?event=${eventId}&league=${league}&sport=${sportFor(league)}`);
         const json = await res.json();
         if (!alive) return;
-        const next = applyPhotoOverrides(normalizeSummary(json), gfx.photoOverrides);
+        const next = applyPhotoOverrides(normalizeAnySummary(json, sportFor(league)), gfx.photoOverrides);
         if (next) {
           setSummary(next);
           setShots(normalizeShots(json));
@@ -255,6 +256,7 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
   const liveClock = (() => {
     const off = gfx.theme?.clockOffset || 0;   // operator sync nudge (seconds)
     const now = Date.now();
+    if (summary?.sport === 'soccer') return summary.clock || '';   // ESPN minute string, shown as-is
     // Prefer the NBA's own clock from the local agent when it's fresh. The agent
     // writes the exact clock every second, so show it raw — NO interpolation
     // (interpolating made it flicker when the NBA clock was stopped).
@@ -321,7 +323,11 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
   /* Theme: official team colors by default, operator overrides at will */
   const custom = !!(gfx.theme && gfx.theme.useTeamColors === false);
   const awayColor = custom && gfx.theme?.c1 ? gfx.theme.c1 : summary?.away.color || '#1f2937';
-  const homeColor = custom && gfx.theme?.c2 ? gfx.theme.c2 : summary?.home.color || '#1f2937';
+  // Same primary on both sides (e.g. Chivas vs Xolos, both red) → home falls back
+  // to its alternate color so bars, chips and panels stay tellable apart.
+  const homeColor = custom && gfx.theme?.c2 ? gfx.theme.c2
+    : (summary && summary.home.color.toLowerCase() === summary.away.color.toLowerCase() && summary.home.altColor) ? summary.home.altColor
+    : summary?.home.color || '#1f2937';
   const calloutColor = (c: Callout) => (custom ? awayColor : c.color) || '#7c3aed';
 
   const brand = gfx.showBrand !== false && gfx.brand?.logo ? gfx.brand : null;
@@ -568,7 +574,7 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
               summary.state === 'in' ? (
                 <>
                   <span className="text-yellow-400 font-bold text-lg leading-tight">{liveClock}</span>
-                  <span className="text-zinc-400 text-xs font-semibold">{periodLabel(summary.period)}</span>
+                  <span className="text-zinc-400 text-xs font-semibold">{periodLabel(summary.period, summary.statusDetail, summary.sport)}</span>
                 </>
               ) : (
                 <span className="text-zinc-300 text-xs font-bold uppercase text-center leading-tight px-1">{summary.statusDetail}</span>
@@ -677,7 +683,7 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
                       <div className="plg-accent px-4 flex items-center gap-2" style={{ ['--tc' as any]: '#1f2937', ['--dir' as any]: '90deg' }}>
                         {summary.state === 'in' ? (
                           <>
-                            <span className="text-zinc-300 text-xs font-bold">{periodLabel(summary.period)}</span>
+                            <span className="text-zinc-300 text-xs font-bold">{periodLabel(summary.period, summary.statusDetail, summary.sport)}</span>
                             <span className="text-yellow-400 font-black text-xl">{liveClock}</span>
                           </>
                         ) : (
@@ -698,7 +704,7 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
                     <div className="plg-panel text-center text-[11px] font-bold uppercase tracking-widest px-4 py-1 border-b border-white/15">
                       {summary.state === 'in' ? (
                         <>
-                          <span className="text-zinc-400 mr-2">{periodLabel(summary.period)}</span>
+                          <span className="text-zinc-400 mr-2">{periodLabel(summary.period, summary.statusDetail, summary.sport)}</span>
                           <span className="text-yellow-400 text-sm">{liveClock}</span>
                         </>
                       ) : (
@@ -784,7 +790,7 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
                       style={{ fontStyle: 'italic' }}>
                       {summary.state === 'in' ? (
                         <>
-                          <span className="px-4 py-0.5">{periodLabel(summary.period)}</span>
+                          <span className="px-4 py-0.5">{periodLabel(summary.period, summary.statusDetail, summary.sport)}</span>
                           <span className="px-4 py-0.5 border-l border-white/15">{liveClock}</span>
                           {gfx.shotClock && <span className="px-4 py-0.5 border-l border-white/15 text-yellow-400">{gfx.shotClock}</span>}
                         </>
@@ -841,10 +847,10 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
                   {lower.teamLogo && <img src={lower.teamLogo} className="object-contain drop-shadow-2xl shrink-0" style={{ width: lgL, height: lgL, marginBlock: -(lgL - 56) / 2, marginRight: -(lgL - 56) / 2 }} alt="" />}
                 </div>
                 <div className="flex text-white shadow-2xl rounded-br-2xl overflow-hidden">
-                  <StatChip label="PTS" value={lower.stats.pts} color={custom ? awayColor : lower.teamColor} big />
-                  <StatChip label="REB" value={lower.stats.reb} />
-                  <StatChip label="AST" value={lower.stats.ast} />
-                  <StatChip label="FG" value={lower.stats.fg} />
+                  {(summary.sport === 'soccer'
+                    ? [['G', lower.stats.pts], ['AST', lower.stats.ast], ['SHOTS', lower.stats.fg], ['FOULS', lower.stats.pf]]
+                    : [['PTS', lower.stats.pts], ['REB', lower.stats.reb], ['AST', lower.stats.ast], ['FG', lower.stats.fg]]
+                  ).map(([l, v], i) => <StatChip key={l} label={l} value={v} color={custom ? awayColor : lower.teamColor} big={i === 0} />)}
                 </div>
               </div>
             </div>
@@ -1157,13 +1163,13 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
                     <span className="text-2xl font-black">{summary.away.abbr}</span>
                     <Score value={summary.away.score} />
                   </div>
-                  <div className="text-center">
+                  <div className="text-center shrink-0 px-3">
                     {gfx.leagueBadge && (
                       <img src={gfx.leagueBadge} className="h-7 mx-auto mb-1 object-contain" alt="" />
                     )}
-                    <div className="text-sm font-bold text-yellow-400">{summary.state === 'in' ? `${periodLabel(summary.period)} · ${liveClock}` : summary.statusDetail}</div>
-                    <div className="text-base font-black uppercase tracking-widest text-white mt-0.5">
-                      {bus.full === 'teamstats' ? 'Team Stats' : bus.full === 'lineups' ? 'Starting Lineups' : bus.full === 'matchup' ? 'Matchup — Top 5' : bus.full === 'linescore' ? (summary.state === 'post' ? 'Final Stats' : 'Quarter Break') : bus.full === 'shotchart' ? 'Shot Chart' : bus.full === 'assists' ? 'Assist Leaders' : bus.full === 'alerts' ? 'Game Alerts' : bus.full === 'trivia' ? 'Trivia' : bus.full === 'nextgame' ? 'Up Next' : 'Top Performers'}
+                    <div className="text-sm font-bold text-yellow-400">{summary.state === 'in' ? `${periodLabel(summary.period, summary.statusDetail, summary.sport)} · ${liveClock}` : summary.statusDetail}</div>
+                    <div className="text-base font-black uppercase tracking-widest text-white mt-0.5 whitespace-nowrap">
+                      {bus.full === 'teamstats' ? 'Team Stats' : bus.full === 'lineups' ? 'Starting Lineups' : bus.full === 'matchup' ? 'Matchup — Top 5' : bus.full === 'linescore' ? (summary.state === 'post' ? 'Final Stats' : summary.sport === 'soccer' ? 'Halftime' : 'Quarter Break') : bus.full === 'shotchart' ? 'Shot Chart' : bus.full === 'assists' ? 'Assist Leaders' : bus.full === 'alerts' ? 'Game Alerts' : bus.full === 'trivia' ? 'Trivia' : bus.full === 'nextgame' ? 'Up Next' : 'Top Performers'}
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
@@ -1356,7 +1362,13 @@ function PlayerCompare({ summary, aId, bId, awayColor, homeColor, brand, scale, 
   if (!A || !B) return null;
   const aColor = A.teamColor || awayColor, bColor = B.teamColor || homeColor;
   const clsz = 112 * logoM;   // corner team-logo size
-  const rows: [string, string, string][] = [
+  const rows: [string, string, string][] = summary.sport === 'soccer' ? [
+    ['GOALS', A.stats.pts || '0', B.stats.pts || '0'],
+    ['ASSISTS', A.stats.ast || '0', B.stats.ast || '0'],
+    ['SHOTS', A.stats.fg || '0-0', B.stats.fg || '0-0'],
+    ['FOULS', A.stats.pf || '0', B.stats.pf || '0'],
+    ['CARDS', `${A.stats.oreb || '0'}/${A.stats.dreb || '0'}`, `${B.stats.oreb || '0'}/${B.stats.dreb || '0'}`],
+  ] : [
     ['PTS', A.stats.pts || '0', B.stats.pts || '0'],
     ['REB', A.stats.reb || '0', B.stats.reb || '0'],
     ['AST', A.stats.ast || '0', B.stats.ast || '0'],
@@ -1428,7 +1440,10 @@ function StatLineBanner({ summary, id, awayColor, homeColor, tex, photoScale = 1
   const color = p.teamColor || (isHome ? homeColor : awayColor);
   const phW = 128 * photoScale, phH = 158 * photoScale;
   const lsz = 96 * logoM;   // team logo — floats above the banner, grows with Team logos
-  const cells: [string, string][] = [
+  const cells: [string, string][] = summary.sport === 'soccer' ? [
+    ['G', p.stats.pts || '0'], ['AST', p.stats.ast || '0'], ['SHOTS', p.stats.fg || '0-0'], ['FOULS', p.stats.pf || '0'],
+    ['YC', p.stats.oreb || '0'], ['RC', p.stats.dreb || '0'], ['SAVES', p.stats.reb || '0'],
+  ] : [
     ['PTS', p.stats.pts || '0'], ['REB', p.stats.reb || '0'], ['AST', p.stats.ast || '0'],
     ['STL', p.stats.stl || '0'], ['BLK', p.stats.blk || '0'], ['FG', p.stats.fg || '0-0'], ['3PT', p.stats.tp || '0-0'],
   ];
@@ -1464,7 +1479,9 @@ function BoxscoreFull({ summary, teamKey, awayColor, homeColor, scale, tex, logo
   const color = teamKey === 'home' ? homeColor : awayColor;
   const lsz = 56 * logoM / textM;
   const players = t.athletes.filter(a => a.played);
-  const cols: [string, keyof Athlete['stats']][] = [
+  const cols: [string, keyof Athlete['stats']][] = summary.sport === 'soccer' ? [
+    ['G', 'pts'], ['A', 'ast'], ['SH (OT-T)', 'fg'], ['FC', 'pf'], ['OFF', 'to'], ['YC', 'oreb'], ['RC', 'dreb'], ['SV', 'reb'],
+  ] : [
     ['MIN', 'min'], ['FG', 'fg'], ['3PT', 'tp'], ['FT', 'ft'], ['OREB', 'oreb'], ['DREB', 'dreb'],
     ['REB', 'reb'], ['AST', 'ast'], ['PF', 'pf'], ['STL', 'stl'], ['TO', 'to'], ['BLK', 'blk'], ['+/-', 'plusMinus'], ['PTS', 'pts'],
   ];
@@ -1533,7 +1550,17 @@ function TaleOfTape({ summary, awayColor, homeColor, scale, tex, logoM = 1, text
 }) {
   const lsz = 64 * logoM / textM;   // header logos hold size independent of text zoom
   const stat = (t: Summary['home'], label: string) => t.stats.find(s => s.label === label)?.value || '0';
-  const rows = [
+  const rows = summary.sport === 'soccer' ? [
+    { cat: 'GOALS', a: summary.away.score || '0', h: summary.home.score || '0', lowerWins: false },
+    { cat: 'POSSESSION', a: stat(summary.away, 'Possession'), h: stat(summary.home, 'Possession'), lowerWins: false },
+    { cat: 'SHOTS', a: stat(summary.away, 'SHOTS'), h: stat(summary.home, 'SHOTS'), lowerWins: false },
+    { cat: 'ON TARGET', a: stat(summary.away, 'ON GOAL'), h: stat(summary.home, 'ON GOAL'), lowerWins: false },
+    { cat: 'CORNERS', a: stat(summary.away, 'Corner Kicks'), h: stat(summary.home, 'Corner Kicks'), lowerWins: false },
+    { cat: 'FOULS', a: stat(summary.away, 'Fouls'), h: stat(summary.home, 'Fouls'), lowerWins: true },
+    { cat: 'YELLOW CARDS', a: stat(summary.away, 'Yellow Cards'), h: stat(summary.home, 'Yellow Cards'), lowerWins: true },
+    { cat: 'SAVES', a: stat(summary.away, 'Saves'), h: stat(summary.home, 'Saves'), lowerWins: false },
+    { cat: 'ACCURATE PASSES', a: stat(summary.away, 'Accurate Passes'), h: stat(summary.home, 'Accurate Passes'), lowerWins: false },
+  ] : [
     { cat: 'POINTS', a: summary.away.score || '0', h: summary.home.score || '0', lowerWins: false },
     { cat: 'REBOUNDS', a: stat(summary.away, 'Rebounds'), h: stat(summary.home, 'Rebounds'), lowerWins: false },
     { cat: 'ASSISTS', a: stat(summary.away, 'Assists'), h: stat(summary.home, 'Assists'), lowerWins: false },
@@ -1685,7 +1712,7 @@ function PlayByPlayRail({ plays, summary, awayColor, homeColor, clock, tex }: {
           {tex && <div className="absolute inset-0 pointer-events-none" style={{ backgroundImage: tex }} />}
           <span className="relative z-10 text-xs font-black uppercase tracking-[0.2em]">Play by Play</span>
           <span className="relative z-10 text-[11px] font-bold text-yellow-400">
-            {summary.state === 'in' ? `${periodLabel(summary.period)} · ${clock}` : summary.statusDetail}
+            {summary.state === 'in' ? `${periodLabel(summary.period, summary.statusDetail, summary.sport)} · ${clock}` : summary.statusDetail}
           </span>
         </div>
         <div className="relative z-10 divide-y divide-white/10">
@@ -1996,9 +2023,15 @@ function QuarterBreak({ summary, awayColor, homeColor, nextGame }: {
   summary: Summary; awayColor: string; homeColor: string;
   nextGame: { awayName?: string; awayLogo?: string; homeName?: string; homeLogo?: string; date?: string; time?: string; venue?: string } | null;
 }) {
-  const nP = Math.max(4, summary.period, summary.away.linescores?.length || 0, summary.home.linescores?.length || 0);
+  const soccer = summary.sport === 'soccer';
+  // soccer: two halves (+ extra time / penalties as they appear); basketball: 4 quarters + OTs
+  const nP = soccer
+    ? Math.max(2, summary.period, summary.away.linescores?.length || 0, summary.home.linescores?.length || 0)
+    : Math.max(4, summary.period, summary.away.linescores?.length || 0, summary.home.linescores?.length || 0);
   const cols = Array.from({ length: nP }, (_, i) => i);
-  const colLabel = (i: number) => (i < 4 ? String(i + 1) : nP > 5 ? `OT${i - 3}` : 'OT');
+  const colLabel = (i: number) => soccer
+    ? (i === 0 ? '1H' : i === 1 ? '2H' : i < 4 ? `ET${i - 1}` : 'PK')
+    : (i < 4 ? String(i + 1) : nP > 5 ? `OT${i - 3}` : 'OT');
   const topBy = (t: Summary['home'], key: 'pts' | 'reb' | 'ast') =>
     [...t.athletes].filter(a => a.played)
       .sort((a, b) => parseInt(b.stats[key] || '0') - parseInt(a.stats[key] || '0'))[0];
@@ -2015,7 +2048,9 @@ function QuarterBreak({ summary, awayColor, homeColor, nextGame }: {
     const h = parseInt(m[1], 10);
     return `${h % 12 || 12}:${m[2]} ${h < 12 ? 'AM' : 'PM'}`;
   };
-  const CATS: ['pts' | 'reb' | 'ast', string][] = [['pts', 'Points'], ['reb', 'Rebounds'], ['ast', 'Assists']];
+  const CATS: ['pts' | 'reb' | 'ast', string][] = soccer
+    ? [['pts', 'Goals'], ['reb', 'Saves'], ['ast', 'Assists']]
+    : [['pts', 'Points'], ['reb', 'Rebounds'], ['ast', 'Assists']];
   return (
     <div className="px-8 py-6 flex gap-6">
       <div className="flex-1 min-w-0">
@@ -2109,19 +2144,20 @@ function TeamStats({ summary, awayColor, homeColor }: { summary: Summary; awayCo
 }
 
 function Lineups({ summary, awayColor, homeColor, photoScale = 1 }: { summary: Summary; awayColor: string; homeColor: string; photoScale?: number }) {
-  const five = (t: Summary['home']) => t.athletes.filter(a => a.starter).slice(0, 5);
-  const psz = 40 * photoScale;
+  const soccer = summary.sport === 'soccer';
+  const five = (t: Summary['home']) => { const st = t.athletes.filter(a => a.starter); return soccer ? st : st.slice(0, 5); };
+  const psz = (soccer ? 30 : 40) * photoScale;   // 11 rows need to stay compact
   return (
     <div className="px-8 py-6 grid grid-cols-2 gap-8">
       {[{ team: summary.away, color: awayColor }, { team: summary.home, color: homeColor }].map(({ team, color }) => (
         <div key={team.abbr}>
-          <div className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color }}>{team.name}</div>
-          <div className="space-y-2">
+          <div className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color }}>{team.name}{soccer && team.formation ? <span className="text-zinc-400"> · {team.formation}</span> : null}</div>
+          <div className={soccer ? 'space-y-1' : 'space-y-2'}>
             {five(team).map(a => (
-              <div key={a.id} className="flex items-center gap-3 bg-zinc-800/60 rounded-xl px-3 py-1.5">
+              <div key={a.id} className={`flex items-center gap-3 bg-zinc-800/60 rounded-xl px-3 ${soccer ? 'py-0.5' : 'py-1.5'}`}>
                 <PlayerPhoto src={a.headshot} className="rounded-full object-cover object-top bg-zinc-700 shrink-0" style={{ width: psz, height: psz }} />
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm font-bold truncate">{a.name}</div>
+                  <div className={`${soccer ? 'text-[13px]' : 'text-sm'} font-bold truncate`}>{soccer ? (a.shortName || a.name) : a.name}</div>
                   <div className="text-[10px] text-zinc-400">#{a.jersey} · {a.pos}</div>
                 </div>
               </div>
@@ -2234,7 +2270,7 @@ function Leaders({ summary, custom, awayColor, photoScale = 1 }: { summary: Summ
                 <span className="text-[10px] font-semibold" style={{ color }}>{a.teamAbbr} · #{a.jersey} · {a.pos}</span>
               </div>
               <div className="flex gap-4 text-center">
-                {[['PTS', a.stats.pts], ['REB', a.stats.reb], ['AST', a.stats.ast]].map(([l, v]) => (
+                {(summary.sport === 'soccer' ? [['G', a.stats.pts], ['SH', a.stats.fg], ['AST', a.stats.ast]] : [['PTS', a.stats.pts], ['REB', a.stats.reb], ['AST', a.stats.ast]]).map(([l, v]) => (
                   <div key={l}>
                     <div className="text-xl font-black">{v || '0'}</div>
                     <div className="text-[9px] text-zinc-400 font-bold tracking-widest">{l}</div>

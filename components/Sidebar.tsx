@@ -48,6 +48,13 @@ const nav = [
   { href: '/company', label: 'Company Info', icon: Building2 },
 ];
 
+/* Live Graphics modes — one CG engine, one mode per context. Sports drive an
+ * ESPN league; News/Church are feed-less branding modes (later phases). */
+const CG_MODES: [string, string][] = [
+  ['basketball', 'Basketball'], ['soccer', 'Soccer'], ['football', 'Football'],
+  ['hockey', 'Hockey'], ['baseball', 'Baseball'], ['news', 'News'], ['church', 'Church'],
+];
+
 const PLAN_BADGE: Record<string, string> = {
   free: 'bg-gray-700 text-gray-300',
   pro: 'bg-blue-600 text-white',
@@ -63,6 +70,12 @@ export default function Sidebar({ forceExpanded = false }: { forceExpanded?: boo
     else setCollapsedPref(localStorage.getItem('plg_sidebar_collapsed') === '1');
   }, [path]);
   const collapsed = forceExpanded ? false : collapsedPref;
+  const [cgMode, setCgMode] = useState('basketball');
+  useEffect(() => {
+    if (!path.startsWith('/live-graphics')) return;
+    const m = new URLSearchParams(window.location.search).get('mode');
+    if (m) setCgMode(m);
+  }, [path]);
   const toggle = () => {
     const next = !collapsedPref;
     setCollapsedPref(next);
@@ -126,6 +139,29 @@ export default function Sidebar({ forceExpanded = false }: { forceExpanded?: boo
           }
           const { href, label, icon: Icon } = item as any;
           const active = href === '/' ? path === '/' : path.startsWith(href);
+          if (href === '/live-graphics') {
+            return (
+              <div key={href}>
+                <Link href={`/live-graphics?mode=${cgMode}`} title={label}
+                  className={`flex items-center gap-2.5 py-2 text-sm transition-colors ${collapsed ? 'justify-center px-0' : 'px-4'} ${
+                    active ? 'bg-zinc-700 text-white font-medium' : 'text-zinc-300 hover:text-white hover:bg-zinc-800'
+                  }`}>
+                  <Icon size={collapsed ? 17 : 15} />
+                  {!collapsed && label}
+                </Link>
+                {!collapsed && (
+                  <div className="px-4 pb-1.5 -mt-0.5">
+                    <select value={cgMode} title="Live Graphics mode"
+                      onChange={e => { setCgMode(e.target.value); router.push(`/live-graphics?mode=${e.target.value}`); }}
+                      className="w-full text-xs rounded-md px-2 py-1 border border-white/15 focus:outline-none"
+                      style={{ backgroundColor: 'rgba(255,255,255,0.08)', color: 'white' }}>
+                      {CG_MODES.map(([v, lab]) => <option key={v} value={v} style={{ color: '#111' }}>{lab}</option>)}
+                    </select>
+                  </div>
+                )}
+              </div>
+            );
+          }
           return (
             <Link key={href} href={href} title={label}
               className={`flex items-center gap-2.5 py-2 text-sm transition-colors ${collapsed ? 'justify-center px-0' : 'px-4'} ${

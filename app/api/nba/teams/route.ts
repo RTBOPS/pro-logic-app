@@ -1,18 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { SPORT_LEAGUES, sportFor } from '@/lib/espn-sports';
 
 /* Proxy for ESPN's team directory per league (names, abbreviations, logos).
    Team lists barely change — cache aggressively. */
 
-const LEAGUES = new Set(['nba', 'nba-development', 'mens-college-basketball', 'womens-college-basketball', 'wnba']);
 
 export async function GET(req: NextRequest) {
   const league = req.nextUrl.searchParams.get('league') || 'nba';
-  if (!LEAGUES.has(league)) {
+  const sport = req.nextUrl.searchParams.get('sport') || sportFor(league);
+  if (!SPORT_LEAGUES[sport]?.has(league)) {
     return NextResponse.json({ error: 'unknown league' }, { status: 400 });
   }
   try {
     const res = await fetch(
-      `https://site.api.espn.com/apis/site/v2/sports/basketball/${league}/teams?limit=400`,
+      `https://site.api.espn.com/apis/site/v2/sports/${sport}/${league}/teams?limit=400`,
       { cache: 'no-store' }
     );
     if (!res.ok) {

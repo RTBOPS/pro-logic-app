@@ -14,10 +14,11 @@ import {
   Palette, HelpCircle, Flame, Mic, Star, Calendar, ClipboardList, Users, X, Settings,
 } from 'lucide-react';
 import {
-  normalizeScoreboard, normalizeSummary, normalizeTeams, gameLeaders, periodLabel, buildCallout, detectCallouts, detectRichCallouts, advanceManualPeriod,
+  normalizeScoreboard, normalizeSummary, normalizeAnySummary, normalizeTeams, gameLeaders, periodLabel, buildCallout, detectCallouts, detectRichCallouts, advanceManualPeriod,
   LEAGUES, emptyManualGame, manualToSummary, manualClockRemaining, fmtClockSec,
   type Game, type Summary, type Athlete, type Callout, type ManualGame, type ManualPlayer, type LeagueTeam,
 } from '@/lib/nba';
+import { sportFor } from '@/lib/espn-sports';
 
 /* Live Graphics control panel — pick an NBA game, everything populates from
    the live feed (scores, official clock, player stats, headshots), and the
@@ -86,6 +87,18 @@ function ControlInner() {
   /* Data source: live ESPN feed (any supported league) or operator-keyed manual game */
   const [source, setSource] = useState<'feed' | 'manual'>('feed');
   const [league, setLeague] = useState('nba');
+  const sport = sportFor(league);
+  /* Mode entry point (sidebar dropdown / deep link): /live-graphics?mode=soccer.
+   * Picks that sport's default league; remembered so the saved doc league
+   * (possibly another sport) does not override it on load. */
+  const urlModeRef = useRef<string | null>(null);
+  useEffect(() => {
+    const m = new URLSearchParams(window.location.search).get('mode');
+    if (!m) return;
+    urlModeRef.current = m;
+    const def = MODE_DEFAULT_LEAGUE[m];
+    if (def) { setLeague(def); setEventId(''); }
+  }, []);
   const [manual, setManual] = useState<ManualGame>(emptyManualGame());
   const [clockMM, setClockMM] = useState('10');
   const [clockSS, setClockSS] = useState('00');
@@ -150,7 +163,7 @@ function ControlInner() {
   const [leagueTeams, setLeagueTeams] = useState<LeagueTeam[]>([]);
   useEffect(() => {
     if (dock !== 'nextgame' || leagueTeams.length > 0) return;
-    fetch(`/api/nba/teams?league=${league}`).then(r => r.json()).then(j => setLeagueTeams(normalizeTeams(j))).catch(() => {});
+    fetch(`/api/nba/teams?league=${league}&sport=${sportFor(league)}`).then(r => r.json()).then(j => setLeagueTeams(normalizeTeams(j))).catch(() => {});
   }, [dock, league]);
   const [coachCfg, setCoachCfg] = useState({ away: '', home: '' });
   const [subIn, setSubIn] = useState('');
@@ -206,7 +219,7 @@ function ControlInner() {
       const d = snap.data() as any;
       if (d.preview) setPvw({ ...GFX_OFF, ...d.preview });
       if (d.sourceMode === 'manual') setSource('manual');
-      if (d.league) setLeague(d.league);
+      if (d.league && (!urlModeRef.current || sportFor(d.league) === urlModeRef.current)) setLeague(d.league);
       if (d.manual) {
         const m = { ...emptyManualGame(), ...d.manual };
         setManual(m);
@@ -264,7 +277,7 @@ function ControlInner() {
   const loadGames = async (d: string) => {
     setLoadingGames(true);
     try {
-      const res = await fetch(`/api/nba/scoreboard?league=${league}${d ? `&dates=${d}` : ''}`);
+      const res = await fetch(`/api/nba/scoreboard?league=${league}&sport=${sportFor(league)}${d ? `&dates=${d}` : ''}`);
       const json = await res.json();
       setGames(normalizeScoreboard(json));
     } catch { /* keep last list */ }
@@ -298,10 +311,10 @@ function ControlInner() {
     let alive = true;
     const load = async () => {
       try {
-        const res = await fetch(`/api/nba/summary?event=${eventId}&league=${league}`);
+        const res = await fetch(`/api/nba/summary?event=${eventId}&league=${league}&sport=${sportFor(league)}`);
         const json = await res.json();
         if (alive) {
-          const s = normalizeSummary(json);
+          const s = normalizeAnySummary(json, sportFor(league));
           suggest(s, json);
           setSummary(s);
           // Auto free-throw spotlight: when a shooter reaches the line, target them
@@ -816,9 +829,13 @@ function ControlInner() {
           </div>
           {source === 'feed' && (
             <>
+              <select value={sport} onChange={e => { const def = MODE_DEFAULT_LEAGUE[e.target.value]; if (def) { setLeague(def); setEventId(''); } }}
+                title="Sport" className="border border-gray-200 rounded-lg px-2 py-1.5 text-xs bg-white font-semibold">
+                {Object.entries(MODE_LABELS).filter(([k]) => MODE_DEFAULT_LEAGUE[k]).map(([k, lab]) => <option key={k} value={k}>{lab}</option>)}
+              </select>
               <select value={league} onChange={e => { setLeague(e.target.value); setEventId(''); }}
                 className="border border-gray-200 rounded-lg px-2 py-1.5 text-xs bg-white">
-                {LEAGUES.map(l => <option key={l.id} value={l.id}>{l.label}</option>)}
+                {LEAGUES.filter(l => sportFor(l.id) === sport).map(l => <option key={l.id} value={l.id}>{l.label}</option>)}
               </select>
               <button onClick={() => setDate('')}
                 className={`${fireBtn} ${!date ? 'bg-black text-white' : 'border border-gray-200 text-gray-600 hover:bg-gray-50'}`}>
@@ -1023,7 +1040,7 @@ function ControlInner() {
                     </div>
                   )}
                   <div className="flex items-center justify-center gap-1">
-                    <span className="text-yellow-400 font-mono font-bold text-sm">{summary.state === 'in' ? `${periodLabel(summary.period)} ${summary.clock}` : summary.statusDetail}</span>
+                    <span className="text-yellow-400 font-mono font-bold text-sm">{summary.state === 'in' ? `${periodLabel(summary.period, summary.statusDetail, summary.sport)} ${summary.clock}` : summary.statusDetail}</span>
                     <span className="text-[9px] text-gray-500 uppercase tracking-wide ml-2 mr-0.5">Sync</span>
                     <button onClick={() => setClockOffset(v => Math.round((v - 1) * 10) / 10)} className="px-1.5 py-0.5 rounded bg-white/10 text-[11px] font-bold hover:bg-white/20">−1s</button>
                     <span className="text-[11px] font-mono w-8 text-center tabular-nums">{clockOffset > 0 ? '+' : ''}{clockOffset}s</span>
@@ -1218,7 +1235,9 @@ function ControlInner() {
                 ['alerts', 'Game Alerts'],
                 ['matchupbanner', 'Matchup Banner'],
                 ['taletape', 'Tale of the Tape'],
-              ] as ['teamstats' | 'lineups' | 'leaders' | 'matchup' | 'linescore' | 'shotchart' | 'assists' | 'alerts' | 'matchupbanner' | 'taletape', string][]).map(([kind, label]) => (
+              ] as ['teamstats' | 'lineups' | 'leaders' | 'matchup' | 'linescore' | 'shotchart' | 'assists' | 'alerts' | 'matchupbanner' | 'taletape', string][])
+                .filter(([kind]) => !(sport === 'soccer' && ['shotchart', 'assists', 'alerts'].includes(kind)))   // no shot coords / assist links in soccer feeds
+                .map(([kind, label]) => (
                 <div key={kind} className="relative flex items-stretch gap-1">
                   <button onClick={() => fire({ full: active.full === kind ? null : kind })}
                     className={`flex-1 min-w-0 flex items-center justify-between gap-1 px-3 py-2 rounded-lg text-xs font-medium ${active.full === kind ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
@@ -1348,7 +1367,7 @@ function ControlInner() {
 
               {/* Shooting splits LOWER THIRD — the full chart lives on the Shot Chart
                   button; this cell only fires the compact splits strip. */}
-              <div className="relative flex items-stretch gap-1">
+              <div className={`relative flex items-stretch gap-1 ${sport === 'soccer' ? 'hidden' : ''}`}>
                 <button onClick={() => fire({ shotLine: active.shotLine ? null : shotPick })}
                   className={`flex-1 min-w-0 flex items-center justify-between gap-1 px-3 py-2 rounded-lg text-xs font-medium ${active.shotLine ? 'bg-amber-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
                   <span className="flex items-center gap-2 min-w-0"><GfxThumb k='shotline' /><span className="truncate">Shot Splits L3</span></span> {active.shotLine ? <Eye size={13} className="shrink-0" /> : <EyeOff size={13} className="shrink-0" />}
@@ -1373,7 +1392,7 @@ function ControlInner() {
               </div>
 
               {/* At The Line — free-throw side panel. Pick the shooter in ⚙, then fire. */}
-              <div className="relative flex items-stretch gap-1">
+              <div className={`relative flex items-stretch gap-1 ${sport === 'soccer' ? 'hidden' : ''}`}>
                 <button onClick={() => fire({ ftId: active.ftId ? null : ftPick })}
                   disabled={!active.ftId && !ftPick}
                   className={`flex-1 min-w-0 flex items-center justify-between gap-1 px-3 py-2 rounded-lg text-xs font-medium disabled:opacity-40 ${active.ftId ? 'bg-amber-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
@@ -2064,6 +2083,11 @@ const byJerseyThenName = (a: Athlete, b: Athlete) => {
   return last(a.name).localeCompare(last(b.name));
 };
 
+
+/* CG modes. Sports map to an ESPN default league; News/Church are feed-less
+ * (manual/branding-driven) and land in later phases. */
+const MODE_LABELS: Record<string, string> = { basketball: 'Basketball', soccer: 'Soccer', football: 'Football', hockey: 'Hockey', baseball: 'Baseball', news: 'News', church: 'Church' };
+const MODE_DEFAULT_LEAGUE: Record<string, string> = { basketball: 'nba', soccer: 'mex.1', football: 'nfl', hockey: 'nhl', baseball: 'mlb' };
 
 /* Tiny schematic preview of each graphic's layout, shown on the left of its
  * fire button so the operator recognises it at a glance. Pure CSS — no iframes. */
