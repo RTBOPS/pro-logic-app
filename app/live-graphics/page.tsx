@@ -41,10 +41,15 @@ interface GfxState {
   pbp?: boolean;
   pbpTicker?: boolean;
   ftId: string | null;
+  breaking?: { title?: string; text?: string } | null;
+  headline?: { title?: string; sub?: string } | null;
+  newsTicker?: boolean;
+  verse?: { ref?: string; text?: string } | null;
+  speaker?: { label?: string; name?: string; role?: string } | null;
   sub: { inId: string; outId: string } | null;
   coach: 'away' | 'home' | null;
 }
-const GFX_OFF: GfxState = { bug: false, lowerId: null, full: null, banner: null, portal: false, talent: false, mention: false, ftId: null, sub: null, coach: null, pbp: false, pbpTicker: false };
+const GFX_OFF: GfxState = { bug: false, lowerId: null, full: null, banner: null, portal: false, talent: false, mention: false, ftId: null, sub: null, coach: null, pbp: false, pbpTicker: false, breaking: null, headline: null, newsTicker: false, verse: null, speaker: null };
 
 const DEMO = { label: 'Demo: Finals 2024 — DAL @ BOS (G5)', date: '20240617' };
 
@@ -92,12 +97,20 @@ function ControlInner() {
    * Picks that sport's default league; remembered so the saved doc league
    * (possibly another sport) does not override it on load. */
   const urlModeRef = useRef<string | null>(null);
+  const [cgMode, setCgMode] = useState<'sports' | 'news' | 'church'>('sports');
   useEffect(() => {
-    const m = new URLSearchParams(window.location.search).get('mode');
-    if (!m) return;
-    urlModeRef.current = m;
-    const def = MODE_DEFAULT_LEAGUE[m];
-    if (def) { setLeague(def); setEventId(''); }
+    const apply = () => {
+      const m = new URLSearchParams(window.location.search).get('mode');
+      if (!m || m === urlModeRef.current) return;
+      urlModeRef.current = m;
+      if (m === 'news' || m === 'church') { setCgMode(m); return; }
+      setCgMode('sports');
+      const def = MODE_DEFAULT_LEAGUE[m];
+      if (def) { setLeague(def); setEventId(''); }
+    };
+    apply();
+    const t = setInterval(apply, 1000);   // sidebar router.push keeps the page mounted
+    return () => clearInterval(t);
   }, []);
   const [manual, setManual] = useState<ManualGame>(emptyManualGame());
   const [clockMM, setClockMM] = useState('10');
@@ -129,6 +142,12 @@ function ControlInner() {
    * public-read, so credentials must never be written into it. */
   const [clockSrc, setClockSrc] = useState<'espn' | 'ngss' | 'oes'>('espn');
   const [srcOpen, setSrcOpen] = useState(false);
+  /* News / Church editor fields (persisted in the doc via newsCfg) */
+  const [nBreaking, setNBreaking] = useState({ title: 'BREAKING', text: '' });
+  const [nHeadline, setNHeadline] = useState({ title: '', sub: '' });
+  const [nTicker, setNTicker] = useState('');
+  const [nVerse, setNVerse] = useState({ ref: '', text: '' });
+  const [nSpeaker, setNSpeaker] = useState({ label: '', name: '', role: '' });
   const [ngssCfg, setNgssCfg] = useState({ url: '', apikey: '', gameId: '' });
   const [ngssStatus, setNgssStatus] = useState<{ state: 'off' | 'connecting' | 'live' | 'error'; clock?: string; msg?: string; ts?: number }>({ state: 'off' });
   const [oesStatus, setOesStatus] = useState<{ ts?: number; clock?: string } | null>(null);
@@ -302,6 +321,13 @@ function ControlInner() {
       if (d.preview) setPvw({ ...GFX_OFF, ...d.preview });
       if (d.sourceMode === 'manual') setSource('manual');
       if (d.league && (!urlModeRef.current || sportFor(d.league) === urlModeRef.current)) setLeague(d.league);
+      if (d.newsCfg) {
+        if (d.newsCfg.breaking) setNBreaking(x => ({ ...x, ...d.newsCfg.breaking }));
+        if (d.newsCfg.headline) setNHeadline(x => ({ ...x, ...d.newsCfg.headline }));
+        if (typeof d.newsCfg.ticker === 'string') setNTicker(d.newsCfg.ticker);
+        if (d.newsCfg.verse) setNVerse(x => ({ ...x, ...d.newsCfg.verse }));
+        if (d.newsCfg.speaker) setNSpeaker(x => ({ ...x, ...d.newsCfg.speaker }));
+      }
       if (d.manual) {
         const m = { ...emptyManualGame(), ...d.manual };
         setManual(m);
@@ -440,6 +466,9 @@ function ControlInner() {
         extraBadges,
         nextGameCfg,
         coachCfg,
+        cgMode,
+        newsCfg: { breaking: nBreaking, headline: nHeadline, ticker: nTicker, verse: nVerse, speaker: nSpeaker },
+        tickerItems: nTicker.split('\n').map(x => x.trim()).filter(Boolean),
         leagueBadge: leagueBadge === 'none' ? '' : leagueBadge === 'auto'
           ? (source === 'feed' ? (LEAGUES.find(l => l.id === league)?.logo || '') : '')
           : leagueBadge,
@@ -532,8 +561,8 @@ function ControlInner() {
 
   /* Re-push settings when branding/theme changes (only once a game is loaded) */
   useEffect(() => {
-    if ((eventId || source === 'manual') && token) pushDoc({});
-  }, [showBrand, autoCallouts, useTeamColors, c1, c2, banners, logoScale, brandScale, bugTextScale, badgeSec, bugStyle, bugScale, matchup3d, matchupInset, gfxScale, texture, textureIntensity, clockOffset, fullScale, atlScale, gScale, logoByGfx, imgByGfx, textByGfx, texByGfx, texIntByGfx, motionFx, trivia, portalCfg, talentList, mentionCfg, bugPos, skin, lowerPos, ftPos, photoOverrides, leagueBadge, league, source, extraBadges, nextGameCfg, coachCfg]);
+    if ((eventId || source === 'manual' || cgMode !== 'sports') && token) pushDoc({});
+  }, [showBrand, autoCallouts, useTeamColors, c1, c2, banners, logoScale, brandScale, bugTextScale, badgeSec, bugStyle, bugScale, matchup3d, matchupInset, gfxScale, texture, textureIntensity, clockOffset, fullScale, atlScale, gScale, logoByGfx, imgByGfx, textByGfx, texByGfx, texIntByGfx, motionFx, trivia, portalCfg, talentList, mentionCfg, bugPos, skin, lowerPos, ftPos, photoOverrides, leagueBadge, league, source, extraBadges, nextGameCfg, coachCfg, cgMode, nBreaking, nHeadline, nTicker, nVerse, nSpeaker]);
 
   /* Fire a play callout for the on-air player (or top scorer) */
   const calloutTarget: Athlete | null = useMemo(() => {
@@ -888,13 +917,96 @@ function ControlInner() {
       )}
 
       {/* Data source: feed (by league) or manual ingest — collapsible; only needed at setup */}
-      {token && summary && !pickerOpen && (
+      {cgMode !== 'sports' && (
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-4 mb-4">
+          <h2 className="text-sm font-semibold text-gray-800">{cgMode === 'news' ? 'News graphics' : 'Church graphics'}</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {cgMode === 'news' && (
+            <div className="space-y-1.5">
+              <div className="text-[10px] font-black uppercase tracking-widest text-gray-400">Breaking banner</div>
+              <input value={nBreaking.title} onChange={e => setNBreaking(x => ({ ...x, title: e.target.value }))} placeholder="BREAKING"
+                className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs" />
+              <input value={nBreaking.text} onChange={e => setNBreaking(x => ({ ...x, text: e.target.value }))} placeholder="Texto del banner"
+                className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs" />
+              <div className="relative flex items-stretch gap-1">
+                <button onClick={() => fire({ breaking: active.breaking ? null : nBreaking })} disabled={!active.breaking && !nBreaking.text}
+                  className={`flex-1 min-w-0 flex items-center justify-between gap-1 px-3 py-2 rounded-lg text-xs font-medium disabled:opacity-40 ${active.breaking ? 'bg-red-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
+                  <span className="truncate">Breaking</span> {active.breaking ? <Eye size={13} className="shrink-0" /> : <EyeOff size={13} className="shrink-0" />}
+                </button>
+                {gfxCog('breaking', 'Breaking banner')}
+              </div>
+            </div>
+            )}
+            <div className="space-y-1.5">
+              <div className="text-[10px] font-black uppercase tracking-widest text-gray-400">{cgMode === 'news' ? 'Headline lower third' : 'Announcement lower third'}</div>
+              <input value={nHeadline.title} onChange={e => setNHeadline(x => ({ ...x, title: e.target.value }))} placeholder="Título"
+                className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs" />
+              <input value={nHeadline.sub} onChange={e => setNHeadline(x => ({ ...x, sub: e.target.value }))} placeholder="Subtítulo"
+                className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs" />
+              <div className="relative flex items-stretch gap-1">
+                <button onClick={() => fire({ headline: active.headline ? null : nHeadline })} disabled={!active.headline && !nHeadline.title}
+                  className={`flex-1 min-w-0 flex items-center justify-between gap-1 px-3 py-2 rounded-lg text-xs font-medium disabled:opacity-40 ${active.headline ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
+                  <span className="truncate">Headline</span> {active.headline ? <Eye size={13} className="shrink-0" /> : <EyeOff size={13} className="shrink-0" />}
+                </button>
+                {gfxCog('headline', 'Headline')}
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <div className="text-[10px] font-black uppercase tracking-widest text-gray-400">{cgMode === 'news' ? 'Speaker / reporter' : 'Predicador / orador'}</div>
+              <input value={nSpeaker.label} onChange={e => setNSpeaker(x => ({ ...x, label: e.target.value }))} placeholder={cgMode === 'news' ? 'LIVE / EN VIVO' : 'PASTOR'}
+                className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs" />
+              <input value={nSpeaker.name} onChange={e => setNSpeaker(x => ({ ...x, name: e.target.value }))} placeholder="Nombre"
+                className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs" />
+              <input value={nSpeaker.role} onChange={e => setNSpeaker(x => ({ ...x, role: e.target.value }))} placeholder="Cargo / tema"
+                className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs" />
+              <div className="relative flex items-stretch gap-1">
+                <button onClick={() => fire({ speaker: active.speaker ? null : nSpeaker })} disabled={!active.speaker && !nSpeaker.name}
+                  className={`flex-1 min-w-0 flex items-center justify-between gap-1 px-3 py-2 rounded-lg text-xs font-medium disabled:opacity-40 ${active.speaker ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
+                  <span className="truncate">{cgMode === 'news' ? 'Speaker' : 'Predicador'}</span> {active.speaker ? <Eye size={13} className="shrink-0" /> : <EyeOff size={13} className="shrink-0" />}
+                </button>
+                {gfxCog('speaker', 'Speaker')}
+              </div>
+            </div>
+            {cgMode === 'church' && (
+            <div className="space-y-1.5">
+              <div className="text-[10px] font-black uppercase tracking-widest text-gray-400">Versículo / cita</div>
+              <input value={nVerse.ref} onChange={e => setNVerse(x => ({ ...x, ref: e.target.value }))} placeholder="Juan 3:16"
+                className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs" />
+              <textarea value={nVerse.text} onChange={e => setNVerse(x => ({ ...x, text: e.target.value }))} placeholder="Texto del versículo…" rows={3}
+                className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs resize-y" />
+              <div className="relative flex items-stretch gap-1">
+                <button onClick={() => fire({ verse: active.verse ? null : nVerse })} disabled={!active.verse && !nVerse.text}
+                  className={`flex-1 min-w-0 flex items-center justify-between gap-1 px-3 py-2 rounded-lg text-xs font-medium disabled:opacity-40 ${active.verse ? 'bg-amber-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
+                  <span className="truncate">Versículo</span> {active.verse ? <Eye size={13} className="shrink-0" /> : <EyeOff size={13} className="shrink-0" />}
+                </button>
+                {gfxCog('verse', 'Versículo')}
+              </div>
+            </div>
+            )}
+            <div className="space-y-1.5">
+              <div className="text-[10px] font-black uppercase tracking-widest text-gray-400">{cgMode === 'news' ? 'Ticker (una noticia por línea)' : 'Anuncios en cinta (uno por línea)'}</div>
+              <textarea value={nTicker} onChange={e => setNTicker(e.target.value)} rows={4} placeholder={'Titular uno\nTitular dos\nTitular tres'}
+                className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs resize-y" />
+              <div className="relative flex items-stretch gap-1">
+                <button onClick={() => fire({ newsTicker: !active.newsTicker })} disabled={!active.newsTicker && !nTicker.trim()}
+                  className={`flex-1 min-w-0 flex items-center justify-between gap-1 px-3 py-2 rounded-lg text-xs font-medium disabled:opacity-40 ${active.newsTicker ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
+                  <span className="truncate">Ticker</span> {active.newsTicker ? <Eye size={13} className="shrink-0" /> : <EyeOff size={13} className="shrink-0" />}
+                </button>
+                {gfxCog('newsticker', 'Ticker')}
+              </div>
+            </div>
+          </div>
+          <button onClick={clearProgram}
+            className="w-full px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider bg-red-600 text-white hover:bg-red-500">Clear Program</button>
+        </div>
+      )}
+      {cgMode === 'sports' && token && summary && !pickerOpen && (
         <button onClick={() => setPickerOpen(true)}
           className="mb-4 text-xs font-medium text-gray-500 hover:text-gray-800 flex items-center gap-1.5">
           ▸ Feed & games {summary ? `· ${summary.away.abbr} @ ${summary.home.abbr}` : ''}
         </button>
       )}
-      {pickerOpen && (
+      {cgMode === 'sports' && pickerOpen && (
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 mb-6 relative">
         <button onClick={() => setPickerOpen(false)} title="Collapse"
           className="absolute top-2.5 right-3 text-[11px] font-medium text-gray-400 hover:text-gray-700">Hide ▲</button>

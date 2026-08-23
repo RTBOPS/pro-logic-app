@@ -127,9 +127,16 @@ interface BusState {
   pbpTicker?: boolean;                  // latest-play strip hanging off the score bug
   sub?: { inId: string; outId: string } | null;
   coach?: 'away' | 'home' | null;
+  /* feed-less graphics (News / Church modes — no game required) */
+  breaking?: { title?: string; text?: string } | null;
+  headline?: { title?: string; sub?: string } | null;
+  newsTicker?: boolean;
+  verse?: { ref?: string; text?: string } | null;
+  speaker?: { label?: string; name?: string; role?: string } | null;
 }
 
 interface GfxDoc extends BusState {
+  tickerItems?: string[];   // news ticker lines
   eventId?: string;
   shotClock?: string;
   nbaClock?: { clock?: string; sec?: number | null; period?: number; status?: string; running?: boolean; ts?: number } | null;
@@ -491,6 +498,7 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
         @keyframes plg-pop { from { opacity: 0; transform: translateY(16px) scale(0.9); } to { opacity: 1; transform: translateY(0) scale(1); } }
         @keyframes plg-lower-in { from { opacity: 0; transform: translateX(-420px); } to { opacity: 1; transform: translateX(0); } }
         @keyframes plg-drop-in { from { opacity: 0; transform: translateY(-60px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes plg-marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
         @keyframes plg-rise-in-b { from { opacity: 0; transform: translateY(120%); } to { opacity: 1; transform: translateY(0); } }
         @keyframes plg-sink-out-b { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(120%); } }
         @keyframes plg-slide-in-l { from { opacity: 0; transform: translateX(-120%); } to { opacity: 1; transform: translateX(0); } }
@@ -1301,6 +1309,74 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
           ); })()}
         </div>
       )}
+
+      {/* ── FEED-LESS GRAPHICS (News / Church) — no game needed ── */}
+      {bus.breaking?.title && (
+        <div className="absolute left-1/2 -translate-x-1/2" style={{ top: 48 }}>
+          <div style={{ animation: 'plg-drop-in 0.5s cubic-bezier(0.3, 1.15, 0.6, 1) both', zoom: (gfx.theme?.gScale?.breaking || 1) * textMul('breaking') }}>
+            <div className="flex items-stretch rounded-xl overflow-hidden shadow-2xl text-white">
+              <div className="px-4 flex items-center text-sm font-black uppercase tracking-[0.25em] bg-red-600" style={{ animation: 'plg-ft-pulse 1.6s ease-in-out infinite' }}>
+                {bus.breaking.title}
+              </div>
+              {bus.breaking.text && (
+                <div className="plg-panel px-6 py-3 text-2xl font-black whitespace-nowrap" style={{ backgroundImage: texFor('breaking') || undefined }}>{bus.breaking.text}</div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+      {bus.headline?.title && (
+        <div className={`absolute ${lowerPosCls}`} style={{ bottom: bus.newsTicker ? 96 : 32 }}>
+          <div style={{ animation: 'plg-lower-in 0.5s cubic-bezier(0.3, 1.15, 0.6, 1) both', zoom: (gfx.theme?.gScale?.headline || 1) * textMul('headline') }}>
+            <div className="flex items-stretch rounded-xl overflow-hidden shadow-2xl text-white">
+              {brand?.logo && <div className="bg-white px-3 flex items-center"><img src={brand.logo} className="h-8 max-w-[90px] object-contain" alt="" /></div>}
+              <div className="plg-panel px-6 py-3" style={{ backgroundImage: texFor('headline') || undefined }}>
+                <div className="text-2xl font-black leading-tight whitespace-nowrap">{bus.headline.title}</div>
+                {bus.headline.sub && <div className="text-xs font-bold uppercase tracking-widest text-zinc-400 whitespace-nowrap mt-0.5">{bus.headline.sub}</div>}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {bus.speaker?.name && (
+        <div className={`absolute ${lowerPosCls}`} style={{ bottom: bus.newsTicker ? 96 : 32 }}>
+          <div style={{ animation: 'plg-lower-in 0.5s cubic-bezier(0.3, 1.15, 0.6, 1) both', zoom: (gfx.theme?.gScale?.speaker || 1) * textMul('speaker') }}>
+            <div className="flex items-stretch rounded-xl overflow-hidden shadow-2xl text-white">
+              <div className="plg-label px-4 flex items-center text-[10px] font-black uppercase tracking-[0.2em] text-black whitespace-nowrap">{bus.speaker.label || 'Speaker'}</div>
+              <div className="plg-panel px-5 py-2.5" style={{ backgroundImage: texFor('speaker') || undefined }}>
+                <div className="text-xl font-black leading-tight whitespace-nowrap">{bus.speaker.name}</div>
+                {bus.speaker.role && <div className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 whitespace-nowrap">{bus.speaker.role}</div>}
+              </div>
+              {brand?.logo && <div className="bg-white px-3 flex items-center"><img src={brand.logo} className="h-6 max-w-[64px] object-contain" alt="" /></div>}
+            </div>
+          </div>
+        </div>
+      )}
+      {bus.verse?.text && (
+        <div className="absolute inset-0 flex items-center justify-center" style={{ animation: 'plg-full-in 0.4s ease-out both', zoom: (gfx.theme?.gScale?.verse || 1) * textMul('verse') }}>
+          <div className="plg-panel w-[860px] max-w-[92vw] text-white rounded-3xl shadow-2xl px-12 py-10 text-center" style={{ backgroundImage: texFor('verse') || undefined }}>
+            <div className="text-4xl leading-snug font-black">“{bus.verse.text}”</div>
+            {bus.verse.ref && <div className="mt-5 text-lg font-bold uppercase tracking-[0.25em] text-amber-400">{bus.verse.ref}</div>}
+            <div className="mt-6 flex items-center justify-center gap-2 opacity-85">
+              {brand?.logo && <img src={brand.logo} className="h-5 max-w-[90px] object-contain brightness-0 invert opacity-80" alt="" />}
+              {brand?.name && <span className="text-[10px] font-semibold text-zinc-400">{brand.name}</span>}
+            </div>
+          </div>
+        </div>
+      )}
+      {bus.newsTicker && (gfx.tickerItems || []).length > 0 && (() => {
+        const items = (gfx.tickerItems || []).filter(Boolean);
+        const line = items.join('   •   ');
+        return (
+          <div className="absolute left-0 right-0 bottom-0" style={{ zoom: (gfx.theme?.gScale?.newsticker || 1) * textMul('newsticker') }}>
+            <div className="plg-panel border-t border-white/15 overflow-hidden py-2.5" style={{ backgroundImage: texFor('newsticker') || undefined }}>
+              <div className="whitespace-nowrap text-white text-xl font-bold" style={{ display: 'inline-block', animation: `plg-marquee ${Math.max(18, line.length * 0.28)}s linear infinite` }}>
+                <span className="px-8">{line}</span><span className="px-8">{line}</span>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
