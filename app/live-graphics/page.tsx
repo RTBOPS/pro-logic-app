@@ -1462,6 +1462,11 @@ function ControlInner() {
                 </button>
                 {gfxCog('coach', 'Head Coach', 'coach-h')}
               </div>
+              {/* Clear Program — solid red cell that completes the grid */}
+              <button onClick={clearProgram}
+                className="flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-black uppercase tracking-wider bg-red-600 text-white hover:bg-red-500 shadow-sm">
+                <X size={14} /> Clear Program
+              </button>
               </div>
               {active.full === 'shotchart' && (
                 <div className="flex items-center gap-1.5">
@@ -1492,10 +1497,6 @@ function ControlInner() {
                   Hide Lower Third
                 </button>
               )}
-              <button onClick={clearProgram}
-                className="w-full px-4 py-2 rounded-xl text-xs text-red-500 border border-red-200 hover:bg-red-50">
-                CLEAR PROGRAM
-              </button>
             </div>
 
           </div>
@@ -2092,8 +2093,8 @@ function GfxThumb({ k }: { k: string }) {
     coach:         <>{B('bottom-[3px] left-[3px] w-[8px] h-[8px] rounded-[2px] bg-zinc-200')}{B('bottom-[3px] left-[12px] w-[20px] h-[8px] rounded-r-[2px] bg-blue-500')}</>,
   };
   return (
-    <span className="relative inline-block w-10 h-6 rounded-md bg-zinc-900 ring-1 ring-black/10 shrink-0 overflow-hidden" aria-hidden
-      style={{ zoom: 1.5 }}>
+    <span className="relative inline-block w-9 h-9 rounded-lg bg-zinc-900 ring-1 ring-black/10 shrink-0 overflow-hidden" aria-hidden
+      style={{ zoom: 1.3 }}>
       {body[k] ?? B('inset-[3px] rounded-[3px] bg-zinc-700')}
     </span>
   );
