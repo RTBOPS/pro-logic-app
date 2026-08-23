@@ -122,6 +122,88 @@ function ControlInner() {
   const [bugStyle, setBugStyle] = useState<'classic' | 'bar' | 'strip' | 'stack' | 'arena'>('classic');
   const [bugScale, setBugScale] = useState(1);
   const [clockOffset, setClockOffset] = useState(0);
+
+  /* ── Clock source: ESPN (auto) · NGSS Arena (browser WebSocket) · OES agent.
+   * Config fields live NOW so game day is paste-credentials-and-connect.
+   * The NGSS apikey stays in localStorage ONLY — the live_graphics doc is
+   * public-read, so credentials must never be written into it. */
+  const [clockSrc, setClockSrc] = useState<'espn' | 'ngss' | 'oes'>('espn');
+  const [srcOpen, setSrcOpen] = useState(false);
+  const [ngssCfg, setNgssCfg] = useState({ url: '', apikey: '', gameId: '' });
+  const [ngssStatus, setNgssStatus] = useState<{ state: 'off' | 'connecting' | 'live' | 'error'; clock?: string; msg?: string; ts?: number }>({ state: 'off' });
+  const [oesStatus, setOesStatus] = useState<{ ts?: number; clock?: string } | null>(null);
+  const ngssWs = useRef<WebSocket | null>(null);
+  const ngssLastRef = useRef('');
+  useEffect(() => {   // restore saved source config
+    try {
+      const src = localStorage.getItem('plg_clock_src');
+      if (src === 'ngss' || src === 'oes') setClockSrc(src);
+      const cfg = localStorage.getItem('plg_ngss_cfg');
+      if (cfg) setNgssCfg(c => ({ ...c, ...JSON.parse(cfg) }));
+    } catch { /* ignore */ }
+  }, []);
+  const saveClockSrc = (v: 'espn' | 'ngss' | 'oes') => { setClockSrc(v); try { localStorage.setItem('plg_clock_src', v); } catch { /* ignore */ } };
+  const saveNgssCfg = (patch: Partial<typeof ngssCfg>) => setNgssCfg(c => { const n = { ...c, ...patch }; try { localStorage.setItem('plg_ngss_cfg', JSON.stringify(n)); } catch { /* ignore */ } return n; });
+
+  /* NGSS: the arena feed is a WebSocket, so the panel itself can be the agent —
+   * no terminal needed. Auth within 5s, clockstate arrives on every tick, and
+   * we write nbaClock (the field the output already prefers) + fouls/bonus. */
+  const isoClockSec = (c: string) => { const m = /^PT(?:(\d+)M)?(\d+(?:\.\d+)?)S$/.exec(String(c || '').trim()); return m ? parseInt(m[1] || '0', 10) * 60 + parseFloat(m[2]) : null; };
+  const ngssDisconnect = () => { const w = ngssWs.current; ngssWs.current = null; try { w?.close(); } catch { /* ignore */ } setNgssStatus({ state: 'off' }); };
+  const ngssConnect = () => {
+    if (!ngssCfg.url || !ngssCfg.apikey || !token) { setNgssStatus({ state: 'error', msg: 'URL y API key requeridos' }); return; }
+    ngssDisconnect();
+    if (window.location.protocol === 'https:' && ngssCfg.url.startsWith('ws://')) {
+      setNgssStatus({ state: 'error', msg: 'Endpoint ws:// inseguro — usa wss:// o abre el panel en localhost' }); return;
+    }
+    const qs = new URLSearchParams({ format: 'json', types: 'sc,cl' });
+    if (ngssCfg.gameId) qs.set('gameId', ngssCfg.gameId);
+    setNgssStatus({ state: 'connecting' });
+    let ws: WebSocket;
+    try { ws = new WebSocket(`${ngssCfg.url}${ngssCfg.url.includes('?') ? '&' : '?'}${qs}`); }
+    catch (e: any) { setNgssStatus({ state: 'error', msg: e?.message || 'URL inválida' }); return; }
+    ngssWs.current = ws;
+    ws.onopen = () => ws.send(JSON.stringify({ type: 'authentication', apikey: ngssCfg.apikey }));
+    ws.onmessage = ev => {
+      let m: any; try { m = JSON.parse(ev.data); } catch { return; }
+      const t = String(m.type || '').toLowerCase();
+      if (t === 'clockstate' || t === 'scoreboard') {
+        const sec = isoClockSec(m.clock); if (sec == null) return;
+        const running = String(m.clockRunning) === '1';
+        const period = m.period ?? m.periodNumber ?? 0;
+        const clock = sec >= 60 ? `${Math.floor(sec / 60)}:${String(Math.ceil(sec) % 60).padStart(2, '0')}` : sec.toFixed(1);
+        const key = `${sec.toFixed(1)}|${period}|${running}`;
+        const extra: Record<string, any> = {};
+        if (t === 'scoreboard') {
+          const h = m.homeTeam || {}, a = m.awayTeam || {};
+          if (h.fouls != null) extra.homeFouls = String(h.fouls);
+          if (a.fouls != null) extra.awayFouls = String(a.fouls);
+          extra.homeBonus = String(h.inBonus) === '1'; extra.awayBonus = String(a.inBonus) === '1';
+        }
+        if (key !== ngssLastRef.current || Object.keys(extra).length) {
+          ngssLastRef.current = key;
+          setDoc(doc(db, 'live_graphics', token), { nbaClock: { sec, clock, period, running, status: 'in', ts: Date.now() }, ...extra }, { merge: true }).catch(() => { /* transient */ });
+          setNgssStatus({ state: 'live', clock, ts: Date.now() });
+        }
+      } else if (t === 'authentication' && m.status && String(m.status).toLowerCase() !== 'ok') {
+        setNgssStatus({ state: 'error', msg: `auth: ${m.status}` });
+      }
+    };
+    ws.onclose = () => { if (ngssWs.current === ws) setNgssStatus(st => st.state === 'error' ? st : { state: 'error', msg: 'conexión cerrada' }); };
+    ws.onerror = () => setNgssStatus({ state: 'error', msg: 'no se pudo conectar (¿red del arena / URL?)' });
+  };
+  useEffect(() => () => ngssDisconnect(), []);   // eslint-disable-line react-hooks/exhaustive-deps
+
+  /* OES agent status: the agent writes nbaClock from another process, so we
+   * poll the doc while the source panel is open to show freshness. */
+  useEffect(() => {
+    if (!srcOpen || clockSrc !== 'oes' || !token) return;
+    const tick = async () => {
+      try { const snap = await getDoc(doc(db, 'live_graphics', token)); const n = snap.data()?.nbaClock; setOesStatus(n ? { ts: n.ts, clock: n.clock } : null); } catch { /* ignore */ }
+    };
+    tick(); const t = setInterval(tick, 3000);
+    return () => clearInterval(t);
+  }, [srcOpen, clockSrc, token]);
   const [fullScale, setFullScale] = useState(1);
   const [atlScale, setAtlScale] = useState(1);
   const [ftPick, setFtPick] = useState('');           // At The Line player (pick first, then fire)
@@ -1046,6 +1128,58 @@ function ControlInner() {
                     <span className="text-[11px] font-mono w-8 text-center tabular-nums">{clockOffset > 0 ? '+' : ''}{clockOffset}s</span>
                     <button onClick={() => setClockOffset(v => Math.round((v + 1) * 10) / 10)} className="px-1.5 py-0.5 rounded bg-white/10 text-[11px] font-bold hover:bg-white/20">+1s</button>
                     {clockOffset !== 0 && <button onClick={() => setClockOffset(0)} className="px-1.5 py-0.5 rounded bg-white/10 text-[10px] hover:bg-white/20">reset</button>}
+                    <span className="relative inline-flex items-center gap-1 ml-2">
+                      <span className="text-[9px] text-gray-500 uppercase tracking-wide">Source</span>
+                      <span className={`w-2 h-2 rounded-full ${clockSrc === 'espn' ? 'bg-sky-400' : (clockSrc === 'ngss' ? (ngssStatus.state === 'live' ? 'bg-green-400' : ngssStatus.state === 'connecting' ? 'bg-amber-400' : ngssStatus.state === 'error' ? 'bg-red-500' : 'bg-zinc-500') : (oesStatus?.ts && Date.now() - oesStatus.ts < 6000 ? 'bg-green-400' : 'bg-zinc-500'))}`} />
+                      <button onClick={() => setSrcOpen(v => !v)}
+                        className={`px-2 py-0.5 rounded text-[11px] font-bold ${srcOpen ? 'bg-white text-gray-900' : 'bg-white/10 hover:bg-white/20'}`}>
+                        {clockSrc === 'espn' ? 'ESPN' : clockSrc === 'ngss' ? 'NGSS' : 'OES'} ▾
+                      </button>
+                      {srcOpen && (
+                        <div className="absolute z-50 top-full mt-2 right-0 w-80 bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl p-3 space-y-2.5 text-left">
+                          <div className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Clock source</div>
+                          <div className="grid grid-cols-3 gap-1 bg-black/40 rounded-lg p-1">
+                            {([['espn', 'ESPN auto'], ['ngss', 'NGSS Arena'], ['oes', 'OES 9000IP']] as const).map(([v, lab]) => (
+                              <button key={v} onClick={() => { saveClockSrc(v); if (v !== 'ngss') ngssDisconnect(); }}
+                                className={`px-1 py-1.5 rounded-md text-[10px] font-bold ${clockSrc === v ? 'bg-white text-gray-900' : 'text-zinc-300 hover:text-white'}`}>{lab}</button>
+                            ))}
+                          </div>
+                          {clockSrc === 'espn' && (
+                            <p className="text-[11px] text-zinc-400 leading-snug">Reloj automático del feed de ESPN (±segundos). Sin credenciales. Ajusta con Sync ±1s.</p>
+                          )}
+                          {clockSrc === 'ngss' && (
+                            <div className="space-y-1.5">
+                              <p className="text-[11px] text-zinc-400 leading-snug">Feed oficial de arena (Genius Sports). Pega la URL y el API key cuando NBA/Genius los entreguen — el panel se conecta directo, sin agente.</p>
+                              <input value={ngssCfg.url} onChange={e => saveNgssCfg({ url: e.target.value.trim() })} placeholder="wss://…  (endpoint Arena)"
+                                className="w-full bg-black/40 border border-zinc-700 rounded-lg px-2 py-1.5 text-[11px] font-mono text-zinc-100 focus:outline-none" />
+                              <input value={ngssCfg.apikey} onChange={e => saveNgssCfg({ apikey: e.target.value.trim() })} placeholder="API key" type="password"
+                                className="w-full bg-black/40 border border-zinc-700 rounded-lg px-2 py-1.5 text-[11px] font-mono text-zinc-100 focus:outline-none" />
+                              <input value={ngssCfg.gameId} onChange={e => saveNgssCfg({ gameId: e.target.value.trim() })} placeholder="gameId (opcional en arena)"
+                                className="w-full bg-black/40 border border-zinc-700 rounded-lg px-2 py-1.5 text-[11px] font-mono text-zinc-100 focus:outline-none" />
+                              <div className="flex items-center gap-2">
+                                {ngssStatus.state !== 'live' && ngssStatus.state !== 'connecting'
+                                  ? <button onClick={ngssConnect} className="flex-1 px-2 py-1.5 rounded-lg text-[11px] font-black bg-green-600 hover:bg-green-500 text-white">CONNECT</button>
+                                  : <button onClick={ngssDisconnect} className="flex-1 px-2 py-1.5 rounded-lg text-[11px] font-black bg-red-600 hover:bg-red-500 text-white">DISCONNECT</button>}
+                                <span className="text-[11px] font-mono text-zinc-300">
+                                  {ngssStatus.state === 'live' ? `● LIVE ${ngssStatus.clock || ''}` : ngssStatus.state === 'connecting' ? '… conectando' : ngssStatus.state === 'error' ? `✕ ${ngssStatus.msg || 'error'}` : 'sin conectar'}
+                                </span>
+                              </div>
+                              <p className="text-[10px] text-zinc-500 leading-snug">El API key se guarda solo en este navegador (localStorage) — nunca en el documento público.</p>
+                            </div>
+                          )}
+                          {clockSrc === 'oes' && (
+                            <div className="space-y-1.5">
+                              <p className="text-[11px] text-zinc-400 leading-snug">Cable del controlador OES ISC-9000IP (UDP). El navegador no puede escuchar UDP: corre el agente en la Mac que recibe el cable y este panel muestra su estado.</p>
+                              <div className="bg-black/50 border border-zinc-700 rounded-lg px-2 py-1.5 text-[10px] font-mono text-zinc-200 select-all">node scripts/oes-clock-agent.js run 5000 {token || '<token>'}</div>
+                              <p className="text-[10px] text-zinc-500 leading-snug">En el módulo IP del controlador: UDP Client Settings → enviar a la IP de esa Mac, puerto 5000. Primera vez: usa el modo <span className="font-mono">capture</span> y mándanos el .bin para calibrar el parser.</p>
+                              <div className="text-[11px] font-mono text-zinc-300">
+                                {oesStatus?.ts ? (Date.now() - oesStatus.ts < 6000 ? `● LIVE ${oesStatus.clock || ''}` : `✕ sin datos hace ${Math.round((Date.now() - (oesStatus.ts || 0)) / 1000)}s`) : '✕ agente sin conectar'}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </span>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
