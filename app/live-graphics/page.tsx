@@ -170,17 +170,17 @@ function ControlInner() {
   const isoClockSec = (c: string) => { const m = /^PT(?:(\d+)M)?(\d+(?:\.\d+)?)S$/.exec(String(c || '').trim()); return m ? parseInt(m[1] || '0', 10) * 60 + parseFloat(m[2]) : null; };
   const ngssDisconnect = () => { const w = ngssWs.current; ngssWs.current = null; try { w?.close(); } catch { /* ignore */ } setNgssStatus({ state: 'off' }); };
   const ngssConnect = () => {
-    if (!ngssCfg.url || !ngssCfg.apikey || !token) { setNgssStatus({ state: 'error', msg: 'URL y API key requeridos' }); return; }
+    if (!ngssCfg.url || !ngssCfg.apikey || !token) { setNgssStatus({ state: 'error', msg: 'URL and API key required' }); return; }
     ngssDisconnect();
     if (window.location.protocol === 'https:' && ngssCfg.url.startsWith('ws://')) {
-      setNgssStatus({ state: 'error', msg: 'Endpoint ws:// inseguro — usa wss:// o abre el panel en localhost' }); return;
+      setNgssStatus({ state: 'error', msg: 'Insecure ws:// endpoint — use wss:// or open the panel on localhost' }); return;
     }
     const qs = new URLSearchParams({ format: 'json', types: 'sc,cl' });
     if (ngssCfg.gameId) qs.set('gameId', ngssCfg.gameId);
     setNgssStatus({ state: 'connecting' });
     let ws: WebSocket;
     try { ws = new WebSocket(`${ngssCfg.url}${ngssCfg.url.includes('?') ? '&' : '?'}${qs}`); }
-    catch (e: any) { setNgssStatus({ state: 'error', msg: e?.message || 'URL inválida' }); return; }
+    catch (e: any) { setNgssStatus({ state: 'error', msg: e?.message || 'invalid URL' }); return; }
     ngssWs.current = ws;
     ws.onopen = () => ws.send(JSON.stringify({ type: 'authentication', apikey: ngssCfg.apikey }));
     ws.onmessage = ev => {
@@ -208,8 +208,8 @@ function ControlInner() {
         setNgssStatus({ state: 'error', msg: `auth: ${m.status}` });
       }
     };
-    ws.onclose = () => { if (ngssWs.current === ws) setNgssStatus(st => st.state === 'error' ? st : { state: 'error', msg: 'conexión cerrada' }); };
-    ws.onerror = () => setNgssStatus({ state: 'error', msg: 'no se pudo conectar (¿red del arena / URL?)' });
+    ws.onclose = () => { if (ngssWs.current === ws) setNgssStatus(st => st.state === 'error' ? st : { state: 'error', msg: 'connection closed' }); };
+    ws.onerror = () => setNgssStatus({ state: 'error', msg: 'could not connect (arena network / URL?)' });
   };
   useEffect(() => () => ngssDisconnect(), []);   // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -926,7 +926,7 @@ function ControlInner() {
               <div className="text-[10px] font-black uppercase tracking-widest text-gray-400">Breaking banner</div>
               <input value={nBreaking.title} onChange={e => setNBreaking(x => ({ ...x, title: e.target.value }))} placeholder="BREAKING"
                 className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs" />
-              <input value={nBreaking.text} onChange={e => setNBreaking(x => ({ ...x, text: e.target.value }))} placeholder="Texto del banner"
+              <input value={nBreaking.text} onChange={e => setNBreaking(x => ({ ...x, text: e.target.value }))} placeholder="Banner text"
                 className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs" />
               <div className="relative flex items-stretch gap-1">
                 <button onClick={() => fire({ breaking: active.breaking ? null : nBreaking })} disabled={!active.breaking && !nBreaking.text}
@@ -939,9 +939,9 @@ function ControlInner() {
             )}
             <div className="space-y-1.5">
               <div className="text-[10px] font-black uppercase tracking-widest text-gray-400">{cgMode === 'news' ? 'Headline lower third' : 'Announcement lower third'}</div>
-              <input value={nHeadline.title} onChange={e => setNHeadline(x => ({ ...x, title: e.target.value }))} placeholder="Título"
+              <input value={nHeadline.title} onChange={e => setNHeadline(x => ({ ...x, title: e.target.value }))} placeholder="Title"
                 className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs" />
-              <input value={nHeadline.sub} onChange={e => setNHeadline(x => ({ ...x, sub: e.target.value }))} placeholder="Subtítulo"
+              <input value={nHeadline.sub} onChange={e => setNHeadline(x => ({ ...x, sub: e.target.value }))} placeholder="Subtitle"
                 className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs" />
               <div className="relative flex items-stretch gap-1">
                 <button onClick={() => fire({ headline: active.headline ? null : nHeadline })} disabled={!active.headline && !nHeadline.title}
@@ -952,40 +952,40 @@ function ControlInner() {
               </div>
             </div>
             <div className="space-y-1.5">
-              <div className="text-[10px] font-black uppercase tracking-widest text-gray-400">{cgMode === 'news' ? 'Speaker / reporter' : 'Predicador / orador'}</div>
-              <input value={nSpeaker.label} onChange={e => setNSpeaker(x => ({ ...x, label: e.target.value }))} placeholder={cgMode === 'news' ? 'LIVE / EN VIVO' : 'PASTOR'}
+              <div className="text-[10px] font-black uppercase tracking-widest text-gray-400">{cgMode === 'news' ? 'Speaker / reporter' : 'Preacher / speaker'}</div>
+              <input value={nSpeaker.label} onChange={e => setNSpeaker(x => ({ ...x, label: e.target.value }))} placeholder={cgMode === 'news' ? 'LIVE' : 'PASTOR'}
                 className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs" />
-              <input value={nSpeaker.name} onChange={e => setNSpeaker(x => ({ ...x, name: e.target.value }))} placeholder="Nombre"
+              <input value={nSpeaker.name} onChange={e => setNSpeaker(x => ({ ...x, name: e.target.value }))} placeholder="Name"
                 className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs" />
-              <input value={nSpeaker.role} onChange={e => setNSpeaker(x => ({ ...x, role: e.target.value }))} placeholder="Cargo / tema"
+              <input value={nSpeaker.role} onChange={e => setNSpeaker(x => ({ ...x, role: e.target.value }))} placeholder="Role / topic"
                 className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs" />
               <div className="relative flex items-stretch gap-1">
                 <button onClick={() => fire({ speaker: active.speaker ? null : nSpeaker })} disabled={!active.speaker && !nSpeaker.name}
                   className={`flex-1 min-w-0 flex items-center justify-between gap-1 px-3 py-2 rounded-lg text-xs font-medium disabled:opacity-40 ${active.speaker ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
-                  <span className="truncate">{cgMode === 'news' ? 'Speaker' : 'Predicador'}</span> {active.speaker ? <Eye size={13} className="shrink-0" /> : <EyeOff size={13} className="shrink-0" />}
+                  <span className="truncate">{cgMode === 'news' ? 'Speaker' : 'Preacher'}</span> {active.speaker ? <Eye size={13} className="shrink-0" /> : <EyeOff size={13} className="shrink-0" />}
                 </button>
                 {gfxCog('speaker', 'Speaker')}
               </div>
             </div>
             {cgMode === 'church' && (
             <div className="space-y-1.5">
-              <div className="text-[10px] font-black uppercase tracking-widest text-gray-400">Versículo / cita</div>
+              <div className="text-[10px] font-black uppercase tracking-widest text-gray-400">Verse / quote</div>
               <input value={nVerse.ref} onChange={e => setNVerse(x => ({ ...x, ref: e.target.value }))} placeholder="Juan 3:16"
                 className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs" />
-              <textarea value={nVerse.text} onChange={e => setNVerse(x => ({ ...x, text: e.target.value }))} placeholder="Texto del versículo…" rows={3}
+              <textarea value={nVerse.text} onChange={e => setNVerse(x => ({ ...x, text: e.target.value }))} placeholder="Verse text…" rows={3}
                 className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs resize-y" />
               <div className="relative flex items-stretch gap-1">
                 <button onClick={() => fire({ verse: active.verse ? null : nVerse })} disabled={!active.verse && !nVerse.text}
                   className={`flex-1 min-w-0 flex items-center justify-between gap-1 px-3 py-2 rounded-lg text-xs font-medium disabled:opacity-40 ${active.verse ? 'bg-amber-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
-                  <span className="truncate">Versículo</span> {active.verse ? <Eye size={13} className="shrink-0" /> : <EyeOff size={13} className="shrink-0" />}
+                  <span className="truncate">Verse</span> {active.verse ? <Eye size={13} className="shrink-0" /> : <EyeOff size={13} className="shrink-0" />}
                 </button>
-                {gfxCog('verse', 'Versículo')}
+                {gfxCog('verse', 'Verse')}
               </div>
             </div>
             )}
             <div className="space-y-1.5">
-              <div className="text-[10px] font-black uppercase tracking-widest text-gray-400">{cgMode === 'news' ? 'Ticker (una noticia por línea)' : 'Anuncios en cinta (uno por línea)'}</div>
-              <textarea value={nTicker} onChange={e => setNTicker(e.target.value)} rows={4} placeholder={'Titular uno\nTitular dos\nTitular tres'}
+              <div className="text-[10px] font-black uppercase tracking-widest text-gray-400">{cgMode === 'news' ? 'Ticker (one headline per line)' : 'Announcement ticker (one per line)'}</div>
+              <textarea value={nTicker} onChange={e => setNTicker(e.target.value)} rows={4} placeholder={'First headline\nSecond headline\nThird headline'}
                 className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs resize-y" />
               <div className="relative flex items-stretch gap-1">
                 <button onClick={() => fire({ newsTicker: !active.newsTicker })} disabled={!active.newsTicker && !nTicker.trim()}
@@ -1257,35 +1257,35 @@ function ControlInner() {
                             ))}
                           </div>
                           {clockSrc === 'espn' && (
-                            <p className="text-[11px] text-zinc-400 leading-snug">Reloj automático del feed de ESPN (±segundos). Sin credenciales. Ajusta con Sync ±1s.</p>
+                            <p className="text-[11px] text-zinc-400 leading-snug">Automatic clock from the ESPN feed (±seconds). No credentials needed. Fine-tune with Sync ±1s.</p>
                           )}
                           {clockSrc === 'ngss' && (
                             <div className="space-y-1.5">
-                              <p className="text-[11px] text-zinc-400 leading-snug">Feed oficial de arena (Genius Sports). Pega la URL y el API key cuando NBA/Genius los entreguen — el panel se conecta directo, sin agente.</p>
+                              <p className="text-[11px] text-zinc-400 leading-snug">Official arena feed (Genius Sports). Paste the URL and API key once NBA/Genius provide them — the panel connects directly, no agent needed.</p>
                               <input value={ngssCfg.url} onChange={e => saveNgssCfg({ url: e.target.value.trim() })} placeholder="wss://…  (endpoint Arena)"
                                 className="w-full bg-black/40 border border-zinc-700 rounded-lg px-2 py-1.5 text-[11px] font-mono text-zinc-100 focus:outline-none" />
                               <input value={ngssCfg.apikey} onChange={e => saveNgssCfg({ apikey: e.target.value.trim() })} placeholder="API key" type="password"
                                 className="w-full bg-black/40 border border-zinc-700 rounded-lg px-2 py-1.5 text-[11px] font-mono text-zinc-100 focus:outline-none" />
-                              <input value={ngssCfg.gameId} onChange={e => saveNgssCfg({ gameId: e.target.value.trim() })} placeholder="gameId (opcional en arena)"
+                              <input value={ngssCfg.gameId} onChange={e => saveNgssCfg({ gameId: e.target.value.trim() })} placeholder="gameId (optional at the arena)"
                                 className="w-full bg-black/40 border border-zinc-700 rounded-lg px-2 py-1.5 text-[11px] font-mono text-zinc-100 focus:outline-none" />
                               <div className="flex items-center gap-2">
                                 {ngssStatus.state !== 'live' && ngssStatus.state !== 'connecting'
                                   ? <button onClick={ngssConnect} className="flex-1 px-2 py-1.5 rounded-lg text-[11px] font-black bg-green-600 hover:bg-green-500 text-white">CONNECT</button>
                                   : <button onClick={ngssDisconnect} className="flex-1 px-2 py-1.5 rounded-lg text-[11px] font-black bg-red-600 hover:bg-red-500 text-white">DISCONNECT</button>}
                                 <span className="text-[11px] font-mono text-zinc-300">
-                                  {ngssStatus.state === 'live' ? `● LIVE ${ngssStatus.clock || ''}` : ngssStatus.state === 'connecting' ? '… conectando' : ngssStatus.state === 'error' ? `✕ ${ngssStatus.msg || 'error'}` : 'sin conectar'}
+                                  {ngssStatus.state === 'live' ? `● LIVE ${ngssStatus.clock || ''}` : ngssStatus.state === 'connecting' ? '… connecting' : ngssStatus.state === 'error' ? `✕ ${ngssStatus.msg || 'error'}` : 'not connected'}
                                 </span>
                               </div>
-                              <p className="text-[10px] text-zinc-500 leading-snug">El API key se guarda solo en este navegador (localStorage) — nunca en el documento público.</p>
+                              <p className="text-[10px] text-zinc-500 leading-snug">The API key is stored in this browser only (localStorage) — never in the public document.</p>
                             </div>
                           )}
                           {clockSrc === 'oes' && (
                             <div className="space-y-1.5">
-                              <p className="text-[11px] text-zinc-400 leading-snug">Cable del controlador OES ISC-9000IP (UDP). El navegador no puede escuchar UDP: corre el agente en la Mac que recibe el cable y este panel muestra su estado.</p>
+                              <p className="text-[11px] text-zinc-400 leading-snug">OES ISC-9000IP controller cable (UDP). Browsers can't listen on UDP: run the agent on the Mac receiving the cable and this panel shows its status.</p>
                               <div className="bg-black/50 border border-zinc-700 rounded-lg px-2 py-1.5 text-[10px] font-mono text-zinc-200 select-all">node scripts/oes-clock-agent.js run 5000 {token || '<token>'}</div>
-                              <p className="text-[10px] text-zinc-500 leading-snug">En el módulo IP del controlador: UDP Client Settings → enviar a la IP de esa Mac, puerto 5000. Primera vez: usa el modo <span className="font-mono">capture</span> y mándanos el .bin para calibrar el parser.</p>
+                              <p className="text-[10px] text-zinc-500 leading-snug">On the controller's IP module: UDP Client Settings → send to that Mac's IP, port 5000. First time: use <span className="font-mono">capture</span> mode and send us the .bin to calibrate the parser.</p>
                               <div className="text-[11px] font-mono text-zinc-300">
-                                {oesStatus?.ts ? (Date.now() - oesStatus.ts < 6000 ? `● LIVE ${oesStatus.clock || ''}` : `✕ sin datos hace ${Math.round((Date.now() - (oesStatus.ts || 0)) / 1000)}s`) : '✕ agente sin conectar'}
+                                {oesStatus?.ts ? (Date.now() - oesStatus.ts < 6000 ? `● LIVE ${oesStatus.clock || ''}` : `✕ no data for ${Math.round((Date.now() - (oesStatus.ts || 0)) / 1000)}s`) : '✕ agent not connected'}
                               </div>
                             </div>
                           )}
