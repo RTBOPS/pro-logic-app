@@ -79,6 +79,10 @@ service cloud.firestore {
         (
           request.resource.data.diff(resource.data).affectedKeys()
             .hasOnly(['snapshot', 'responded_at'])
+          // inside the snapshot map, an anonymous responder may flip ONLY the
+          // confirmation status — never rewrite the call-sheet copy itself
+          && request.resource.data.snapshot.diff(resource.data.snapshot)
+            .affectedKeys().hasOnly(['confirmation_status'])
           && request.resource.data.snapshot.confirmation_status in ['confirmed', 'declined']
         );
     }
