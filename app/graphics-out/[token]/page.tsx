@@ -20,6 +20,80 @@ import { sportFor } from '@/lib/espn-sports';
 /* Selectable surface textures for the colored panels (arena bug, matchup
    banner). Returns a CSS background-image value layered over the team color;
    `intensity` (default 1) scales how visible the pattern is. */
+/* ── Court / field projection ─────────────────────────────────────────────
+   An ingested image or looping video mapped in perspective onto the playing
+   surface: the operator drags 4 corners until the quad matches the court in
+   THEIR fixed camera, and the browser computes the homography (unit rect →
+   quad) as a CSS matrix3d. Rendered as the stage's bottom layer, so every
+   other graphic stays above it. Soccer occlusion tip: in OBS, duplicate the
+   camera, chroma-key the grass on the copy, and stack it ABOVE this browser
+   source — players then cover the projection like a real floor decal. */
+function adj3(m: number[]): number[] {
+  return [
+    m[4] * m[8] - m[5] * m[7], m[2] * m[7] - m[1] * m[8], m[1] * m[5] - m[2] * m[4],
+    m[5] * m[6] - m[3] * m[8], m[0] * m[8] - m[2] * m[6], m[2] * m[3] - m[0] * m[5],
+    m[3] * m[7] - m[4] * m[6], m[1] * m[6] - m[0] * m[7], m[0] * m[4] - m[1] * m[3],
+  ];
+}
+function mul3(a: number[], b: number[]): number[] {
+  const c = new Array(9).fill(0);
+  for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) for (let k = 0; k < 3; k++) c[3 * i + j] += a[3 * i + k] * b[3 * k + j];
+  return c;
+}
+function mulv3(m: number[], v: number[]): number[] {
+  return [
+    m[0] * v[0] + m[1] * v[1] + m[2] * v[2],
+    m[3] * v[0] + m[4] * v[1] + m[5] * v[2],
+    m[6] * v[0] + m[7] * v[1] + m[8] * v[2],
+  ];
+}
+function basis3(p: { x: number; y: number }[]): number[] {
+  const m = [p[0].x, p[1].x, p[2].x, p[0].y, p[1].y, p[2].y, 1, 1, 1];
+  const v = mulv3(adj3(m), [p[3].x, p[3].y, 1]);   // matrix × VECTOR — not 3x3·3x3
+  return mul3(m, [v[0], 0, 0, 0, v[1], 0, 0, 0, v[2]]);
+}
+function homography(w: number, h: number, quad: { x: number; y: number }[]): string {
+  try {
+    const src = [{ x: 0, y: 0 }, { x: w, y: 0 }, { x: w, y: h }, { x: 0, y: h }];
+    const raw = mul3(basis3(quad), adj3(basis3(src)));
+    if (raw.some(v => !Number.isFinite(v)) || Math.abs(raw[8]) < 1e-12) return '';
+    const t = raw.map(v => v / raw[8]);   // normalize — unscaled values overflow float precision
+    return `matrix3d(${t[0]},${t[3]},0,${t[6]},${t[1]},${t[4]},0,${t[7]},0,0,1,0,${t[2]},${t[5]},0,${t[8]})`;
+  } catch { return ''; }
+}
+const PROJ_DEFAULT_CORNERS = [{ x: 22, y: 30 }, { x: 78, y: 30 }, { x: 96, y: 88 }, { x: 4, y: 88 }];
+
+function Projection({ cfg }: { cfg: NonNullable<GfxDoc['projCfg']> }) {
+  const hostRef = useRef<HTMLDivElement>(null);
+  const [size, setSize] = useState({ w: 0, h: 0 });
+  useEffect(() => {
+    const measure = () => { const el = hostRef.current; if (el) setSize({ w: el.clientWidth, h: el.clientHeight }); };
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, []);
+  const corners = (cfg.corners?.length === 4 ? cfg.corners : PROJ_DEFAULT_CORNERS);
+  const quad = corners.map(c => ({ x: (c.x / 100) * size.w, y: (c.y / 100) * size.h }));
+  const m = size.w > 0 ? homography(size.w, size.h, quad) : '';
+  return (
+    <div ref={hostRef} className="absolute inset-0 overflow-hidden pointer-events-none">
+      {cfg.url && m && (
+        <div className="absolute inset-0" style={{ transform: m, transformOrigin: '0 0', opacity: cfg.opacity ?? 0.85, mixBlendMode: (cfg.blend || 'normal') as any }}>
+          {cfg.kind === 'video'
+            ? <video src={cfg.url} className="w-full h-full object-fill" autoPlay loop muted playsInline />
+            : <img src={cfg.url} className="w-full h-full object-fill" alt="" />}
+        </div>
+      )}
+      {cfg.calib && corners.map((c, i) => (
+        <div key={i} className="absolute z-50 -translate-x-1/2 -translate-y-1/2" style={{ left: `${c.x}%`, top: `${c.y}%` }}>
+          <div className="w-4 h-4 rounded-full bg-fuchsia-500 ring-2 ring-white shadow-lg" />
+          <div className="text-[11px] font-black text-fuchsia-300 text-center mt-0.5" style={{ textShadow: '0 1px 3px #000' }}>{['TL', 'TR', 'BR', 'BL'][i]}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /* Per-sport stat labels. Slots reuse the basketball-shaped AthleteStats — see
  * lib KEYED_SLOTS for the mapping. Basketball is the fallback everywhere. */
 const SPORT_TABLES: Record<string, {
@@ -128,6 +202,7 @@ interface BusState {
   sub?: { inId: string; outId: string } | null;
   coach?: 'away' | 'home' | null;
   /* feed-less graphics (News / Church modes — no game required) */
+  projection?: boolean;                 // court/field projection layer
   breaking?: { title?: string; text?: string } | null;
   headline?: { title?: string; sub?: string } | null;
   newsTicker?: boolean;
@@ -136,6 +211,7 @@ interface BusState {
 }
 
 interface GfxDoc extends BusState {
+  projCfg?: { url?: string; kind?: 'image' | 'video'; corners?: { x: number; y: number }[]; opacity?: number; blend?: string; calib?: boolean } | null;
   tickerItems?: string[];   // news ticker lines
   eventId?: string;
   shotClock?: string;
@@ -485,6 +561,10 @@ export default function GraphicsOutput({ params }: { params: Promise<{ token: st
   return (
     <div className={`fixed inset-0 overflow-hidden font-sans skin-${gfx.theme?.skin || 'clean'}`}
       style={{ background: bg, cursor: cursorHidden ? 'none' : 'default' }}>
+      {/* ── PROJECTION — ingested image/video mapped onto the court/field.
+          First child = bottom layer: every other graphic renders above it. ── */}
+      {bus.projection && gfx.projCfg?.url && <Projection cfg={gfx.projCfg} />}
+
       {/* Warm the default portal FX so firing it is instant */}
       <video muted playsInline preload="auto" className="hidden">
         <source src={DEFAULT_PORTAL_VIDEO} type="video/webm" />

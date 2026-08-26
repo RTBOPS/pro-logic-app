@@ -11,7 +11,7 @@ import { UpgradeGate } from '@/components/UpgradeGate';
 import {
   MonitorPlay, Copy, ExternalLink, Loader2, RefreshCw, Eye, EyeOff, Search,
   Upload, Trash2, Zap, Plus, Play, Pause,
-  Palette, HelpCircle, Flame, Mic, Star, Calendar, ClipboardList, Users, X, Settings,
+  Palette, HelpCircle, Flame, Mic, Star, Calendar, ClipboardList, Users, X, Settings, Projector,
 } from 'lucide-react';
 import {
   normalizeScoreboard, normalizeSummary, normalizeAnySummary, normalizeTeams, gameLeaders, periodLabel, buildCallout, detectCallouts, detectRichCallouts, advanceManualPeriod,
@@ -41,6 +41,7 @@ interface GfxState {
   pbp?: boolean;
   pbpTicker?: boolean;
   ftId: string | null;
+  projection?: boolean;
   breaking?: { title?: string; text?: string } | null;
   headline?: { title?: string; sub?: string } | null;
   newsTicker?: boolean;
@@ -49,7 +50,7 @@ interface GfxState {
   sub: { inId: string; outId: string } | null;
   coach: 'away' | 'home' | null;
 }
-const GFX_OFF: GfxState = { bug: false, lowerId: null, full: null, banner: null, portal: false, talent: false, mention: false, ftId: null, sub: null, coach: null, pbp: false, pbpTicker: false, breaking: null, headline: null, newsTicker: false, verse: null, speaker: null };
+const GFX_OFF: GfxState = { bug: false, lowerId: null, full: null, banner: null, portal: false, talent: false, mention: false, ftId: null, sub: null, coach: null, pbp: false, pbpTicker: false, projection: false, breaking: null, headline: null, newsTicker: false, verse: null, speaker: null };
 
 const DEMO = { label: 'Demo: Finals 2024 — DAL @ BOS (G5)', date: '20240617' };
 
@@ -142,6 +143,24 @@ function ControlInner() {
    * public-read, so credentials must never be written into it. */
   const [clockSrc, setClockSrc] = useState<'espn' | 'ngss' | 'oes'>('espn');
   const [srcOpen, setSrcOpen] = useState(false);
+  /* Court/field projection — media + 4-corner perspective config (in the doc) */
+  const PROJ_DEFAULTS = { url: '', kind: 'image' as 'image' | 'video', corners: [{ x: 22, y: 30 }, { x: 78, y: 30 }, { x: 96, y: 88 }, { x: 4, y: 88 }], opacity: 0.85, blend: 'normal', calib: false };
+  const [projCfg, setProjCfg] = useState(PROJ_DEFAULTS);
+  const projFileRef = useRef<HTMLInputElement>(null);
+  const uploadProjection = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    const uid = auth.currentUser?.uid;
+    if (!file || !uid) return;
+    setUploading(true);
+    try {
+      const path = `graphics_projections/${uid}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+      const snap = await uploadBytes(storageRef(storage, path), file);
+      const url = await getDownloadURL(snap.ref);
+      setProjCfg(c => ({ ...c, url, kind: file.type.startsWith('video') ? 'video' : 'image' }));
+    } catch (err: any) { alert('Upload failed: ' + err.message); }
+    finally { setUploading(false); if (projFileRef.current) projFileRef.current.value = ''; }
+  };
+
   /* News / Church editor fields (persisted in the doc via newsCfg) */
   const [nBreaking, setNBreaking] = useState({ title: 'BREAKING', text: '' });
   const [nHeadline, setNHeadline] = useState({ title: '', sub: '' });
@@ -259,7 +278,7 @@ function ControlInner() {
   const [photoOverrides, setPhotoOverrides] = useState<Record<string, string>>({});
   const [leagueBadge, setLeagueBadge] = useState('auto');   // auto | none | url
   const [extraBadges, setExtraBadges] = useState<string[]>([]);   // sponsor logos in the badge roll
-  const [dock, setDock] = useState<null | 'branding' | 'trivia' | 'portal' | 'team' | 'mention' | 'nextgame' | 'coaches'>(null);
+  const [dock, setDock] = useState<null | 'branding' | 'trivia' | 'portal' | 'team' | 'mention' | 'nextgame' | 'coaches' | 'projection'>(null);
   const [nextGameCfg, setNextGameCfg] = useState({ awayName: '', awayLogo: '', homeName: '', homeLogo: '', date: '', time: '', venue: '' });
   const [leagueTeams, setLeagueTeams] = useState<LeagueTeam[]>([]);
   useEffect(() => {
@@ -321,6 +340,7 @@ function ControlInner() {
       if (d.preview) setPvw({ ...GFX_OFF, ...d.preview });
       if (d.sourceMode === 'manual') setSource('manual');
       if (d.league && (!urlModeRef.current || sportFor(d.league) === urlModeRef.current)) setLeague(d.league);
+      if (d.projCfg) setProjCfg(c => ({ ...c, ...d.projCfg }));
       if (d.newsCfg) {
         if (d.newsCfg.breaking) setNBreaking(x => ({ ...x, ...d.newsCfg.breaking }));
         if (d.newsCfg.headline) setNHeadline(x => ({ ...x, ...d.newsCfg.headline }));
@@ -467,6 +487,7 @@ function ControlInner() {
         nextGameCfg,
         coachCfg,
         cgMode,
+        projCfg,
         newsCfg: { breaking: nBreaking, headline: nHeadline, ticker: nTicker, verse: nVerse, speaker: nSpeaker },
         tickerItems: nTicker.split('\n').map(x => x.trim()).filter(Boolean),
         leagueBadge: leagueBadge === 'none' ? '' : leagueBadge === 'auto'
@@ -562,7 +583,7 @@ function ControlInner() {
   /* Re-push settings when branding/theme changes (only once a game is loaded) */
   useEffect(() => {
     if ((eventId || source === 'manual' || cgMode !== 'sports') && token) pushDoc({});
-  }, [showBrand, autoCallouts, useTeamColors, c1, c2, banners, logoScale, brandScale, bugTextScale, badgeSec, bugStyle, bugScale, matchup3d, matchupInset, gfxScale, texture, textureIntensity, clockOffset, fullScale, atlScale, gScale, logoByGfx, imgByGfx, textByGfx, texByGfx, texIntByGfx, motionFx, trivia, portalCfg, talentList, mentionCfg, bugPos, skin, lowerPos, ftPos, photoOverrides, leagueBadge, league, source, extraBadges, nextGameCfg, coachCfg, cgMode, nBreaking, nHeadline, nTicker, nVerse, nSpeaker]);
+  }, [showBrand, autoCallouts, useTeamColors, c1, c2, banners, logoScale, brandScale, bugTextScale, badgeSec, bugStyle, bugScale, matchup3d, matchupInset, gfxScale, texture, textureIntensity, clockOffset, fullScale, atlScale, gScale, logoByGfx, imgByGfx, textByGfx, texByGfx, texIntByGfx, motionFx, trivia, portalCfg, talentList, mentionCfg, bugPos, skin, lowerPos, ftPos, photoOverrides, leagueBadge, league, source, extraBadges, nextGameCfg, coachCfg, cgMode, projCfg, nBreaking, nHeadline, nTicker, nVerse, nSpeaker]);
 
   /* Fire a play callout for the on-air player (or top scorer) */
   const calloutTarget: Athlete | null = useMemo(() => {
@@ -1860,6 +1881,7 @@ function ControlInner() {
             ['mention', Star, 'Mention'],
             ['nextgame', Calendar, 'Next Game'],
             ['coaches', ClipboardList, 'Coaches'],
+            ['projection', Projector, 'Projection'],
           ] as [typeof dock, any, string][]).map(([id, Icon, label]) => (
             <button key={id as string} onClick={() => setDock(d => d === id ? null : id)} title={label}
               className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold whitespace-nowrap ${dock === id ? 'bg-white text-black' : 'text-zinc-300 hover:bg-zinc-800'}`}>
@@ -2077,6 +2099,66 @@ function ControlInner() {
                     ))}
                   </div>
                 )}
+              </div>
+            </div>
+            </>)}
+            {dock === 'projection' && (<>
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-4">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-sm font-semibold text-gray-800">Projection <span className="text-[10px] text-gray-400 font-normal">court / field mapping</span></h2>
+                <button onClick={() => projFileRef.current?.click()} disabled={uploading}
+                  className="ml-auto px-3 py-1.5 rounded-lg text-xs font-bold bg-gray-900 text-white hover:bg-gray-700 disabled:opacity-50">
+                  {uploading ? 'Uploading…' : projCfg.url ? 'Replace media' : 'Upload image / video'}
+                </button>
+                <input ref={projFileRef} type="file" accept="image/*,video/webm,video/mp4" className="hidden" onChange={uploadProjection} />
+                <button onClick={() => setProjCfg(c => ({ ...c, calib: !c.calib }))}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold ${projCfg.calib ? 'bg-fuchsia-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
+                  {projCfg.calib ? 'Calibrating…' : 'Calibrate'}
+                </button>
+                <button onClick={() => fire({ projection: !active.projection })} disabled={!projCfg.url}
+                  className={`px-4 py-1.5 rounded-lg text-xs font-black disabled:opacity-40 ${active.projection ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
+                  {active.projection ? 'ON AIR' : 'FIRE'}
+                </button>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 text-xs text-gray-500">
+                    <span className="w-14 shrink-0">Opacity</span>
+                    <input type="range" min={0.1} max={1} step={0.05} value={projCfg.opacity}
+                      onChange={e => setProjCfg(c => ({ ...c, opacity: parseFloat(e.target.value) }))} className="flex-1" />
+                    <span className="w-9 text-right tabular-nums">{Math.round(projCfg.opacity * 100)}%</span>
+                  </label>
+                  <div className="flex items-center gap-2 text-xs text-gray-500">
+                    <span className="w-14 shrink-0">Blend</span>
+                    <select value={projCfg.blend} onChange={e => setProjCfg(c => ({ ...c, blend: e.target.value }))}
+                      className="flex-1 border border-gray-200 rounded-lg px-2 py-1 text-xs bg-white">
+                      {['normal', 'multiply', 'overlay', 'screen', 'soft-light'].map(b => <option key={b} value={b}>{b}</option>)}
+                    </select>
+                  </div>
+                  <div className="flex gap-1.5">
+                    <button onClick={() => setProjCfg(c => ({ ...c, corners: [{ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 100, y: 100 }, { x: 0, y: 100 }] }))}
+                      className="flex-1 px-2 py-1 rounded-lg text-[11px] font-bold bg-gray-100 text-gray-700 hover:bg-gray-200">Flat fullscreen</button>
+                    <button onClick={() => setProjCfg(c => ({ ...c, corners: PROJ_DEFAULTS.corners.map(p => ({ ...p })) }))}
+                      className="flex-1 px-2 py-1 rounded-lg text-[11px] font-bold bg-gray-100 text-gray-700 hover:bg-gray-200">Court preset</button>
+                  </div>
+                  {projCfg.url && <div className="text-[10px] text-gray-400 truncate">media: {projCfg.kind} · {projCfg.url.split('/').pop()?.split('?')[0]}</div>}
+                </div>
+                <div className="grid grid-cols-1 gap-2">
+                  {(['TL', 'TR', 'BR', 'BL'] as const).map((lab, i) => (
+                    <div key={lab} className="flex items-center gap-1.5 text-xs text-gray-500">
+                      <span className="w-7 font-black text-fuchsia-600">{lab}</span>
+                      <span>X</span>
+                      <input type="number" step={0.5} value={projCfg.corners[i].x}
+                        onChange={e => setProjCfg(c => ({ ...c, corners: c.corners.map((p, j) => j === i ? { ...p, x: parseFloat(e.target.value) || 0 } : p) }))}
+                        className="w-20 border border-gray-200 rounded-lg px-1.5 py-1 text-xs" />
+                      <span>Y</span>
+                      <input type="number" step={0.5} value={projCfg.corners[i].y}
+                        onChange={e => setProjCfg(c => ({ ...c, corners: c.corners.map((p, j) => j === i ? { ...p, y: parseFloat(e.target.value) || 0 } : p) }))}
+                        className="w-20 border border-gray-200 rounded-lg px-1.5 py-1 text-xs" />
+                    </div>
+                  ))}
+                  <p className="text-[10px] text-gray-400 leading-snug">Turn on <b>Calibrate</b> and fire: the output shows the 4 corner dots — adjust X/Y until the quad sits on your camera's court/field. Values are % of the frame. One-time setup per camera position.</p>
+                </div>
               </div>
             </div>
             </>)}
