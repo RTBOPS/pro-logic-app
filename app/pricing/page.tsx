@@ -79,10 +79,11 @@ export default function PricingPage() {
     setError(null);
 
     try {
+      const idToken = await user.getIdToken();
       const res = await fetch('/api/checkout', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ plan: planId, uid: user.uid, email: user.email }),
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+        body: JSON.stringify({ plan: planId }),
       });
 
       const data = await res.json();

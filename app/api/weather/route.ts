@@ -24,6 +24,7 @@ export async function GET(req: NextRequest) {
   let lat = searchParams.get('lat');
   let lon = searchParams.get('lon');
   const city = searchParams.get('city');
+  if (city && city.length > 100) return NextResponse.json({ error: 'invalid city' }, { status: 400 });
 
   try {
     // Geocode city if no lat/lon
@@ -39,9 +40,13 @@ export async function GET(req: NextRequest) {
     }
 
     if (!lat || !lon) return NextResponse.json({ error: 'lat/lon or city required' }, { status: 400 });
+    const latN = parseFloat(String(lat)), lonN = parseFloat(String(lon));
+    if (!Number.isFinite(latN) || !Number.isFinite(lonN) || latN < -90 || latN > 90 || lonN < -180 || lonN > 180) {
+      return NextResponse.json({ error: 'invalid coordinates' }, { status: 400 });
+    }
 
     const forecastRes = await fetch(
-      `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
+      `https://api.open-meteo.com/v1/forecast?latitude=${latN}&longitude=${lonN}` +
       `&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,weathercode,windspeed_10m_max` +
       `&temperature_unit=fahrenheit&windspeed_unit=mph&timezone=auto&forecast_days=7`
     );

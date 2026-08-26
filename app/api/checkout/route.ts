@@ -1,4 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { initializeApp, getApps, cert } from 'firebase-admin/app';
+import { getAuth } from 'firebase-admin/auth';
+
+/* Identity comes from a verified Firebase ID token — the request body is
+ * never trusted for uid/email (that let anyone subscribe on any account). */
+function adminAuth() {
+  if (!getApps().length) {
+    initializeApp({
+      credential: cert({
+        projectId: process.env.FIREBASE_PROJECT_ID || 'prologicstudio-4a6f5',
+        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+        privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+      }),
+    });
+  }
+  return getAuth();
+}
 
 const PLANS: Record<string, { planId: string; name: string }> = {
   pro: {
@@ -43,7 +60,17 @@ async function getPayPalAccessToken(): Promise<string> {
 
 export async function POST(req: NextRequest) {
   try {
-    const { plan, uid, email } = await req.json();
+    const authz = req.headers.get('authorization') || '';
+    const idToken = authz.startsWith('Bearer ') ? authz.slice(7) : '';
+    if (!idToken) return NextResponse.json({ error: 'Sign in to subscribe.' }, { status: 401 });
+    let uid: string, email: string | undefined;
+    try {
+      const decoded = await adminAuth().verifyIdToken(idToken);
+      uid = decoded.uid; email = decoded.email;
+    } catch {
+      return NextResponse.json({ error: 'Session expired. Sign in again.' }, { status: 401 });
+    }
+    const { plan } = await req.json();
 
     if (!plan || !PLANS[plan]) {
       return NextResponse.json({ error: 'Invalid plan' }, { status: 400 });
@@ -72,7 +99,7 @@ export async function POST(req: NextRequest) {
       },
       body: JSON.stringify({
         plan_id: planConfig.planId,
-        ...(uid ? { custom_id: uid } : {}),
+        custom_id: uid,
         subscriber: email ? { email_address: email } : undefined,
         application_context: {
           brand_name: 'PRO-LOGIC Studio',
@@ -89,7 +116,7 @@ export async function POST(req: NextRequest) {
     if (!subscription.ok) {
       const err = await subscription.text();
       console.error('PayPal create subscription error:', err);
-      return NextResponse.json({ error: `PayPal error: ${err}` }, { status: 500 });
+      return NextResponse.json({ error: 'Subscription creation failed. Please try again.' }, { status: 500 });
     }
 
     const subData = await subscription.json();
@@ -102,6 +129,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ url: approvalLink });
   } catch (err: any) {
     console.error('PayPal checkout error:', err?.message || err);
-    return NextResponse.json({ error: err?.message || 'Checkout failed' }, { status: 500 });
+    return NextResponse.json({ error: 'Checkout failed. Please try again.' }, { status: 500 });
   }
 }

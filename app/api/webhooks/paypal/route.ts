@@ -71,8 +71,9 @@ async function verifyWebhookSignature(req: NextRequest, body: string): Promise<b
 export async function POST(req: NextRequest) {
   const body = await req.text();
 
-  // Skip verification in development
-  if (process.env.NODE_ENV === 'production') {
+  // Verify whenever a webhook id is configured — NODE_ENV is not a security
+  // boundary (preview deploys are publicly reachable).
+  if (process.env.PAYPAL_WEBHOOK_ID) {
     const valid = await verifyWebhookSignature(req, body);
     if (!valid) {
       console.error('PayPal webhook signature verification failed');
