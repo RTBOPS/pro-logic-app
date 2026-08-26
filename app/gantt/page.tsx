@@ -2,8 +2,9 @@
 
 import { useState, useMemo } from 'react';
 import { useData } from '@/hooks/useData';
-import { addDoc, updateDoc, deleteDoc, collection, doc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { addDoc, setDoc, deleteDoc, collection, doc } from 'firebase/firestore';
+import { auth, db } from '@/lib/firebase';
+import { useNamespace } from '@/hooks/useNamespace';
 import { Plus, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { deptColor } from '@/lib/departments';
 import Modal from '@/components/Modal';
@@ -51,7 +52,13 @@ export default function GanttPage() {
   const { data: crew } = useData('crew');
   const { data: locations } = useData('locations');
 
-  const [rows, setRows] = useState<GanttRow[]>([]);
+  /* Rows live in Firestore (users/{ns}/gantt_rows) via the same live hook as
+   * every other page — they used to sit in useState and vanished on reload. */
+  const namespace = useNamespace();
+  const ns = () => namespace ?? auth.currentUser?.uid ?? '';
+  const rowsCol = () => collection(db, `users/${ns()}/gantt_rows`);
+  const { data: rowsRaw } = useData('gantt_rows');
+  const rows = rowsRaw as GanttRow[];
   const [modal, setModal] = useState(false);
   const [form, setForm] = useState({ label: '', type: 'production' as GanttRow['type'], start: '', end: '', notes: '' });
   const [viewStart, setViewStart] = useState(() => new Date().toISOString().split('T')[0]);
@@ -71,49 +78,34 @@ export default function GanttPage() {
     return weeks;
   }, [viewDates]);
 
-  const addRow = () => {
-    if (!form.label || !form.start || !form.end) return;
-    const newRow: GanttRow = {
-      id: crypto.randomUUID(),
-      ...form,
-      color: TYPE_COLORS[form.type],
-    };
-    setRows(r => [...r, newRow]);
+  const addRow = async () => {
+    if (!form.label || !form.start || !form.end || !ns()) return;
+    await addDoc(rowsCol(), { ...form, color: TYPE_COLORS[form.type] });
     setModal(false);
     setForm({ label: '', type: 'production', start: '', end: '', notes: '' });
   };
 
-  const removeRow = (id: string) => setRows(r => r.filter(row => row.id !== id));
+  const removeRow = (id: string) => { if (ns()) deleteDoc(doc(db, `users/${ns()}/gantt_rows/${id}`)); };
 
   const addFromProduction = () => {
     const today = new Date().toISOString().split('T')[0];
     const end = addDays(today, 14);
-    const newRows: GanttRow[] = productions.map((p: any) => ({
-      id: `prod_${p.id}`,
-      label: `${p.name} (${p.client})`,
-      type: 'production' as const,
+    if (!ns()) return;
+    // deterministic doc ids keep re-imports idempotent (merge, never duplicate)
+    productions.forEach((p: any) => setDoc(doc(db, `users/${ns()}/gantt_rows/prod_${p.id}`), {
+      label: `${p.name} (${p.client})`, type: 'production',
       start: today, end, color: TYPE_COLORS.production,
-    }));
-    setRows(r => {
-      const existingIds = new Set(r.map(row => row.id));
-      return [...r, ...newRows.filter(nr => !existingIds.has(nr.id))];
-    });
+    }, { merge: true }));
   };
 
   const addFromCrew = () => {
     const today = new Date().toISOString().split('T')[0];
     const end = addDays(today, 7);
-    const newRows: GanttRow[] = crew.map((c: any) => ({
-      id: `crew_${c.id}`,
-      label: `${c.name} ${c.last_name} — ${c.role || c.department || ''}`,
-      type: 'crew' as const,
-      start: today, end,
-      color: deptColor(c.department || 'other'),
-    }));
-    setRows(r => {
-      const existingIds = new Set(r.map(row => row.id));
-      return [...r, ...newRows.filter(nr => !existingIds.has(nr.id))];
-    });
+    if (!ns()) return;
+    crew.forEach((c: any) => setDoc(doc(db, `users/${ns()}/gantt_rows/crew_${c.id}`), {
+      label: `${c.name} ${c.last_name} — ${c.role || c.department || ''}`, type: 'crew',
+      start: today, end, color: deptColor(c.department || 'other'),
+    }, { merge: true }));
   };
 
   const getBarStyle = (row: GanttRow) => {
