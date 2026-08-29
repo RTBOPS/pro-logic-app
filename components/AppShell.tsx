@@ -44,16 +44,22 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     <AuthGuard>
       <CompanyTheme />
       {/* Mobile header bar */}
-      <div className="md:hidden fixed top-0 left-0 right-0 z-40 flex items-center justify-between px-4 h-14 shrink-0"
-        style={{ backgroundColor: company?.primary_color || '#18181b' }}>
-        <button onClick={() => setSidebarOpen(true)} className="text-white p-1">
+      <div className="md:hidden fixed top-0 left-0 right-0 z-40 flex items-end justify-between px-4 shrink-0"
+        style={{
+          backgroundColor: company?.primary_color || '#18181b',
+          // Installed as a PWA, the iOS status bar overlays the page — keep
+          // the tappable row below it.
+          paddingTop: 'env(safe-area-inset-top)',
+          height: 'calc(3.5rem + env(safe-area-inset-top))',
+        }}>
+        <button onClick={() => setSidebarOpen(true)} className="text-white p-1 my-auto" style={{ marginTop: 'auto', marginBottom: 'auto' }}>
           <Menu size={22} />
         </button>
         {/* Pro-Logic logo center-left */}
-        <img src="/logo.png" alt="PRO-LOGIC" className="h-7 object-contain" style={{ filter: 'brightness(0) invert(1)' }} />
+        <img src="/logo.png" alt="PRO-LOGIC" className="h-7 object-contain my-auto" style={{ filter: 'brightness(0) invert(1)' }} />
         {/* Company logo right */}
         {company?.logo_url
-          ? <img src={company.logo_url} alt={company.name} className="h-8 object-contain rounded" />
+          ? <img src={company.logo_url} alt={company.name} className="h-8 object-contain rounded my-auto" />
           : <div className="w-8" />
         }
       </div>
@@ -62,8 +68,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       {sidebarOpen && (
         <div className="md:hidden fixed inset-0 z-50 flex">
           <div className="absolute inset-0 bg-black/60" onClick={() => setSidebarOpen(false)} />
-          <div className="relative z-10 w-64 h-full">
-            <button onClick={() => setSidebarOpen(false)} className="absolute top-3 right-3 text-zinc-300 hover:text-white z-20">
+          <div className="relative z-10 w-64 h-full" style={{ paddingTop: 'env(safe-area-inset-top)', backgroundColor: '#18181b' }}>
+            <button onClick={() => setSidebarOpen(false)} className="absolute right-3 text-zinc-300 hover:text-white z-20" style={{ top: 'calc(0.75rem + env(safe-area-inset-top))' }}>
               <X size={20} />
             </button>
             <Sidebar forceExpanded />
@@ -77,7 +83,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       </div>
 
       {/* Main content */}
-      <main className="flex-1 overflow-auto pt-14 md:pt-0">
+      <main className="flex-1 overflow-auto pt-[calc(3.5rem+env(safe-area-inset-top))] md:pt-0">
         {children}
       </main>
     </AuthGuard>
