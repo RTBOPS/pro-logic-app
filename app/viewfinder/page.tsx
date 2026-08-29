@@ -71,6 +71,16 @@ export default function ViewfinderPage() {
     return () => ro.disconnect();
   }, [immersive]);
 
+  // Toggling immersive mounts a fresh <video> element — re-attach the live
+  // stream to it or the camera stays on with a black picture.
+  useEffect(() => {
+    const v = videoRef.current;
+    if (v && streamRef.current && v.srcObject !== streamRef.current) {
+      v.srcObject = streamRef.current;
+      v.play().catch(() => {});
+    }
+  }, [immersive]);
+
   const enterImmersive = () => {
     setImmersive(true);
     stageWrapRef.current?.requestFullscreen?.().catch(() => {});
@@ -116,6 +126,7 @@ export default function ViewfinderPage() {
     try {
       // Draw only the zoomed (visible) region, centered.
       const vw = video.videoWidth, vh = video.videoHeight;
+      if (!vw || !vh) { alert('Camera is still warming up — try again in a second.'); setSaving(false); return; }
       const cw = vw / zoom, ch = vh / zoom;
       const canvas = document.createElement('canvas');
       canvas.width = Math.round(cw); canvas.height = Math.round(ch);
@@ -190,7 +201,7 @@ export default function ViewfinderPage() {
 
   const stage = (
     <div ref={stageRef} className={`relative overflow-hidden bg-black ${immersive ? 'absolute inset-0' : 'w-full aspect-video'}`}>
-      <video ref={videoRef} playsInline muted className="absolute inset-0 w-full h-full object-cover" style={{ transform: `scale(${zoom})` }} />
+      <video ref={videoRef} playsInline muted autoPlay className="absolute inset-0 w-full h-full object-cover" style={{ transform: `scale(${zoom})` }} />
       {matteRatio > 0 && (
         <>
           <div className="absolute left-0 right-0 top-0 bg-black/80" style={{ height: `${barY}%` }} />
@@ -305,7 +316,7 @@ export default function ViewfinderPage() {
               <div key={sh.id} className="group relative bg-white rounded-xl border border-gray-200 overflow-hidden">
                 <img src={sh.url} alt="" className="w-full aspect-video object-cover" />
                 <div className="px-2 py-1.5 text-[11px] text-gray-600">{sh.sensor} · {sh.focal}{sh.matte && sh.matte !== 'No matte' ? ` · ${sh.matte}` : ''}</div>
-                <button onClick={() => remove(sh.id)} className="absolute top-1.5 right-1.5 bg-black/60 text-white p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity">
+                <button onClick={() => remove(sh.id)} className="absolute top-1.5 right-1.5 bg-black/60 text-white p-1.5 rounded-lg opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                   <Trash2 size={13} />
                 </button>
               </div>
