@@ -6,7 +6,7 @@ import { addDoc, deleteDoc, collection, doc, serverTimestamp } from 'firebase/fi
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { auth, db, storage } from '@/lib/firebase';
 import { useNamespace } from '@/hooks/useNamespace';
-import { Camera, Grid3x3, Crosshair, Trash2, Video, VideoOff } from 'lucide-react';
+import { Camera, Grid3x3, Crosshair, Trash2, Video, VideoOff, Maximize2, Minimize2, Smartphone } from 'lucide-react';
 
 /* Director's viewfinder: simulates the field of view of real sensor + lens
    combos by digitally zooming the phone camera, with aspect mattes and
@@ -45,6 +45,26 @@ export default function ViewfinderPage() {
   const [baseFocal, setBaseFocal] = useState(24); // phone main cam, FF-equivalent
   const [prodId, setProdId] = useState('');
   const [saving, setSaving] = useState(false);
+  const stageWrapRef = useRef<HTMLDivElement>(null);
+  const [isFs, setIsFs] = useState(false);
+  const [fsSupported, setFsSupported] = useState(false);
+  const [iosTip, setIosTip] = useState(false);
+
+  useEffect(() => {
+    setFsSupported(typeof document !== 'undefined' && !!document.fullscreenEnabled);
+    // iPhone Safari can't fullscreen a page — suggest installing to the Home Screen
+    const isIos = /iPhone|iPod/.test(navigator.userAgent);
+    const standalone = (navigator as any).standalone === true;
+    setIosTip(isIos && !standalone);
+    const onFs = () => setIsFs(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', onFs);
+    return () => document.removeEventListener('fullscreenchange', onFs);
+  }, []);
+
+  const toggleFs = () => {
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+    else stageWrapRef.current?.requestFullscreen?.().catch(() => {});
+  };
 
   const sensorW = SENSORS.find(s => s.id === sensor)!.width;
   const ffEquiv = focal * (36 / sensorW);
@@ -129,9 +149,9 @@ export default function ViewfinderPage() {
         <p className="text-gray-500 text-sm">Preview real sensor + lens fields of view with your phone camera, and capture scouting frames.</p>
       </div>
 
-      <div className="bg-zinc-950 rounded-2xl overflow-hidden border border-zinc-800">
+      <div ref={stageWrapRef} className="bg-zinc-950 rounded-2xl overflow-hidden border border-zinc-800">
         {/* Stage */}
-        <div className="relative w-full aspect-video overflow-hidden bg-black">
+        <div className={`relative w-full overflow-hidden bg-black ${isFs ? 'h-[calc(100dvh-140px)]' : 'aspect-video'}`}>
           <video ref={videoRef} playsInline muted className="absolute inset-0 w-full h-full object-cover" style={{ transform: `scale(${zoom})` }} />
           {matteRatio > 0 && (
             <>
@@ -193,6 +213,11 @@ export default function ViewfinderPage() {
               mm
             </label>
             <div className="flex-1" />
+            {fsSupported && (
+              <button onClick={toggleFs} title="Fullscreen" className="flex items-center gap-1.5 text-zinc-400 text-xs px-3 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700">
+                {isFs ? <Minimize2 size={13} /> : <Maximize2 size={13} />} {isFs ? 'Exit' : 'Fullscreen'}
+              </button>
+            )}
             {live && (
               <button onClick={stop} className="flex items-center gap-1.5 text-zinc-400 text-xs px-3 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700"><VideoOff size={13} /> Stop</button>
             )}
@@ -202,6 +227,13 @@ export default function ViewfinderPage() {
           </div>
         </div>
       </div>
+
+      {iosTip && (
+        <div className="mt-3 flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5 text-xs text-amber-800">
+          <Smartphone size={14} className="shrink-0 mt-0.5" />
+          <span>On iPhone, Safari's bars can't be hidden from a web page. For a true fullscreen viewfinder: tap <b>Share → Add to Home Screen</b>, then open PRO-LOGIC from your Home Screen — it runs as a full-screen app.</span>
+        </div>
+      )}
 
       {/* Captured frames */}
       {prodShots.length > 0 && (

@@ -8,6 +8,19 @@ const geist = Geist({ subsets: ['latin'], variable: '--font-geist-sans' });
 export const metadata: Metadata = {
   title: 'PRO-LOGIC Studio',
   description: 'Production management for Pro-Logic Studio',
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'PRO-LOGIC',
+  },
+};
+
+export const viewport = {
+  themeColor: '#09090b',
+  viewportFit: 'cover' as const,
+  width: 'device-width',
+  initialScale: 1,
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
