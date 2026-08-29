@@ -9,7 +9,8 @@ import {
   CheckSquare, Layers, BarChart3, Zap, Globe,
   ArrowRight, Star, ChevronRight,
   ClipboardCheck, IdCard, BookImage, Loader2, CreditCard, Mic,
-  MonitorPlay, Tv, ListOrdered, Shield,
+  MonitorPlay, Tv, ListOrdered, Shield, Sunrise, Aperture, Handshake,
+  Wallet, FileCheck, Brush, Projector, Megaphone,
 } from 'lucide-react';
 
 const FEATURES = [
@@ -26,27 +27,39 @@ const FEATURES = [
   { icon: BarChart3,     title: 'Gantt Chart',       desc: 'Visual timeline across your entire production schedule. See every task, dependency, and deadline at once.',        color: 'bg-yellow-400/10 text-yellow-400' },
   { icon: ClipboardList, title: 'Shoot Log',         desc: 'On-set take journal: scene, shot, lens, aperture, ISO, shutter speed, sound roll — all logged in real time.',     color: 'bg-yellow-400/10 text-yellow-400' },
   { icon: Mic,           title: 'Audio Planner',     desc: 'Live-show input lists with recommended mics, gain structure, phantom power, RF frequency coordination, monitor mixes and comms (walkies, intercom, IFB). Paste a technical rider — get the patch list.', color: 'bg-yellow-400/10 text-yellow-400' },
-  { icon: MonitorPlay,   title: 'Live Sports Graphics', desc: 'A real-time broadcast CG: score bug with official clocks, player lower thirds, auto play callouts, sponsored trivia and AR-style reveals — driven by live NBA, NCAA, G League & WNBA feeds or fully manual for local teams. Preview/Take, skins, and OBS/vMix-ready output.', color: 'bg-yellow-400/10 text-yellow-400' },
+  { icon: MonitorPlay,   title: 'Live Sports Graphics', desc: 'A real-time broadcast CG for basketball, soccer, NFL, NHL and MLB — 15+ leagues of live data. Score bug with official clocks, player lower thirds, auto play callouts, stats and tickers, plus News and Church broadcast modes. Preview/Take, skins, and OBS/vMix-ready output.', color: 'bg-yellow-400/10 text-yellow-400' },
   { icon: Tv,            title: 'Broadcast Plan',    desc: 'The TD\'s paperwork for live multi-cam shows: camera plan with presets, replay units, event-driven graphics package, and transmission circuits coordinated with the network.', color: 'bg-yellow-400/10 text-yellow-400' },
   { icon: ListOrdered,   title: 'Run of Show',       desc: 'The show-caller\'s master timing: segments, cues per department (audio, video, lighting, SFX), computed clock times and total runtime. Doubles as a broadcast rundown.', color: 'bg-yellow-400/10 text-yellow-400' },
   { icon: Shield,        title: 'Safety & Risk',     desc: 'Hazard matrix with severity scoring, mitigations per stunt, pyro, rigging or crowd, emergency plan, and a sign-off ready PDF.', color: 'bg-yellow-400/10 text-yellow-400' },
+  { icon: Projector,     title: 'Projection Mapping', desc: 'Ingest an image or video and project it onto the court or field in true perspective — four calibration points and it locks to the surface, for pregame reveals and sponsor moments.', color: 'bg-yellow-400/10 text-yellow-400' },
+  { icon: Wallet,        title: 'Budget & Finance',  desc: 'Film-standard budget topsheet with 13 categories, purchase orders and invoices with status tracking, and estimated vs actual variance at a glance.', color: 'bg-yellow-400/10 text-yellow-400' },
+  { icon: Handshake,     title: 'Clients & Proposals', desc: 'Your client book plus numbered quotes with line items. Share a link — the client accepts or declines online and the status updates itself.', color: 'bg-yellow-400/10 text-yellow-400' },
+  { icon: FileCheck,     title: 'Permits & Insurance', desc: 'A vault for every certificate, permit and policy with expiry tracking — EXPIRING and EXPIRED alerts before they bite you on set.', color: 'bg-yellow-400/10 text-yellow-400' },
+  { icon: Brush,         title: 'Creative Suite',    desc: 'Write the treatment, build mood boards and look books with your colour palette, and export them as typeset, client-ready PDFs.', color: 'bg-yellow-400/10 text-yellow-400' },
+  { icon: Sunrise,       title: 'Sun Tracker',       desc: 'Golden hour, blue hour, sunrise and shadow direction for any location and date — and sun times printed on every call sheet automatically.', color: 'bg-yellow-400/10 text-yellow-400' },
+  { icon: Aperture,      title: "Director's Viewfinder", desc: 'Preview real sensor and lens fields of view with your phone camera — mattes, framing guides, and scouting frames saved to the production.', color: 'bg-yellow-400/10 text-yellow-400' },
 ];
 
 const PLANS = [
   {
     name: 'Free', price: '$0', period: 'forever', planKey: null,
-    features: ['1 active production', 'Up to 5 crew members', 'Up to 10 inventory items', 'Basic call sheet PDF', 'Community support'],
+    features: ['1 active production', 'Up to 5 crew members', 'Up to 10 inventory items', 'Basic call sheet PDF', 'Sun tracker', 'Community support'],
     cta: 'Get started free', highlight: false,
   },
   {
-    name: 'Pro', price: '$29', period: '/month', planKey: 'pro',
-    features: ['Unlimited productions', 'Unlimited crew & inventory', 'All PDF documents', 'Live sports graphics (CG)', 'Audio planner (input list & RF)', 'Storyboard + Blueprint', 'Equipment forms & ID cards', 'Priority support'],
-    cta: 'Subscribe — $29/mo', highlight: true, badge: 'Most Popular',
+    name: 'Producer', price: '$39', period: '/month', planKey: 'producer',
+    features: ['Unlimited productions, crew & inventory', 'All 30 production documents', 'Budget, POs & invoices', 'Clients & online proposals', 'Permits & insurance vault', 'Creative suite & viewfinder', 'Audio planner, storyboard, stripboard', 'Priority support'],
+    cta: 'Subscribe — $39/mo', highlight: true, badge: 'Most Popular',
   },
   {
-    name: 'Studio', price: '$79', period: '/month', planKey: 'studio',
-    features: ['Everything in Pro', 'Team workspaces & multi-user', 'Custom branding', 'API access', 'Dedicated support'],
-    cta: 'Subscribe — $79/mo', highlight: false,
+    name: 'Broadcast', price: '$99', period: '/month', planKey: 'broadcast',
+    features: ['Everything in Producer', 'Live sports CG with real-time data', '5 sports · 15+ leagues', 'News & church modes', 'Projection mapping', '1 on-air output'],
+    cta: 'Subscribe — $99/mo', highlight: false, badge: 'Live Graphics',
+  },
+  {
+    name: 'Studio', price: '$199', period: '/month', planKey: 'studio',
+    features: ['Everything in Broadcast', 'Multiple team members', '3 on-air outputs', 'White-label exports', 'Dedicated support'],
+    cta: 'Subscribe — $199/mo', highlight: false,
   },
 ];
 
@@ -375,9 +388,9 @@ export default function LandingPage() {
         <div className="max-w-5xl mx-auto">
           <div className="text-center mb-14 sm:mb-20">
             <h2 className="text-3xl sm:text-4xl md:text-5xl font-black mb-4">Simple, transparent pricing</h2>
-            <p className="text-zinc-400 text-base sm:text-lg">Start free. Scale as your studio grows.</p>
+            <p className="text-zinc-400 text-base sm:text-lg">Start free. Scale as your studio grows. Save ~25% on <Link href="/pricing" className="underline hover:text-white">annual billing</Link>.</p>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5 sm:gap-6 items-start md:items-center">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 sm:gap-6 items-start">
             {PLANS.map(({ name, price, period, features, cta, highlight, badge, planKey }) => (
               <div key={name}
                 className={`rounded-2xl p-7 sm:p-8 flex flex-col transition-all ${highlight ? 'bg-white text-zinc-950 shadow-[0_0_60px_rgba(255,255,255,0.15)] md:scale-105' : 'bg-zinc-900 border border-white/10'}`}>
@@ -415,6 +428,21 @@ export default function LandingPage() {
                 )}
               </div>
             ))}
+          </div>
+
+          <div className="mt-8 bg-zinc-900 border border-white/10 rounded-2xl p-6 flex flex-col sm:flex-row items-center gap-5">
+            <div className="p-3 rounded-2xl bg-yellow-400/10 text-yellow-400"><Zap size={26} /></div>
+            <div className="flex-1 text-center sm:text-left">
+              <div className="font-bold text-white text-lg">Event Pass — $79</div>
+              <p className="text-sm text-zinc-400">Full Broadcast access for 4 days. One game weekend, one tournament, one event — no subscription.</p>
+            </div>
+            <Link href="/pricing" className="bg-yellow-400 text-black px-6 py-2.5 rounded-xl text-sm font-bold hover:bg-yellow-300 whitespace-nowrap">Get a pass</Link>
+          </div>
+
+          <div className="mt-4 flex flex-col sm:flex-row items-center justify-center gap-2 text-sm text-zinc-500">
+            <Megaphone size={15} className="text-yellow-400" />
+            <span>Creators: earn <span className="text-zinc-300 font-semibold">10% of every payment for 12 months</span> on customers you refer —</span>
+            <Link href="/partners" className="text-yellow-400 hover:text-yellow-300 font-semibold">join the partner program</Link>
           </div>
         </div>
       </section>
