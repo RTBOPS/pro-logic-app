@@ -7,7 +7,9 @@ import { doc, getDoc, getDocs, collection } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import {
   FileText, Users, MapPin, Film, Shield, UserCheck,
-  ClipboardList, Printer, Eye, Download, X
+  ClipboardList, Printer, Eye, Download, X,
+  FileSignature, CalendarDays, ListOrdered, Package, DollarSign, ShoppingCart, Receipt,
+  UtensilsCrossed, CloudRain, Plane, PackageCheck, Layers,
 } from 'lucide-react';
 import { useNamespace } from '@/hooks/useNamespace';
 import { generateCallSheet } from '@/lib/pdf/callsheet';
@@ -18,6 +20,18 @@ import { generateLocationRelease } from '@/lib/pdf/location-release';
 import { generateShotList } from '@/lib/pdf/shot-list';
 import { generateStripboard } from '@/lib/pdf/stripboard';
 import { generateCharacterBreakdown } from '@/lib/pdf/character-breakdown';
+import { generateTalentRelease } from '@/lib/pdf/talent-release';
+import { generateDayOutOfDays } from '@/lib/pdf/day-out-of-days';
+import { generateOneLiner } from '@/lib/pdf/one-liner';
+import { generateDepartmentLists } from '@/lib/pdf/department-lists';
+import { generateBudget } from '@/lib/pdf/budget';
+import { generatePurchaseOrders } from '@/lib/pdf/purchase-order';
+import { generateInvoiceTracker } from '@/lib/pdf/invoice-tracker';
+import { generateCateringOrder } from '@/lib/pdf/catering-order';
+import { generateWeatherContingency } from '@/lib/pdf/weather-contingency';
+import { generateTravelAccommodation } from '@/lib/pdf/travel-accommodation';
+import { generateDeliverables } from '@/lib/pdf/deliverables';
+import { generateSceneBreakdown } from '@/lib/pdf/scene-breakdown';
 
 const DOCS = [
   { id: 'call-sheet', title: 'Call Sheet', desc: 'Daily production schedule for cast & crew', icon: ClipboardList, color: 'bg-blue-50 text-blue-600', generate: generateCallSheet },
@@ -27,6 +41,18 @@ const DOCS = [
   { id: 'character-breakdown', title: 'Character Breakdown', desc: 'Character profiles for casting & production', icon: UserCheck, color: 'bg-orange-50 text-orange-600', generate: generateCharacterBreakdown },
   { id: 'location-release', title: 'Location Release Agreement', desc: 'Permission to film at a location', icon: MapPin, color: 'bg-teal-50 text-teal-600', generate: generateLocationRelease },
   { id: 'crew-deal', title: 'Crew Deal Memo & Contract', desc: 'Standard crew deal memo with payment terms', icon: Users, color: 'bg-indigo-50 text-indigo-600', generate: generateCrewDeal },
+  { id: 'talent-release', title: 'Talent Release', desc: 'Appearance release, one page per performer', icon: FileSignature, color: 'bg-pink-50 text-pink-600', generate: generateTalentRelease },
+  { id: 'day-out-of-days', title: 'Day out of Days', desc: 'Cast × shoot-day matrix (SW/W/H/WF)', icon: CalendarDays, color: 'bg-amber-50 text-amber-600', generate: generateDayOutOfDays },
+  { id: 'one-liner', title: 'One-Liner Schedule', desc: 'Every scene on one line, grouped by day', icon: ListOrdered, color: 'bg-cyan-50 text-cyan-600', generate: generateOneLiner },
+  { id: 'department-lists', title: 'Department Lists', desc: 'Crew + equipment per department; blank sheets for art/wardrobe', icon: Package, color: 'bg-lime-50 text-lime-600', generate: generateDepartmentLists },
+  { id: 'budget', title: 'Production Budget', desc: 'Topsheet + detail, estimates vs actuals', icon: DollarSign, color: 'bg-emerald-50 text-emerald-600', generate: generateBudget },
+  { id: 'purchase-orders', title: 'Purchase Orders', desc: 'One printable PO per record', icon: ShoppingCart, color: 'bg-violet-50 text-violet-600', generate: generatePurchaseOrders },
+  { id: 'invoice-tracker', title: 'Invoice Tracker', desc: 'Received invoices with totals by status', icon: Receipt, color: 'bg-rose-50 text-rose-600', generate: generateInvoiceTracker },
+  { id: 'catering-order', title: 'Catering / Craft Order', desc: 'Headcount + dietary counts from crew profiles', icon: UtensilsCrossed, color: 'bg-orange-50 text-orange-600', generate: generateCateringOrder },
+  { id: 'weather-contingency', title: 'Weather Contingency', desc: '7-day forecast + cover set & call protocol', icon: CloudRain, color: 'bg-sky-50 text-sky-600', generate: generateWeatherContingency },
+  { id: 'travel-accommodation', title: 'Travel & Accommodation', desc: 'Crew grid: arrivals, hotels, rooms', icon: Plane, color: 'bg-fuchsia-50 text-fuchsia-600', generate: generateTravelAccommodation },
+  { id: 'scene-breakdown', title: 'Scene Breakdown Sheets', desc: 'One classic breakdown sheet per scene', icon: Layers, color: 'bg-stone-50 text-stone-600', generate: generateSceneBreakdown },
+  { id: 'deliverables', title: 'Final Deliverables', desc: 'Spec sheet + delivery checklist with sign-off', icon: PackageCheck, color: 'bg-slate-50 text-slate-600', generate: generateDeliverables },
 ];
 
 function DocumentsPageInner() {
@@ -37,6 +63,8 @@ function DocumentsPageInner() {
   const { data: locations } = useData('locations');
   const { data: inventory } = useData('inventory');
   const { data: stripboardScenes } = useData('stripboard');
+  const { data: budgetLines } = useData('budget_lines');
+  const { data: financeDocs } = useData('finance_docs');
   const { data: characters } = useData('characters');
   const [selectedProduction, setSelectedProduction] = useState('');
   const [generating, setGenerating] = useState<string | null>(null);
@@ -92,12 +120,12 @@ function DocumentsPageInner() {
     // Filter stripboard scenes and characters to this production
     const prodStrips = stripboardScenes.filter((s: any) => !s.production_id || s.production_id === selectedProduction);
     const prodChars = characters.filter((c: any) => !c.production_id || c.production_id === selectedProduction);
-    return { production, crew: crewWithTimes, locations, inventory, weather, forecast, company, stripboardScenes: prodStrips, characters: prodChars };
+    return { production, crew: crewWithTimes, locations, inventory, weather, forecast, company, stripboardScenes: prodStrips, characters: prodChars, budgetLines, financeDocs };
   };
 
   const handlePreview = async (docItem: typeof DOCS[0]) => {
     if (!selectedProduction) { alert('Please select a production first.'); return; }
-    const isCallSheet = docItem.id === 'call-sheet';
+    const isCallSheet = ['call-sheet', 'weather-contingency'].includes(docItem.id);
     const ctx = await getContext(isCallSheet);
     if (!ctx.production) return;
     setGenerating(docItem.id + '-preview');
@@ -106,7 +134,7 @@ function DocumentsPageInner() {
       setPreview({ title: docItem.title, dataUri, docItem });
     } catch (e) {
       console.error(e);
-      alert('Error generating preview.');
+      alert(`Error generating preview: ${(e as any)?.message || e}`);
     } finally {
       setGenerating(null);
     }
@@ -114,14 +142,14 @@ function DocumentsPageInner() {
 
   const handleDownload = async (docItem: typeof DOCS[0]) => {
     if (!selectedProduction) { alert('Please select a production first.'); return; }
-    const ctx = await getContext(docItem.id === 'call-sheet');
+    const ctx = await getContext(['call-sheet', 'weather-contingency'].includes(docItem.id));
     if (!ctx.production) return;
     setGenerating(docItem.id + '-download');
     try {
       await docItem.generate({ ...ctx, preview: false });
     } catch (e) {
       console.error(e);
-      alert('Error generating document.');
+      alert(`Error generating document: ${(e as any)?.message || e}`);
     } finally {
       setGenerating(null);
     }

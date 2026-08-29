@@ -11,6 +11,8 @@ export type PDFContext = {
   company?: any;
   stripboardScenes?: any[];
   characters?: any[];
+  budgetLines?: any[];
+  financeDocs?: any[];
 };
 
 export function createDoc(orientation: 'p' | 'l' = 'p'): jsPDF {

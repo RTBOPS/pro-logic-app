@@ -101,6 +101,8 @@ export const LEAGUES: { id: string; label: string; logo: string; sport?: string 
   { id: 'usa.1', label: 'MLS', logo: 'https://a.espncdn.com/i/leaguelogos/soccer/500/19.png', sport: 'soccer' },
   { id: 'eng.1', label: 'Premier League', logo: 'https://a.espncdn.com/i/leaguelogos/soccer/500/23.png', sport: 'soccer' },
   { id: 'esp.1', label: 'LaLiga', logo: 'https://a.espncdn.com/i/leaguelogos/soccer/500/15.png', sport: 'soccer' },
+  { id: 'bra.1', label: 'Brasileirão', logo: 'https://a.espncdn.com/i/leaguelogos/soccer/500/85.png', sport: 'soccer' },
+  { id: 'arg.1', label: 'Liga Argentina', logo: 'https://a.espncdn.com/i/leaguelogos/soccer/500/1.png', sport: 'soccer' },
   { id: 'uefa.champions', label: 'Champions League', logo: 'https://a.espncdn.com/i/leaguelogos/soccer/500/2.png', sport: 'soccer' },
 ];
 

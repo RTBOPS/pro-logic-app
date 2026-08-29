@@ -3,7 +3,7 @@
  * derives the sport slug from the league id. */
 export const SPORT_LEAGUES: Record<string, Set<string>> = {
   basketball: new Set(['nba', 'nba-development', 'mens-college-basketball', 'womens-college-basketball', 'wnba']),
-  soccer:     new Set(['mex.1', 'usa.1', 'eng.1', 'esp.1', 'uefa.champions', 'concacaf.champions']),
+  soccer:     new Set(['mex.1', 'usa.1', 'eng.1', 'esp.1', 'bra.1', 'arg.1', 'uefa.champions', 'concacaf.champions']),
   football:   new Set(['nfl', 'college-football']),
   hockey:     new Set(['nhl']),
   baseball:   new Set(['mlb']),
