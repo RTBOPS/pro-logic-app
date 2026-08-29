@@ -73,7 +73,7 @@ export default function CompliancePage() {
   const expired = docs.filter((d: any) => statusOf(d.expires)[0] === 'EXPIRED').length;
 
   return (
-    <UpgradeGate feature="Permits & Insurance" requires="pro">
+    <UpgradeGate feature="Permits & Insurance" requires="producer">
     <div className="p-6 max-w-5xl mx-auto">
       <PageHeader title="Permits & Insurance" subtitle="Certificates, permits and licenses — tracked with expiry alerts">
         <select value={prodFilter} onChange={e => setProdFilter(e.target.value)} className="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white">

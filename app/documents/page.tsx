@@ -35,6 +35,7 @@ import { generateSceneBreakdown } from '@/lib/pdf/scene-breakdown';
 import { generateComplianceStatus } from '@/lib/pdf/compliance';
 import { generateTreatment } from '@/lib/pdf/treatment';
 import { generateLookBook } from '@/lib/pdf/lookbook';
+import { sunTimes } from '@/lib/sun';
 
 const DOCS = [
   { id: 'call-sheet', title: 'Call Sheet', desc: 'Daily production schedule for cast & crew', icon: ClipboardList, color: 'bg-blue-50 text-blue-600', generate: generateCallSheet },
@@ -90,6 +91,7 @@ function DocumentsPageInner() {
     const production = productions.find((p: any) => p.id === selectedProduction);
     let weather = null;
     let forecast = null;
+    let sun = null;
     if (includeWeather && production) {
       try {
         const loc = locations.find((l: any) => l.id === production.location_id);
@@ -103,6 +105,11 @@ function DocumentsPageInner() {
             weather = targetDate
               ? data.forecast.find((f: any) => f.date === targetDate) || data.forecast[0]
               : data.forecast[0];
+            if (typeof data.lat === 'number' && typeof data.lon === 'number') {
+              const [y, m, d] = String(weather?.date || targetDate || '').split('-').map(Number);
+              const dt = y && m && d ? new Date(y, m - 1, d) : new Date();
+              sun = sunTimes(dt, data.lat, data.lon);
+            }
           }
         }
       } catch {}
@@ -129,7 +136,7 @@ function DocumentsPageInner() {
     // Filter stripboard scenes and characters to this production
     const prodStrips = stripboardScenes.filter((s: any) => !s.production_id || s.production_id === selectedProduction);
     const prodChars = characters.filter((c: any) => !c.production_id || c.production_id === selectedProduction);
-    return { production, crew: crewWithTimes, locations, inventory, weather, forecast, company, stripboardScenes: prodStrips, characters: prodChars, budgetLines, financeDocs, complianceDocs, creativeDocs, creativeImages };
+    return { production, crew: crewWithTimes, locations, inventory, weather, forecast, sun, company, stripboardScenes: prodStrips, characters: prodChars, budgetLines, financeDocs, complianceDocs, creativeDocs, creativeImages };
   };
 
   const handlePreview = async (docItem: typeof DOCS[0]) => {
@@ -261,7 +268,7 @@ function DocumentsPageInner() {
 
 export default function DocumentsPage() {
   return (
-    <UpgradeGate feature="Document generation" requires="pro">
+    <UpgradeGate feature="Document generation" requires="producer">
       <DocumentsPageInner />
     </UpgradeGate>
   );

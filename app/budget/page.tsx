@@ -69,7 +69,7 @@ export default function BudgetPage() {
   const inp = 'w-full border border-gray-200 rounded-lg px-2.5 py-2 text-sm focus:outline-none focus:border-gray-400';
 
   return (
-    <UpgradeGate feature="Budget & Finance" requires="pro">
+    <UpgradeGate feature="Budget & Finance" requires="producer">
     <div className="p-6 max-w-6xl mx-auto">
       <PageHeader title="Budget & Finance" subtitle="Estimates vs actuals, purchase orders, invoices">
         <select value={prodFilter} onChange={e => setProdFilter(e.target.value)} className="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white">

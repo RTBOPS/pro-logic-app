@@ -712,7 +712,7 @@ function AudioPlannerInner() {
 
 export default function AudioPlannerPage() {
   return (
-    <UpgradeGate feature="Audio Planner" requires="pro">
+    <UpgradeGate feature="Audio Planner" requires="producer">
       <AudioPlannerInner />
     </UpgradeGate>
   );

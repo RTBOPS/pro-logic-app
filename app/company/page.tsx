@@ -48,7 +48,7 @@ export default function CompanyPage() {
   const [teamGate, setTeamGate] = useState(false);
   const { data: crew } = useData('crew');
 
-  const PLAN_LIMITS: Record<string, number> = { free: 5, pro: 50, studio: Infinity };
+  const PLAN_LIMITS: Record<string, number> = { free: 5, producer: 50, pro: 100, broadcast: 100, studio: Infinity };
   const plan = (profile as any)?.plan || 'free';
   const crewLimit = PLAN_LIMITS[plan] ?? 5;
   const crewCount = crew?.length ?? 0;
@@ -279,12 +279,12 @@ export default function CompanyPage() {
             <p className="text-xs text-gray-500 mb-1">Users you add here can log in and access your company's data.</p>
             {plan === 'free' && (
               <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 mb-4 text-xs text-amber-700">
-                <Lock size={12} /> Free plan: 5 crew max. <a href="/pricing" className="underline font-medium ml-1">Upgrade to Pro (50) or Studio (unlimited)</a>
+                <Lock size={12} /> Free plan: 5 crew max. <a href="/pricing" className="underline font-medium ml-1">Upgrade to Producer (50), Broadcast (100) or Studio (unlimited)</a>
               </div>
             )}
-            {plan === 'pro' && (
+            {(plan === 'producer' || plan === 'pro' || plan === 'broadcast') && (
               <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-xl px-3 py-2 mb-4 text-xs text-blue-700">
-                <Share2 size={12} /> Pro plan: up to 50 crew members. <a href="/pricing" className="underline font-medium ml-1">Upgrade to Studio for unlimited</a>
+                <Share2 size={12} /> Your plan includes up to {plan === 'producer' ? 50 : 100} crew members. <a href="/pricing" className="underline font-medium ml-1">Upgrade to Studio for unlimited</a>
               </div>
             )}
             {plan === 'studio' && (

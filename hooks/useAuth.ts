@@ -5,7 +5,8 @@ import { onAuthStateChanged, User } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 
-export type Plan = 'free' | 'pro' | 'studio';
+// 'pro' is the legacy name of the old $29 all-in plan; it ranks like broadcast.
+export type Plan = 'free' | 'producer' | 'pro' | 'broadcast' | 'studio';
 
 export interface UserProfile {
   uid: string;

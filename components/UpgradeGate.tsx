@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { Lock, Sparkles } from 'lucide-react';
 import { useAuth, Plan } from '@/hooks/useAuth';
-import { planAtLeast } from '@/lib/plans';
+import { hasAccess, PLAN_LABEL } from '@/lib/plans';
 import Modal from './Modal';
 
 /* Full-page gate: wraps a premium page and shows an upgrade screen
@@ -20,7 +20,7 @@ export function UpgradeGate({
   const { profile, loading } = useAuth();
 
   if (loading) return null;
-  if (planAtLeast(profile?.plan, requires)) return <>{children}</>;
+  if (hasAccess(profile, requires)) return <>{children}</>;
 
   return (
     <div className="p-8 flex items-center justify-center min-h-[70vh]">
@@ -28,7 +28,7 @@ export function UpgradeGate({
         <div className="inline-flex p-3 rounded-2xl bg-purple-50 text-purple-600 mb-4">
           <Lock size={24} />
         </div>
-        <h1 className="text-xl font-bold text-gray-900 mb-2">{feature} is a {requires === 'studio' ? 'Studio' : 'Pro'} feature</h1>
+        <h1 className="text-xl font-bold text-gray-900 mb-2">{feature} is a {PLAN_LABEL[requires]} feature</h1>
         <p className="text-sm text-gray-500 mb-6">
           Upgrade your plan to unlock {feature.toLowerCase()} and take your productions further.
         </p>
@@ -54,13 +54,13 @@ export function FeatureModal({
   onClose: () => void;
 }) {
   return (
-    <Modal title={`${requires === 'studio' ? 'Studio' : 'Pro'} feature`} onClose={onClose}>
+    <Modal title={`${PLAN_LABEL[requires]} feature`} onClose={onClose}>
       <div className="text-center">
         <div className="inline-flex p-3 rounded-2xl bg-purple-50 text-purple-600 mb-4">
           <Lock size={22} />
         </div>
         <p className="text-sm text-gray-600 mb-6">
-          <span className="font-semibold">{feature}</span> is available on the {requires === 'studio' ? 'Studio' : 'Pro'} plan.
+          <span className="font-semibold">{feature}</span> is available on the {PLAN_LABEL[requires]} plan.
         </p>
         <div className="flex justify-center gap-3">
           <button onClick={onClose} className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700">

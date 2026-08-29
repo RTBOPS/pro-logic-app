@@ -227,7 +227,7 @@ function StripboardPageInner() {
 
 export default function StripboardPage() {
   return (
-    <UpgradeGate feature="Stripboard" requires="pro">
+    <UpgradeGate feature="Stripboard" requires="producer">
       <StripboardPageInner />
     </UpgradeGate>
   );

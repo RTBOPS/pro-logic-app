@@ -18,6 +18,11 @@ function getAdminDb() {
 // Lookup which plan corresponds to a PayPal plan ID
 function planFromPayPalPlanId(paypalPlanId: string): string {
   if (paypalPlanId === process.env.PAYPAL_STUDIO_PLAN_ID) return 'studio';
+  if (paypalPlanId === process.env.PAYPAL_STUDIO_ANNUAL_PLAN_ID) return 'studio';
+  if (paypalPlanId === process.env.PAYPAL_BROADCAST_PLAN_ID) return 'broadcast';
+  if (paypalPlanId === process.env.PAYPAL_BROADCAST_ANNUAL_PLAN_ID) return 'broadcast';
+  if (paypalPlanId === process.env.PAYPAL_PRODUCER_PLAN_ID) return 'producer';
+  if (paypalPlanId === process.env.PAYPAL_PRODUCER_ANNUAL_PLAN_ID) return 'producer';
   if (paypalPlanId === process.env.PAYPAL_PRO_PLAN_ID) return 'pro';
   return 'pro';
 }

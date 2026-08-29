@@ -445,7 +445,7 @@ function StoryboardPageInner() {
 
 export default function StoryboardPage() {
   return (
-    <UpgradeGate feature="Storyboard" requires="pro">
+    <UpgradeGate feature="Storyboard" requires="producer">
       <StoryboardPageInner />
     </UpgradeGate>
   );

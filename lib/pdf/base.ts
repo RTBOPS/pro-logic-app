@@ -16,6 +16,9 @@ export type PDFContext = {
   complianceDocs?: any[];
   creativeDocs?: any[];
   creativeImages?: any[];
+  sun?: any;
+  proposal?: any;
+  client?: any;
 };
 
 export function createDoc(orientation: 'p' | 'l' = 'p'): jsPDF {

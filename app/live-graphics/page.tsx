@@ -2459,7 +2459,7 @@ function GfxThumb({ k }: { k: string }) {
 
 export default function LiveGraphicsPage() {
   return (
-    <UpgradeGate feature="Live Graphics" requires="pro">
+    <UpgradeGate feature="Live Graphics" requires="broadcast">
       <ControlInner />
     </UpgradeGate>
   );

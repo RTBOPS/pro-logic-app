@@ -8,7 +8,7 @@ import {
   BookImage, FileText, CreditCard, LogOut, User,
   Layout, Clapperboard, CheckSquare, CalendarDays,
   Truck, Building2, IdCard, UserCheck, Layers, ClipboardCheck, Mic,
-  ListOrdered, Shield, Tv, MonitorPlay, ChevronLeft, ChevronRight, Wallet, FileCheck, Brush,
+  ListOrdered, Shield, Tv, MonitorPlay, ChevronLeft, ChevronRight, Wallet, FileCheck, Brush, Sunrise, Aperture, Handshake,
 } from 'lucide-react';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
@@ -31,6 +31,7 @@ const nav = [
   { href: '/broadcast', label: 'Broadcast Plan', icon: Tv },
   { href: '/live-graphics', label: 'Live Graphics', icon: MonitorPlay },
   { href: '/safety', label: 'Safety', icon: Shield },
+  { href: '/clients', label: 'Clients', icon: Handshake },
   { href: '/budget', label: 'Budget', icon: Wallet },
   { href: '/compliance', label: 'Permits & Insurance', icon: FileCheck },
   { section: 'Audio' },
@@ -44,6 +45,8 @@ const nav = [
   { href: '/equipment', label: 'Equipment Forms', icon: ClipboardCheck },
   { href: '/transportation', label: 'Transportation', icon: Truck },
   { href: '/locations', label: 'Locations', icon: MapPin },
+  { href: '/sun', label: 'Sun Tracker', icon: Sunrise },
+  { href: '/viewfinder', label: 'Viewfinder', icon: Aperture },
   { section: 'Tools' },
   { href: '/checklists', label: 'Checklists', icon: CheckSquare },
   { href: '/documents', label: 'Documents', icon: FileText },

@@ -511,7 +511,7 @@ function BroadcastInner() {
 
 export default function BroadcastPage() {
   return (
-    <UpgradeGate feature="Broadcast Plan" requires="pro">
+    <UpgradeGate feature="Broadcast Plan" requires="producer">
       <BroadcastInner />
     </UpgradeGate>
   );

@@ -170,7 +170,7 @@ function BlueprintPageInner() {
 
 export default function BlueprintPage() {
   return (
-    <UpgradeGate feature="Location Blueprints" requires="pro">
+    <UpgradeGate feature="Location Blueprints" requires="producer">
       <BlueprintPageInner />
     </UpgradeGate>
   );

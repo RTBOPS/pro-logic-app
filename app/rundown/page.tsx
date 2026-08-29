@@ -289,7 +289,7 @@ function RundownInner() {
 
 export default function RundownPage() {
   return (
-    <UpgradeGate feature="Run of Show" requires="pro">
+    <UpgradeGate feature="Run of Show" requires="producer">
       <RundownInner />
     </UpgradeGate>
   );

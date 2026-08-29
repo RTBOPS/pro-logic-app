@@ -63,7 +63,7 @@ export async function GET(req: NextRequest) {
       wind_speed: Math.round(d.windspeed_10m_max[i]),
     }));
 
-    return NextResponse.json({ city: city || `${lat},${lon}`, forecast });
+    return NextResponse.json({ city: city || `${lat},${lon}`, lat: latN, lon: lonN, forecast });
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 });
   }

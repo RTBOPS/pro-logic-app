@@ -44,7 +44,8 @@ service cloud.firestore {
       allow update: if signedIn() && request.auth.uid == uid
         && request.resource.data.get('plan', 'free') == resource.data.get('plan', 'free')
         && request.resource.data.get('planStatus', '') == resource.data.get('planStatus', '')
-        && request.resource.data.get('paypalSubscriptionId', '') == resource.data.get('paypalSubscriptionId', '');
+        && request.resource.data.get('paypalSubscriptionId', '') == resource.data.get('paypalSubscriptionId', '')
+        && request.resource.data.get('event_pass_until', '') == resource.data.get('event_pass_until', '');
     }
 
     // ── Invites ──
@@ -84,6 +85,22 @@ service cloud.firestore {
           && request.resource.data.snapshot.diff(resource.data.snapshot)
             .affectedKeys().hasOnly(['confirmation_status'])
           && request.resource.data.snapshot.confirmation_status in ['confirmed', 'declined']
+        );
+    }
+
+    // ── Proposal tokens ──
+    // Clients open a proposal link without an account. Public read; the owner
+    // manages them; an anonymous client may only record accept/decline.
+    match /proposal_tokens/{token} {
+      allow read: if true;
+      allow create: if signedIn() && request.resource.data.uid == request.auth.uid;
+      allow delete: if signedIn() && resource.data.uid == request.auth.uid;
+      allow update: if
+        (signedIn() && resource.data.uid == request.auth.uid) ||
+        (
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['response', 'responded_at', 'response_note'])
+          && request.resource.data.response in ['accepted', 'declined']
         );
     }
 

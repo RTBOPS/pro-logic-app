@@ -18,15 +18,15 @@ function adminAuth() {
 }
 
 const PLANS: Record<string, { planId: string; name: string }> = {
-  pro: {
-    planId: process.env.PAYPAL_PRO_PLAN_ID || '',
-    name: 'Pro',
-  },
-  studio: {
-    planId: process.env.PAYPAL_STUDIO_PLAN_ID || '',
-    name: 'Studio',
-  },
+  producer: { planId: process.env.PAYPAL_PRODUCER_PLAN_ID || '', name: 'Producer' },
+  producer_annual: { planId: process.env.PAYPAL_PRODUCER_ANNUAL_PLAN_ID || '', name: 'Producer (annual)' },
+  broadcast: { planId: process.env.PAYPAL_BROADCAST_PLAN_ID || '', name: 'Broadcast' },
+  broadcast_annual: { planId: process.env.PAYPAL_BROADCAST_ANNUAL_PLAN_ID || '', name: 'Broadcast (annual)' },
+  studio: { planId: process.env.PAYPAL_STUDIO_PLAN_ID || '', name: 'Studio' },
+  studio_annual: { planId: process.env.PAYPAL_STUDIO_ANNUAL_PLAN_ID || '', name: 'Studio (annual)' },
 };
+
+const EVENT_PASS_PRICE = '79.00';
 
 async function getPayPalAccessToken(): Promise<string> {
   const clientId = process.env.PAYPAL_CLIENT_ID;
@@ -72,8 +72,44 @@ export async function POST(req: NextRequest) {
     }
     const { plan } = await req.json();
 
-    if (!plan || !PLANS[plan]) {
+    if (!plan || (plan !== 'event' && !PLANS[plan])) {
       return NextResponse.json({ error: 'Invalid plan' }, { status: 400 });
+    }
+
+    // Event Pass: one-time order, captured by /api/checkout/capture on return.
+    if (plan === 'event') {
+      const appUrl0 = process.env.NEXT_PUBLIC_APP_URL || 'https://pro-logic.studio';
+      const base0 = process.env.PAYPAL_SANDBOX === 'true'
+        ? 'https://api-m.sandbox.paypal.com'
+        : 'https://api-m.paypal.com';
+      const token0 = await getPayPalAccessToken();
+      const order = await fetch(`${base0}/v2/checkout/orders`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token0}` },
+        body: JSON.stringify({
+          intent: 'CAPTURE',
+          purchase_units: [{
+            custom_id: uid,
+            description: 'Pro-Logic Event Pass — 4 days of Broadcast access',
+            amount: { currency_code: 'USD', value: EVENT_PASS_PRICE },
+          }],
+          application_context: {
+            brand_name: 'PRO-LOGIC Studio',
+            shipping_preference: 'NO_SHIPPING',
+            user_action: 'PAY_NOW',
+            return_url: `${appUrl0}/api/checkout/capture`,
+            cancel_url: `${appUrl0}/pricing?canceled=true`,
+          },
+        }),
+      });
+      if (!order.ok) {
+        console.error('PayPal create order error:', await order.text());
+        return NextResponse.json({ error: 'Checkout failed. Please try again.' }, { status: 500 });
+      }
+      const orderData = await order.json();
+      const approve = (orderData.links as { rel: string; href: string }[])?.find(l => l.rel === 'approve')?.href;
+      if (!approve) return NextResponse.json({ error: 'No PayPal approval URL returned' }, { status: 500 });
+      return NextResponse.json({ url: approve });
     }
 
     const planConfig = PLANS[plan];

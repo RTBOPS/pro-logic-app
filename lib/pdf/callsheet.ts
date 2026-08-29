@@ -131,7 +131,7 @@ function drawMemberRow(
 }
 
 /* ── MAIN GENERATOR ── */
-export async function generateCallSheet({ production, crew, locations, inventory, preview, weather, forecast, company }: PDFContext) {
+export async function generateCallSheet({ production, crew, locations, inventory, preview, weather, forecast, sun, company }: PDFContext) {
   const doc = new jsPDF({ unit: 'mm', format: 'letter' });
   const pageW = doc.internal.pageSize.getWidth();
 
@@ -274,6 +274,10 @@ export async function generateCallSheet({ production, crew, locations, inventory
     doc.text(weather.description, cx + iconSize + 6, wy + 9);
     doc.setFontSize(6.5); doc.setTextColor(0, 100, 180);
     doc.text(`Rain: ${weather.precipitation}%   Wind: ${weather.wind_speed || '--'} mph`, cx + 3, wy + 15);
+    if (sun?.sunrise && sun?.sunset) {
+      const t = (d: any) => d ? new Date(d).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '--';
+      doc.text(`Sunrise ${t(sun.sunrise)}  Sunset ${t(sun.sunset)}  Golden hr ${t(sun.goldenStartPM)}`, cx + 3, wy + 19);
+    }
   }
   doc.setTextColor(0, 0, 0);
 

@@ -59,7 +59,7 @@ export default function CreativePage() {
   const delImg = async (id: string) => { const uid = getUid(); if (uid) await deleteDoc(doc(db, 'users', uid, 'creative_images', id)); };
 
   return (
-    <UpgradeGate feature="Creative Docs" requires="pro">
+    <UpgradeGate feature="Creative Docs" requires="producer">
     <div className="p-6 max-w-6xl mx-auto">
       <PageHeader title="Creative" subtitle="Treatment, mood board, look book & colour palette">
         <select value={prodId} onChange={e => setProdId(e.target.value)} className="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white">
