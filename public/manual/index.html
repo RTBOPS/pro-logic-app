@@ -1,0 +1,240 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>PRO-LOGIC Studio — User Manual</title>
+<style>
+  @page { size: letter; margin: 18mm 16mm; }
+  * { box-sizing: border-box; }
+  body { font-family: 'Helvetica Neue', Arial, sans-serif; color: #18181b; line-height: 1.55; font-size: 10.5pt; margin: 0; }
+  .cover { height: 240mm; display: flex; flex-direction: column; justify-content: center; background: #09090b; color: #fff; padding: 30mm; page-break-after: always; border-radius: 6px; }
+  .cover .brand { color: #facc15; font-weight: 800; letter-spacing: .3em; font-size: 11pt; text-transform: uppercase; }
+  .cover h1 { font-size: 34pt; font-weight: 900; margin: 12px 0 6px; }
+  .cover p { color: #a1a1aa; font-size: 12pt; max-width: 420px; }
+  .cover .ver { margin-top: 40px; color: #71717a; font-size: 9pt; }
+  h2 { font-size: 17pt; font-weight: 900; border-bottom: 3px solid #facc15; padding-bottom: 5px; margin: 0 0 10px; page-break-after: avoid; }
+  h3 { font-size: 12pt; font-weight: 700; margin: 14px 0 5px; page-break-after: avoid; }
+  section { page-break-before: always; }
+  section.flow { page-break-before: auto; }
+  img.shot { width: 100%; border: 1px solid #d4d4d8; border-radius: 6px; margin: 8px 0; }
+  ul, ol { margin: 5px 0; padding-left: 20px; }
+  li { margin: 2.5px 0; }
+  .tip { background: #fefce8; border-left: 3px solid #facc15; padding: 7px 11px; border-radius: 0 5px 5px 0; margin: 9px 0; font-size: 9.5pt; }
+  .cols { display: flex; gap: 14px; }
+  .cols > div { flex: 1; }
+  table { border-collapse: collapse; width: 100%; font-size: 9.5pt; margin: 8px 0; }
+  th { text-align: left; background: #18181b; color: #fff; padding: 5px 8px; font-size: 8.5pt; text-transform: uppercase; letter-spacing: .05em; }
+  td { border-bottom: 1px solid #e4e4e7; padding: 5px 8px; vertical-align: top; }
+  .muted { color: #71717a; font-size: 9pt; }
+  .toc td { border: none; padding: 3px 8px; }
+
+  /* Screen-only breathing room — print/PDF layout untouched */
+  @media screen {
+    body { max-width: 880px; margin: 0 auto; padding: 32px 28px 80px; background: #fafaf9; }
+    .cover { height: auto; padding: 90px 60px; margin-bottom: 56px; }
+    section { margin-top: 72px; padding-top: 24px; border-top: 1px solid #e7e5e4; }
+    section.flow { margin-top: 40px; border-top: none; }
+    h2 { margin-top: 0; }
+    img.shot { box-shadow: 0 2px 10px rgba(0,0,0,.06); }
+  }
+</style></head><body>
+
+<div style="max-width:880px;margin:0 auto 18px;font-family:'Helvetica Neue',Arial,sans-serif">
+  <a href="/dashboard" style="color:#8a6100;text-decoration:none;font-size:14px;font-weight:600">&larr; Back to PRO-LOGIC Studio</a>
+</div>
+<div class="cover">
+  <div class="brand">Pro-Logic Studio</div>
+  <h1>User Manual</h1>
+  <p>Production management and live broadcast graphics — from the first client proposal to the final on-air graphic.</p>
+  <div class="ver">Version 2.0 · August 2026 · pro-logic.studio</div>
+</div>
+
+<section class="flow">
+<h2>Contents</h2>
+<table class="toc">
+<tr><td>1. Getting started & plans</td><td>9. Permits & Insurance</td></tr>
+<tr><td>2. Dashboard</td><td>10. Creative Suite</td></tr>
+<tr><td>3. Productions</td><td>11. Scheduling: Stripboard, Gantt, Checklists</td></tr>
+<tr><td>4. Crew & Cast</td><td>12. Storyboard</td></tr>
+<tr><td>5. Inventory & Equipment</td><td>13. Audio Planner</td></tr>
+<tr><td>6. Locations, Sun Tracker & Viewfinder</td><td>14. Live Graphics (CG)</td></tr>
+<tr><td>7. Documents — 30 production PDFs</td><td>15. Company & Team</td></tr>
+<tr><td>8. Budget, Clients & Proposals</td><td>16. Partner Program</td></tr>
+</table>
+</section>
+
+<section>
+<h2>1 · Getting started & plans</h2>
+<p>Create your free account at <b>pro-logic.studio</b> — no credit card needed. The Free plan includes one active production, five crew members and basic call sheets.</p>
+<img class="shot" src="shots/pricing.jpg">
+<table>
+<tr><th>Plan</th><th>Price</th><th>What it unlocks</th></tr>
+<tr><td><b>Free</b></td><td>$0</td><td>1 production, 5 crew, 10 inventory items, basic call sheet, Sun Tracker</td></tr>
+<tr><td><b>Producer</b></td><td>$39/mo · $29 annual</td><td>Unlimited everything, all 30 documents, budget, clients & proposals, compliance vault, creative suite, audio planner, viewfinder</td></tr>
+<tr><td><b>Broadcast</b></td><td>$99/mo · $79 annual</td><td>Everything in Producer + live sports CG with real-time data (5 sports, 15+ leagues), News & Church modes, projection mapping, 1 on-air output</td></tr>
+<tr><td><b>Studio</b></td><td>$199/mo · $159 annual</td><td>Everything in Broadcast + team members, 3 outputs, white-label exports, dedicated support</td></tr>
+<tr><td><b>Event Pass</b></td><td>$79 one-time</td><td>Full Broadcast access for 4 days — one tournament, one game weekend, no subscription</td></tr>
+</table>
+<div class="tip"><b>Tip:</b> Payments are processed by PayPal. You can cancel any subscription from your PayPal account at any time.</div>
+</section>
+
+<section>
+<h2>2 · Dashboard</h2>
+<p>Your studio at a glance: production, crew, equipment and location counts, shoot-readiness percentage per production (driven by your checklists), and recent productions.</p>
+<img class="shot" src="shots/dashboard.jpg">
+</section>
+
+<section>
+<h2>3 · Productions</h2>
+<p>Everything hangs off a production: crew assignments, call sheets, budgets, proposals, documents.</p>
+<img class="shot" src="shots/productions.jpg">
+<ol>
+<li><b>New Production</b> → name, client, type, dates, city and primary location.</li>
+<li>Open a production to assign crew with per-person call times, link a saved location, and set logistics (basecamp, parking, nearest hospital).</li>
+<li>Status moves through Development → Pre-Production → Production → Post → Wrapped.</li>
+</ol>
+</section>
+
+<section>
+<h2>4 · Crew & Cast</h2>
+<img class="shot" src="shots/crew.jpg">
+<ul>
+<li>Full profiles: role, department, day rate, contacts, dietary notes (used by the Catering Order PDF).</li>
+<li><b>ID cards</b> with QR codes, color-coded by department, print-ready on Avery sheets.</li>
+<li>Crew confirm their call sheet from a link — no account needed — and you see confirmed/declined live.</li>
+</ul>
+<h3>ID cards with QR</h3>
+<p>Every crew member gets a badge — photo, role, unique code and QR, with the header color of their department. Choose horizontal or vertical, filter by production or department, and Print All lays them out on Avery sheets.</p>
+<img class="shot" src="shots/id-cards.jpg">
+</section>
+
+<section>
+<h2>5 · Inventory & Equipment</h2>
+<img class="shot" src="shots/inventory.jpg">
+<ul>
+<li>Catalog gear with serials, categories and status; the equipment database can pre-fill specs.</li>
+<li>Digital <b>check-out / return inspection / maintenance / retirement</b> forms with finger signatures on any phone.</li>
+</ul>
+</section>
+
+<section>
+<h2>6 · Locations, Sun Tracker & Director's Viewfinder</h2>
+<img class="shot" src="shots/locations.jpg">
+<h3>Sun Tracker</h3>
+<p>Golden hour, blue hour, sunrise/sunset, solar noon and shadow direction for any place and date — drag the time slider to see the sun's position and where shadows fall. Works from a search, your GPS, or a saved location. Sun times print automatically on every call sheet.</p>
+<img class="shot" src="shots/sun.jpg">
+<h3>Director's Viewfinder</h3>
+<p>Open it on your phone: it simulates the field of view of real sensor + lens combos (Full Frame, Super 35, MFT, Super 16 × 18–135mm) with aspect mattes (2.39, 1.85, 16:9, 9:16) and framing guides. Capture scouting frames — they're saved to the production, tagged with the exact setup.</p>
+<img class="shot" src="shots/viewfinder.jpg">
+</section>
+
+<section>
+<h2>7 · Documents — 30 production PDFs</h2>
+<p>Every industry-standard document, pre-filled from your production data: call sheets (with live weather and sun times), one-liner and day-out-of-days, scene breakdowns, department lists, NDAs, crew deals, talent and location releases, risk assessment, catering order, weather contingency, travel & accommodation, deliverables, budget topsheet, purchase orders, invoice tracker, compliance status, treatment and look book — and more. Pick a production, hit <b>Preview</b> or <b>Download</b>.</p>
+<img class="shot" src="shots/documents.jpg">
+</section>
+
+<section>
+<h2>8 · Budget, Clients & Proposals</h2>
+<h3>Budget & Finance</h3>
+<img class="shot" src="shots/budget.jpg">
+<ul>
+<li>13 film-standard categories; each line is qty × rate with estimated vs actual and variance totals.</li>
+<li><b>Orders tab:</b> purchase orders and invoices with auto numbers (PO-001, INV-001) and status flow Draft → Sent → Approved → Received → Paid.</li>
+</ul>
+<h3>Clients & Proposals</h3>
+<img class="shot" src="shots/clients.jpg">
+<ol>
+<li>Add clients to your book (contacts + notes).</li>
+<li>Create a numbered proposal with line items and terms; generate the PDF, or hit the <b>link</b> icon.</li>
+<li>The client opens the link — no login — reviews the quote and clicks <b>Accept</b> or <b>Decline</b>. The status updates in your panel automatically.</li>
+</ol>
+</section>
+
+<section>
+<h2>9 · Permits & Insurance</h2>
+<p>A vault for every certificate: insurance policies, filming permits, licenses, contracts. Attach the file, set the expiry date, and the app warns you — <b>EXPIRING</b> within 30 days, <b>EXPIRED</b> in red, with alert banners. One click generates the status report PDF.</p>
+<img class="shot" src="shots/compliance.jpg">
+</section>
+
+<section>
+<h2>10 · Creative Suite</h2>
+<p>Per production: write the <b>Treatment</b> (blank line = new paragraph, a line ending in ":" becomes a section heading in the PDF), build <b>Mood Board</b> and <b>Look Book</b> image boards with captions, and define the colour palette. Export the typeset Treatment PDF and the branded Look Book PDF with embedded images.</p>
+<img class="shot" src="shots/creative.jpg">
+</section>
+
+<section>
+<h2>11 · Scheduling: Stripboard, Gantt & Checklists</h2>
+<div class="cols"><div>
+<h3>Stripboard</h3>
+<img class="shot" src="shots/stripboard.jpg">
+</div><div>
+<h3>Gantt chart</h3>
+<img class="shot" src="shots/gantt.jpg">
+</div></div>
+<h3>Checklists</h3>
+<p>Nine pre-built checklists plus your own. Completion drives the shoot-readiness % on the dashboard.</p>
+<img class="shot" src="shots/checklists.jpg">
+</section>
+
+<section>
+<h2>12 · Storyboard</h2>
+<p>Draw panel by panel in the browser — pen, pencil and marker, drag & drop reordering, instant PDF export.</p>
+<img class="shot" src="shots/storyboard.jpg">
+</section>
+
+<section>
+<h2>13 · Audio Planner</h2>
+<p>Live-show input lists with recommended mics, phantom power and gain structure, RF frequency coordination, monitor mixes and comms. Paste a technical rider — get the patch list.</p>
+<img class="shot" src="shots/audio.jpg">
+</section>
+
+<section>
+<h2>14 · Live Graphics (CG) — Broadcast plan</h2>
+<p>A real-time broadcast character generator driven by live data: <b>basketball, soccer, NFL, NHL and MLB</b> across 15+ leagues, plus <b>News</b> and <b>Church</b> modes for non-sports shows.</p>
+<img class="shot" src="shots/live-graphics.jpg">
+<ol>
+<li>Pick the sport in the sidebar dropdown under Live Graphics, then pick the game.</li>
+<li>Every graphic is a button with its own ⚙ — size, team logos, player photos, text scale, texture — <i>per graphic</i>. Pick the player or team <i>before</i> firing.</li>
+<li><b>Preview / Take</b> workflow; anti-collision choreography keeps the score bug, lower thirds and stat graphics from overlapping on air.</li>
+<li>Copy the <b>output URL</b> into OBS or vMix as a browser source — that's your key/fill.</li>
+<li><b>Projection mapping:</b> load an image or video, drag the four calibration corners onto the court or field, and it locks in true perspective.</li>
+<li><b>Clock sources:</b> ESPN auto (default), NGSS arena feed, or OES scoreboard hardware for frame-exact clocks.</li>
+</ol>
+<div class="tip"><b>Note:</b> Live data comes from public third-party sources and official feeds where available. For local teams everything can also run fully manual.</div>
+
+<h3>What it looks like on air</h3>
+<p class="muted">Real output frames from a WNBA game (Connecticut Sun at Indiana Fever), exactly as OBS/vMix receives them:</p>
+<div class="cols"><div>
+<img class="shot" src="shots/gfx-scorebug.jpg">
+<p class="muted" style="margin-top:-4px">Score bug — official clock, team colors, timeouts & bonus.</p>
+</div><div>
+<img class="shot" src="shots/gfx-lowerthird.jpg">
+<p class="muted" style="margin-top:-4px">Player lower third — photo, jersey number and live stat line.</p>
+</div></div>
+<div class="cols"><div>
+<img class="shot" src="shots/gfx-taletape.jpg">
+<p class="muted" style="margin-top:-4px">Tale of the Tape — full-team comparison with leaders per stat.</p>
+</div><div>
+<img class="shot" src="shots/gfx-leaders.jpg">
+<p class="muted" style="margin-top:-4px">Top Performers — leaders of the game with photos.</p>
+</div></div>
+<div class="cols"><div>
+<img class="shot" src="shots/gfx-shotchart.jpg">
+<p class="muted" style="margin-top:-4px">Shot Chart — every attempt plotted on the court, filterable.</p>
+</div><div>
+<img class="shot" src="shots/gfx-lineups.jpg">
+<p class="muted" style="margin-top:-4px">Starting Lineups — with player photos.</p>
+</div></div>
+</section>
+
+<section>
+<h2>15 · Company & Team</h2>
+<p>Set your company profile (name, logo — it brands every PDF), and on Studio invite team members who log in to your workspace with their own accounts. Crew directory limits: Free 5 · Producer 50 · Broadcast 100 · Studio unlimited.</p>
+<img class="shot" src="shots/company.jpg">
+</section>
+
+<section>
+<h2>16 · Partner Program</h2>
+<p>Earn <b>10% of every payment for 12 months</b> from customers you refer. Claim your code on the Partners page — your link looks like <b>pro-logic.studio/?ref=yourcode</b>. Anyone who signs up through it is yours: you see their sign-up instantly, and every payment they make posts a commission automatically, straight from the payment processor. Payouts monthly via PayPal.</p>
+<img class="shot" src="shots/partners.jpg">
+<p class="muted">Commissions are calculated on the gross payment. Partners are responsible for their own taxes. Self-referrals don't count.</p>
+</section>
+
+</body></html>

@@ -492,6 +492,7 @@ export default function LandingPage() {
           <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6 text-sm text-zinc-600">
             <a href="#features"  className="hover:text-zinc-300 transition-colors">Features</a>
             <a href="#pricing"   className="hover:text-zinc-300 transition-colors">Pricing</a>
+            <a href="/manual/index.html" className="hover:text-zinc-300 transition-colors">User Manual</a>
             <a href="#reviews"   className="hover:text-zinc-300 transition-colors">Reviews</a>
             <Link href="/auth"   className="hover:text-zinc-300 transition-colors">Sign in</Link>
             <div className="flex items-center gap-1.5">
