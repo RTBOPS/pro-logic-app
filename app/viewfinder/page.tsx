@@ -237,70 +237,72 @@ export default function ViewfinderPage() {
     </div>
   );
 
-  /* ── Immersive: the viewfinder owns the whole screen, menus gone ── */
-  if (immersive) {
-    return (
-      <div ref={stageWrapRef} className="fixed inset-0 z-[100] bg-black">
-        {stage}
-        <button onClick={exitImmersive}
-          className="absolute right-3 z-20 bg-black/50 text-white p-2 rounded-full"
-          style={{ top: 'calc(0.5rem + env(safe-area-inset-top))' }}>
-          <X size={18} />
-        </button>
+  /* One tree for both modes: immersive only swaps CSS classes, so the
+     <video> element is never remounted and the camera stream survives. */
+  return (
+    <div className={immersive ? '' : 'p-4 sm:p-6 max-w-5xl mx-auto'}>
+      {!immersive && (
+        <div className="mb-4">
+          <h1 className="text-2xl font-bold text-gray-900">Director's Viewfinder</h1>
+          <p className="text-gray-500 text-sm">Preview real sensor + lens fields of view with your phone camera, and capture scouting frames.</p>
+        </div>
+      )}
 
-        {showCtl && (
-          <div className="absolute left-2 right-2 z-20 bg-black/75 backdrop-blur rounded-2xl p-3 space-y-2.5 max-h-[55dvh] overflow-y-auto"
-            style={{ bottom: 'calc(5.5rem + env(safe-area-inset-bottom))' }}>
+      <div ref={stageWrapRef}
+        className={immersive
+          ? 'fixed inset-0 z-[100] bg-black'
+          : 'bg-zinc-950 rounded-2xl overflow-hidden border border-zinc-800'}>
+        {stage}
+
+        {immersive ? (
+          <>
+            <button onClick={exitImmersive}
+              className="absolute right-3 z-20 bg-black/50 text-white p-2 rounded-full"
+              style={{ top: 'calc(0.5rem + env(safe-area-inset-top))' }}>
+              <X size={18} />
+            </button>
+
+            {showCtl && (
+              <div className="absolute left-2 right-2 z-20 bg-black/75 backdrop-blur rounded-2xl p-3 space-y-2.5 max-h-[55dvh] overflow-y-auto"
+                style={{ bottom: 'calc(5.5rem + env(safe-area-inset-bottom))' }}>
+                {controlRows}
+              </div>
+            )}
+
+            <div className="absolute left-0 right-0 z-20 flex items-center justify-center gap-8"
+              style={{ bottom: 'calc(1rem + env(safe-area-inset-bottom))' }}>
+              <button onClick={() => setShowCtl(!showCtl)} className={`p-3 rounded-full ${showCtl ? 'bg-amber-400 text-black' : 'bg-black/50 text-white'}`}>
+                <SlidersHorizontal size={20} />
+              </button>
+              <button onClick={capture} disabled={!live || saving}
+                className="w-16 h-16 rounded-full bg-white border-4 border-amber-400 disabled:opacity-40 flex items-center justify-center active:scale-95 transition-transform">
+                {saving ? <span className="text-[10px] font-bold text-black">…</span> : <span className="w-12 h-12 rounded-full bg-amber-400 block" />}
+              </button>
+              <button onClick={() => setGrid(!grid)} className={`p-3 rounded-full ${grid ? 'bg-amber-400 text-black' : 'bg-black/50 text-white'}`}>
+                <Grid3x3 size={20} />
+              </button>
+            </div>
+          </>
+        ) : (
+          <div className="p-3 space-y-2.5">
             {controlRows}
+            <div className="flex flex-wrap gap-2 items-center">
+              <div className="flex-1" />
+              <button onClick={enterImmersive} className="flex items-center gap-1.5 text-black text-xs font-semibold px-3 py-2 rounded-xl bg-amber-400 hover:bg-amber-300">
+                <Maximize2 size={13} /> Full screen
+              </button>
+              {live && (
+                <button onClick={stop} className="flex items-center gap-1.5 text-zinc-400 text-xs px-3 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700"><VideoOff size={13} /> Stop</button>
+              )}
+              <button onClick={capture} disabled={!live || saving} className="flex items-center gap-1.5 bg-amber-400 text-black px-4 py-2 rounded-xl text-sm font-semibold hover:bg-amber-300 disabled:opacity-40">
+                <Video size={15} /> {saving ? 'Saving…' : 'Capture frame'}
+              </button>
+            </div>
           </div>
         )}
-
-        <div className="absolute left-0 right-0 z-20 flex items-center justify-center gap-8"
-          style={{ bottom: 'calc(1rem + env(safe-area-inset-bottom))' }}>
-          <button onClick={() => setShowCtl(!showCtl)} className={`p-3 rounded-full ${showCtl ? 'bg-amber-400 text-black' : 'bg-black/50 text-white'}`}>
-            <SlidersHorizontal size={20} />
-          </button>
-          <button onClick={capture} disabled={!live || saving}
-            className="w-16 h-16 rounded-full bg-white border-4 border-amber-400 disabled:opacity-40 flex items-center justify-center active:scale-95 transition-transform">
-            {saving ? <span className="text-[10px] font-bold text-black">…</span> : <span className="w-12 h-12 rounded-full bg-amber-400 block" />}
-          </button>
-          <button onClick={() => setGrid(!grid)} className={`p-3 rounded-full ${grid ? 'bg-amber-400 text-black' : 'bg-black/50 text-white'}`}>
-            <Grid3x3 size={20} />
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="p-4 sm:p-6 max-w-5xl mx-auto">
-      <div className="mb-4">
-        <h1 className="text-2xl font-bold text-gray-900">Director's Viewfinder</h1>
-        <p className="text-gray-500 text-sm">Preview real sensor + lens fields of view with your phone camera, and capture scouting frames.</p>
       </div>
 
-      <div ref={stageWrapRef} className="bg-zinc-950 rounded-2xl overflow-hidden border border-zinc-800">
-        {stage}
-
-        {/* Controls */}
-        <div className="p-3 space-y-2.5">
-          {controlRows}
-          <div className="flex flex-wrap gap-2 items-center">
-            <div className="flex-1" />
-            <button onClick={enterImmersive} className="flex items-center gap-1.5 text-black text-xs font-semibold px-3 py-2 rounded-xl bg-amber-400 hover:bg-amber-300">
-              <Maximize2 size={13} /> Full screen
-            </button>
-            {live && (
-              <button onClick={stop} className="flex items-center gap-1.5 text-zinc-400 text-xs px-3 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700"><VideoOff size={13} /> Stop</button>
-            )}
-            <button onClick={capture} disabled={!live || saving} className="flex items-center gap-1.5 bg-amber-400 text-black px-4 py-2 rounded-xl text-sm font-semibold hover:bg-amber-300 disabled:opacity-40">
-              <Video size={15} /> {saving ? 'Saving…' : 'Capture frame'}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {iosTip && (
+      {!immersive && iosTip && (
         <div className="mt-3 flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5 text-xs text-amber-800">
           <Smartphone size={14} className="shrink-0 mt-0.5" />
           <span>Tip: add PRO-LOGIC to your Home Screen (<b>Share → Add to Home Screen</b>) and use the <b>Full screen</b> button — the viewfinder takes the entire display.</span>
@@ -308,7 +310,7 @@ export default function ViewfinderPage() {
       )}
 
       {/* Captured frames */}
-      {prodShots.length > 0 && (
+      {!immersive && prodShots.length > 0 && (
         <div className="mt-5">
           <div className="text-sm font-semibold text-gray-900 mb-2">Scouting frames {prodId ? 'for this production' : ''}</div>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
