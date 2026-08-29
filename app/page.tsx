@@ -178,10 +178,10 @@ export default function LandingPage() {
       <section className="border-y border-white/10 py-10 sm:py-14 px-4 bg-zinc-900/60 backdrop-blur-sm">
         <div className="max-w-5xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-6 sm:gap-10 text-center">
           {[
-            { value: '12+', label: 'Production tools' },
-            { value: '9',   label: 'Checklist categories' },
-            { value: '7',   label: 'PDF document types' },
-            { value: '∞',   label: 'Productions on Studio plan' },
+            { value: '25+', label: 'Production tools' },
+            { value: '30',  label: 'PDF documents' },
+            { value: '15+', label: 'Live sports leagues' },
+            { value: '∞',   label: 'Productions on paid plans' },
           ].map(({ value, label }) => (
             <div key={label}>
               <div className="text-3xl sm:text-5xl font-black text-white mb-1">{value}</div>
@@ -415,7 +415,7 @@ export default function LandingPage() {
                   <button
                     onClick={() => handleSubscribe(planKey)}
                     disabled={checkingOut !== null}
-                    className={`flex items-center justify-center gap-2 py-3.5 rounded-xl text-sm font-bold transition-all disabled:opacity-60 ${highlight ? 'bg-zinc-950 text-white hover:bg-zinc-800' : 'border border-white/15 text-white hover:bg-white/10 hover:border-white/30'}`}>
+                    className={`flex items-center justify-center gap-2 py-3.5 px-2 rounded-xl text-sm font-bold whitespace-nowrap transition-all disabled:opacity-60 ${highlight ? 'bg-zinc-950 text-white hover:bg-zinc-800' : 'border border-white/15 text-white hover:bg-white/10 hover:border-white/30'}`}>
                     {checkingOut === planKey
                       ? <><Loader2 size={15} className="animate-spin" /> Redirecting…</>
                       : <><CreditCard size={15} /> {cta}</>}
