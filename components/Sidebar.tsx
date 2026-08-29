@@ -8,7 +8,7 @@ import {
   BookImage, FileText, CreditCard, LogOut, User,
   Layout, Clapperboard, CheckSquare, CalendarDays,
   Truck, Building2, IdCard, UserCheck, Layers, ClipboardCheck, Mic,
-  ListOrdered, Shield, Tv, MonitorPlay, ChevronLeft, ChevronRight, Wallet,
+  ListOrdered, Shield, Tv, MonitorPlay, ChevronLeft, ChevronRight, Wallet, FileCheck, Brush,
 } from 'lucide-react';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
@@ -23,6 +23,7 @@ const nav = [
   { section: 'Production' },
   { href: '/productions', label: 'Productions', icon: Film },
   { href: '/storyboard', label: 'Storyboard', icon: Layers },
+  { href: '/creative', label: 'Creative', icon: Brush },
   { href: '/stripboard', label: 'Stripboard', icon: BookImage },
   { href: '/blueprint', label: 'Blueprint', icon: Layout },
   { href: '/shoot-log', label: 'Shoot Log', icon: Clapperboard },
@@ -31,6 +32,7 @@ const nav = [
   { href: '/live-graphics', label: 'Live Graphics', icon: MonitorPlay },
   { href: '/safety', label: 'Safety', icon: Shield },
   { href: '/budget', label: 'Budget', icon: Wallet },
+  { href: '/compliance', label: 'Permits & Insurance', icon: FileCheck },
   { section: 'Audio' },
   { href: '/audio', label: 'Audio Planner', icon: Mic },
   { section: 'Team' },

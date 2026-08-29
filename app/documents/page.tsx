@@ -9,7 +9,7 @@ import {
   FileText, Users, MapPin, Film, Shield, UserCheck,
   ClipboardList, Printer, Eye, Download, X,
   FileSignature, CalendarDays, ListOrdered, Package, DollarSign, ShoppingCart, Receipt,
-  UtensilsCrossed, CloudRain, Plane, PackageCheck, Layers,
+  UtensilsCrossed, CloudRain, Plane, PackageCheck, Layers, FileCheck, Brush, BookImage,
 } from 'lucide-react';
 import { useNamespace } from '@/hooks/useNamespace';
 import { generateCallSheet } from '@/lib/pdf/callsheet';
@@ -32,6 +32,9 @@ import { generateWeatherContingency } from '@/lib/pdf/weather-contingency';
 import { generateTravelAccommodation } from '@/lib/pdf/travel-accommodation';
 import { generateDeliverables } from '@/lib/pdf/deliverables';
 import { generateSceneBreakdown } from '@/lib/pdf/scene-breakdown';
+import { generateComplianceStatus } from '@/lib/pdf/compliance';
+import { generateTreatment } from '@/lib/pdf/treatment';
+import { generateLookBook } from '@/lib/pdf/lookbook';
 
 const DOCS = [
   { id: 'call-sheet', title: 'Call Sheet', desc: 'Daily production schedule for cast & crew', icon: ClipboardList, color: 'bg-blue-50 text-blue-600', generate: generateCallSheet },
@@ -53,6 +56,9 @@ const DOCS = [
   { id: 'travel-accommodation', title: 'Travel & Accommodation', desc: 'Crew grid: arrivals, hotels, rooms', icon: Plane, color: 'bg-fuchsia-50 text-fuchsia-600', generate: generateTravelAccommodation },
   { id: 'scene-breakdown', title: 'Scene Breakdown Sheets', desc: 'One classic breakdown sheet per scene', icon: Layers, color: 'bg-stone-50 text-stone-600', generate: generateSceneBreakdown },
   { id: 'deliverables', title: 'Final Deliverables', desc: 'Spec sheet + delivery checklist with sign-off', icon: PackageCheck, color: 'bg-slate-50 text-slate-600', generate: generateDeliverables },
+  { id: 'compliance-status', title: 'Permits & Insurance Status', desc: 'Every tracked certificate with expiry state', icon: FileCheck, color: 'bg-teal-50 text-teal-600', generate: generateComplianceStatus },
+  { id: 'treatment', title: 'Treatment', desc: 'The written pitch, typeset from Creative', icon: Brush, color: 'bg-yellow-50 text-yellow-700', generate: generateTreatment },
+  { id: 'lookbook', title: 'Look Book / Mood Board', desc: 'Cover, palette swatches and image boards', icon: BookImage, color: 'bg-purple-50 text-purple-600', generate: generateLookBook },
 ];
 
 function DocumentsPageInner() {
@@ -65,6 +71,9 @@ function DocumentsPageInner() {
   const { data: stripboardScenes } = useData('stripboard');
   const { data: budgetLines } = useData('budget_lines');
   const { data: financeDocs } = useData('finance_docs');
+  const { data: complianceDocs } = useData('compliance_docs');
+  const { data: creativeDocs } = useData('creative_docs');
+  const { data: creativeImages } = useData('creative_images');
   const { data: characters } = useData('characters');
   const [selectedProduction, setSelectedProduction] = useState('');
   const [generating, setGenerating] = useState<string | null>(null);
@@ -120,7 +129,7 @@ function DocumentsPageInner() {
     // Filter stripboard scenes and characters to this production
     const prodStrips = stripboardScenes.filter((s: any) => !s.production_id || s.production_id === selectedProduction);
     const prodChars = characters.filter((c: any) => !c.production_id || c.production_id === selectedProduction);
-    return { production, crew: crewWithTimes, locations, inventory, weather, forecast, company, stripboardScenes: prodStrips, characters: prodChars, budgetLines, financeDocs };
+    return { production, crew: crewWithTimes, locations, inventory, weather, forecast, company, stripboardScenes: prodStrips, characters: prodChars, budgetLines, financeDocs, complianceDocs, creativeDocs, creativeImages };
   };
 
   const handlePreview = async (docItem: typeof DOCS[0]) => {

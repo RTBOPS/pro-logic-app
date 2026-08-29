@@ -13,6 +13,9 @@ export type PDFContext = {
   characters?: any[];
   budgetLines?: any[];
   financeDocs?: any[];
+  complianceDocs?: any[];
+  creativeDocs?: any[];
+  creativeImages?: any[];
 };
 
 export function createDoc(orientation: 'p' | 'l' = 'p'): jsPDF {
