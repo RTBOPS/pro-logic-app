@@ -49,6 +49,7 @@ export async function GET(req: NextRequest) {
     });
     out.push({
       code: a.id, name: a.data().name || '', email: a.data().email || '',
+      paypal_email: a.data().paypal_email || '',
       active: a.data().active !== false,
       signups: refs.size, pending: Math.round(pending * 100) / 100,
       paid: Math.round(paid * 100) / 100, commissions,

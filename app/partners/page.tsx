@@ -18,6 +18,7 @@ export default function PartnersPage() {
   const { user, profile, loading } = useAuth();
   const [aff, setAff] = useState<any | null | undefined>(undefined); // undefined = loading
   const [codeInput, setCodeInput] = useState('');
+  const [paypalInput, setPaypalInput] = useState('');
   const [joining, setJoining] = useState(false);
   const [joinError, setJoinError] = useState('');
   const [referrals, setReferrals] = useState<any[]>([]);
@@ -25,6 +26,10 @@ export default function PartnersPage() {
   const [copied, setCopied] = useState(false);
   const [adminData, setAdminData] = useState<any | null>(null);
   const [marking, setMarking] = useState('');
+
+  useEffect(() => {
+    if (!paypalInput && (profile?.email || user?.email)) setPaypalInput(profile?.email || user?.email || '');
+  }, [profile, user]);
 
   // Find my partner profile
   useEffect(() => {
@@ -70,6 +75,8 @@ export default function PartnersPage() {
     if (!user) return;
     const code = codeInput.trim().toLowerCase();
     if (!/^[a-z0-9-]{3,24}$/.test(code)) { setJoinError('3–24 characters: letters, numbers and dashes.'); return; }
+    const paypal = paypalInput.trim().toLowerCase();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(paypal)) { setJoinError('A valid PayPal email is required — commissions are paid there.'); return; }
     setJoining(true); setJoinError('');
     try {
       const existing = await getDoc(doc(db, 'affiliates', code));
@@ -78,6 +85,7 @@ export default function PartnersPage() {
         uid: user.uid,
         name: profile?.displayName || '',
         email: profile?.email || user.email || '',
+        paypal_email: paypal,
         active: true,
         created: new Date().toISOString(),
       };
@@ -130,16 +138,22 @@ export default function PartnersPage() {
           <p className="text-sm text-gray-500 mb-4">
             Pick your referral code. You'll get a personal link — anyone who signs up through it and
             subscribes earns you <strong>10% of everything they pay for 12 months</strong>, tracked
-            automatically from real payments. Payouts monthly via PayPal.
+            automatically from real payments. Payouts are sent monthly <strong>to your PayPal</strong> —
+            PayPal-to-PayPal, no transfer fees.
           </p>
-          <div className="flex gap-2">
-            <div className="flex items-center border border-gray-200 rounded-xl px-3 flex-1">
+          <div className="space-y-2">
+            <div className="flex items-center border border-gray-200 rounded-xl px-3">
               <span className="text-sm text-gray-400">pro-logic.studio/?ref=</span>
               <input value={codeInput} onChange={e => setCodeInput(e.target.value)} placeholder="carol"
                 className="flex-1 py-2 text-sm focus:outline-none min-w-0" />
             </div>
-            <button onClick={join} disabled={joining} className="bg-gray-900 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-black disabled:opacity-40">
-              {joining ? 'Creating…' : 'Join'}
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">PayPal email (required — payouts go here)</label>
+              <input value={paypalInput} onChange={e => setPaypalInput(e.target.value)} placeholder="you@paypal-email.com"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-gray-900" />
+            </div>
+            <button onClick={join} disabled={joining} className="w-full bg-gray-900 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-black disabled:opacity-40">
+              {joining ? 'Creating…' : 'Join the program'}
             </button>
           </div>
           {joinError && <p className="text-xs text-red-500 mt-2">{joinError}</p>}
@@ -208,6 +222,9 @@ export default function PartnersPage() {
             </div>
           )}
 
+          <p className="text-xs text-gray-500">
+            Payouts go to PayPal: <span className="font-medium text-gray-700">{aff.paypal_email || aff.email}</span>
+          </p>
           <p className="text-xs text-gray-400">
             Commissions are recorded automatically from confirmed payments (10% of each payment during the
             customer's first 12 months, before payment-processor fees and taxes). Payouts are sent monthly
@@ -227,7 +244,7 @@ export default function PartnersPage() {
                 <div className="flex-1 min-w-[160px]">
                   <span className="font-mono font-semibold text-gray-900">{a.code}</span>
                   <span className="text-gray-500 ml-2">{a.name}</span>
-                  <div className="text-xs text-gray-400">{a.email} · {a.signups} sign-ups</div>
+                  <div className="text-xs text-gray-400">PayPal: {a.paypal_email || a.email} · {a.signups} sign-ups</div>
                 </div>
                 <div className="text-xs text-gray-500">Pending <span className="font-semibold text-amber-600 tabular-nums">{money(a.pending)}</span></div>
                 <div className="text-xs text-gray-500">Paid <span className="font-semibold text-green-700 tabular-nums">{money(a.paid)}</span></div>
