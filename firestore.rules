@@ -45,7 +45,8 @@ service cloud.firestore {
         && request.resource.data.get('plan', 'free') == resource.data.get('plan', 'free')
         && request.resource.data.get('planStatus', '') == resource.data.get('planStatus', '')
         && request.resource.data.get('paypalSubscriptionId', '') == resource.data.get('paypalSubscriptionId', '')
-        && request.resource.data.get('event_pass_until', '') == resource.data.get('event_pass_until', '');
+        && request.resource.data.get('event_pass_until', '') == resource.data.get('event_pass_until', '')
+        && request.resource.data.get('referredBy', '') == resource.data.get('referredBy', '');
     }
 
     // ── Invites ──
@@ -86,6 +87,28 @@ service cloud.firestore {
             .affectedKeys().hasOnly(['confirmation_status'])
           && request.resource.data.snapshot.confirmation_status in ['confirmed', 'declined']
         );
+    }
+
+    // ── Affiliate program ──
+    // A signed-in user claims a code once; commissions are written only by
+    // the server (Admin SDK). Referral records are created by the referred
+    // user at signup, keyed by their own uid.
+    match /affiliates/{code} {
+      allow read: if signedIn();
+      allow create: if signedIn() && request.resource.data.uid == request.auth.uid;
+      allow update, delete: if signedIn() && resource.data.uid == request.auth.uid;
+
+      match /referrals/{ruid} {
+        allow read: if signedIn()
+          && get(/databases/$(database)/documents/affiliates/$(code)).data.uid == request.auth.uid;
+        allow create: if signedIn() && ruid == request.auth.uid
+          && request.resource.data.uid == request.auth.uid;
+      }
+
+      match /commissions/{txn} {
+        allow read: if signedIn()
+          && get(/databases/$(database)/documents/affiliates/$(code)).data.uid == request.auth.uid;
+      }
     }
 
     // ── Proposal tokens ──

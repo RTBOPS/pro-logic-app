@@ -10,7 +10,7 @@ import { useCompany } from '@/hooks/useCompany';
 import { useAuth } from '@/hooks/useAuth';
 import { Menu, X } from 'lucide-react';
 
-const PUBLIC_PATHS = ['/', '/auth', '/confirm', '/callsheet', '/graphics-out'];
+const PUBLIC_PATHS = ['/', '/auth', '/confirm', '/callsheet', '/graphics-out', '/proposal'];
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const path = usePathname();
@@ -23,6 +23,19 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   // Close sidebar on route change
   useEffect(() => { setSidebarOpen(false); }, [path]);
+
+  // Referral capture: ?ref=code sticks for 30 days (first touch wins while fresh)
+  useEffect(() => {
+    try {
+      const code = new URLSearchParams(window.location.search).get('ref');
+      if (code && /^[a-z0-9-]{3,24}$/i.test(code)) {
+        const cur = JSON.parse(localStorage.getItem('plg_ref') || 'null');
+        if (!cur || Date.now() - (cur.at || 0) > 30 * 86400000) {
+          localStorage.setItem('plg_ref', JSON.stringify({ code: code.toLowerCase(), at: Date.now() }));
+        }
+      }
+    } catch {}
+  }, []);
 
   if (isPublic) return <>{children}</>;
 

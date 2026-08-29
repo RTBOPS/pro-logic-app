@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
+import { recordCommission } from '@/lib/affiliate-server';
 
 /* PayPal redirects the buyer here after approving an Event Pass order.
  * We capture the order server-side; the uid comes from the order's own
@@ -58,6 +59,8 @@ export async function GET(req: NextRequest) {
       event_pass_order: orderId,
       event_pass_purchased_at: new Date().toISOString(),
     }, { merge: true });
+
+    await recordCommission(adminDb(), uid, 79, 'event_pass', orderId, 'Event Pass');
 
     return NextResponse.redirect(`${appUrl}/live-graphics?eventpass=active`);
   } catch (e: any) {

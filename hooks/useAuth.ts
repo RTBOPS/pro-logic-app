@@ -14,6 +14,9 @@ export interface UserProfile {
   displayName: string;
   plan: Plan;
   createdAt: string;
+  referredBy?: string;
+  event_pass_until?: string;
+  [key: string]: any;
 }
 
 export function useAuth() {
@@ -31,14 +34,29 @@ export function useAuth() {
           if (snap.exists()) {
             setProfile(snap.data() as UserProfile);
           } else {
+            let referredBy: string | undefined;
+            try {
+              const r = JSON.parse(localStorage.getItem('plg_ref') || 'null');
+              if (r?.code && Date.now() - (r.at || 0) < 30 * 86400000) referredBy = r.code;
+            } catch {}
             const newProfile: UserProfile = {
               uid: firebaseUser.uid,
               email: firebaseUser.email || '',
               displayName: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'User',
               plan: 'free',
               createdAt: new Date().toISOString(),
+              ...(referredBy ? { referredBy } : {}),
             };
             await setDoc(ref, newProfile);
+            if (referredBy) {
+              try {
+                await setDoc(doc(db, 'affiliates', referredBy, 'referrals', firebaseUser.uid), {
+                  uid: firebaseUser.uid,
+                  name: newProfile.displayName,
+                  at: new Date().toISOString(),
+                });
+              } catch {}
+            }
             setProfile(newProfile);
           }
         } else {

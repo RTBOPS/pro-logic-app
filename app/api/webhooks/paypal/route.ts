@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
+import { recordCommission } from '@/lib/affiliate-server';
 
 function getAdminDb() {
   if (!getApps().length) {
@@ -150,6 +151,24 @@ export async function POST(req: NextRequest) {
             },
             { merge: true }
           );
+        }
+        break;
+      }
+
+      case 'PAYMENT.SALE.COMPLETED': {
+        // Recurring subscription payment. `custom` carries the uid we set at
+        // subscription creation; fall back to a lookup by subscription id.
+        let saleUid: string | undefined = resource.custom || resource.custom_id;
+        const agreementId = resource.billing_agreement_id;
+        if (!saleUid && agreementId) {
+          const q = await db.collection('users')
+            .where('paypalSubscriptionId', '==', agreementId).limit(1).get();
+          saleUid = q.docs[0]?.id;
+        }
+        const total = parseFloat(resource.amount?.total || '0');
+        if (saleUid && total > 0) {
+          const plan = (await db.doc(`users/${saleUid}`).get()).data()?.plan || 'subscription';
+          await recordCommission(db, saleUid, total, 'subscription', resource.id, String(plan));
         }
         break;
       }
