@@ -137,7 +137,7 @@ export default function Sidebar({ forceExpanded = false }: { forceExpanded?: boo
       )}
 
       <nav className="flex-1 py-2">
-        {nav.filter((item: any) => !item.adminOnly || profile?.email === 'rtbops@gmail.com').map((item, i) => {
+        {nav.filter((item: any) => !item.adminOnly || profile?.email === 'marketing@pro-logic.studio').map((item, i) => {
           if ('section' in item) {
             if (collapsed) return <div key={i} className="mx-3 my-2 border-t border-white/10" />;
             return (

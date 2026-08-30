@@ -28,7 +28,7 @@ async function requireAdmin(req: NextRequest) {
   if (!idToken) return null;
   try {
     const decoded = await admin().auth.verifyIdToken(idToken);
-    const admins = (process.env.ADMIN_EMAILS || 'rtbops@gmail.com')
+    const admins = (process.env.ADMIN_EMAILS || 'marketing@pro-logic.studio')
       .split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
     return decoded.email && admins.includes(decoded.email.toLowerCase()) ? decoded : null;
   } catch { return null; }
