@@ -8,6 +8,9 @@ import { useEffect, useState } from 'react';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useNamespace } from '@/hooks/useNamespace';
+import { useAuth } from '@/hooks/useAuth';
+import { removeSampleData } from '@/lib/sample-data';
+import { Sparkles } from 'lucide-react';
 import { auth } from '@/lib/firebase';
 
 const STATUS_COLOR: Record<string, string> = {
@@ -28,6 +31,16 @@ const TOTAL_DEFAULT_ITEMS = Object.values(DEFAULT_ITEM_COUNTS).reduce((a, b) => 
 
 export default function Dashboard() {
   const namespace = useNamespace();
+  const { user, profile } = useAuth();
+  const [clearing, setClearing] = useState(false);
+  const [sampleGone, setSampleGone] = useState(false);
+  const clearSample = async () => {
+    const uid = namespace || user?.uid;
+    if (!uid || !confirm('Remove all sample data? Your own data is not affected.')) return;
+    setClearing(true);
+    try { await removeSampleData(uid); setSampleGone(true); window.location.reload(); }
+    finally { setClearing(false); }
+  };
   const getUid = () => namespace || auth.currentUser?.uid || null;
   const { data: productions, loading: lp } = useData('productions');
   const { data: crew, loading: lc } = useData('crew');
@@ -115,6 +128,19 @@ export default function Dashboard() {
 
   return (
     <div className="p-4 md:p-8">
+      {profile?.hasSampleData && !sampleGone && (
+        <div className="mb-4 flex flex-wrap items-center gap-3 bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3">
+          <Sparkles size={16} className="text-amber-500 shrink-0" />
+          <p className="text-sm text-amber-800 flex-1 min-w-[220px]">
+            You're looking at <b>sample data</b> — a ready-made production so you can try call sheets,
+            budgets and documents right away. Remove it whenever you're ready to start your own.
+          </p>
+          <button onClick={clearSample} disabled={clearing}
+            className="bg-amber-500 text-white text-xs font-semibold px-3 py-2 rounded-xl hover:bg-amber-600 disabled:opacity-50">
+            {clearing ? 'Removing…' : 'Remove sample data'}
+          </button>
+        </div>
+      )}
       {activating === 'pending' && (
         <div className="mb-6 bg-blue-50 border border-blue-200 text-blue-800 rounded-2xl px-5 py-3.5 text-sm flex items-center gap-3">
           <div className="w-4 h-4 border-2 border-blue-300 border-t-blue-700 rounded-full animate-spin shrink-0" />

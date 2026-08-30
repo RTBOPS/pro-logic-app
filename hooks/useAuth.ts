@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { seedSampleData } from '@/lib/sample-data';
 import { auth, db } from '@/lib/firebase';
 
 // 'pro' is the legacy name of the old $29 all-in plan; it ranks like broadcast.
@@ -45,9 +46,13 @@ export function useAuth() {
               displayName: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'User',
               plan: 'free',
               createdAt: new Date().toISOString(),
+              hasSampleData: true,
               ...(referredBy ? { referredBy } : {}),
             };
             await setDoc(ref, newProfile);
+            // A populated app sells itself — every new account starts with a
+            // sample production they can remove in one click.
+            try { await seedSampleData(firebaseUser.uid); } catch {}
             if (referredBy) {
               try {
                 await setDoc(doc(db, 'affiliates', referredBy, 'referrals', firebaseUser.uid), {

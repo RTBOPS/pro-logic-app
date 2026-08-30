@@ -8,7 +8,7 @@ import {
   BookImage, FileText, CreditCard, LogOut, User,
   Layout, Clapperboard, CheckSquare, CalendarDays,
   Truck, Building2, IdCard, UserCheck, Layers, ClipboardCheck, Mic,
-  ListOrdered, Shield, Tv, MonitorPlay, ChevronLeft, ChevronRight, Wallet, FileCheck, Brush, Sunrise, Aperture, Handshake, Megaphone, BookOpen,
+  ListOrdered, Shield, Tv, MonitorPlay, ChevronLeft, ChevronRight, Wallet, FileCheck, Brush, Sunrise, Aperture, Handshake, Megaphone, BookOpen, ShieldCheck,
 } from 'lucide-react';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
@@ -34,6 +34,7 @@ const nav = [
   { href: '/clients', label: 'Clients', icon: Handshake },
   { href: '/partners', label: 'Partners', icon: Megaphone },
   { href: '/manual/index.html', label: 'User Manual', icon: BookOpen },
+  { href: '/admin', label: 'Admin', icon: ShieldCheck, adminOnly: true },
   { href: '/budget', label: 'Budget', icon: Wallet },
   { href: '/compliance', label: 'Permits & Insurance', icon: FileCheck },
   { section: 'Audio' },
@@ -136,7 +137,7 @@ export default function Sidebar({ forceExpanded = false }: { forceExpanded?: boo
       )}
 
       <nav className="flex-1 py-2">
-        {nav.map((item, i) => {
+        {nav.filter((item: any) => !item.adminOnly || profile?.email === 'rtbops@gmail.com').map((item, i) => {
           if ('section' in item) {
             if (collapsed) return <div key={i} className="mx-3 my-2 border-t border-white/10" />;
             return (
