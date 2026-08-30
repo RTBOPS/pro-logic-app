@@ -65,7 +65,7 @@ export async function GET(req: NextRequest) {
       planStatus: u.planStatus || '',
       paypalPlanId: u.paypalPlanId || '',
       mrr: u.planStatus === 'active' ? planMonthly(u.paypalPlanId) : 0,
-      createdAt: u.createdAt || '',
+      createdAt: typeof u.createdAt === 'string' ? u.createdAt : (u.createdAt?.toDate?.().toISOString?.() || ''),
       referredBy: u.referredBy || '',
       eventPassUntil: u.event_pass_until || '',
       eventPassAt: u.event_pass_purchased_at || '',
@@ -83,7 +83,7 @@ export async function GET(req: NextRequest) {
   const now = Date.now();
   const passes = users.filter(u => u.eventPassAt);
   const passes30d = passes.filter(u => now - new Date(u.eventPassAt).getTime() < 30 * 86400000).length;
-  const signups30d = users.filter(u => u.createdAt && now - new Date(u.createdAt).getTime() < 30 * 86400000).length;
+  const signups30d = users.filter(u => u.createdAt && now - new Date(String(u.createdAt)).getTime() < 30 * 86400000).length;
 
   // ── Affiliate liability ──
   let pendingCommissions = 0, paidCommissions = 0;
@@ -117,7 +117,7 @@ export async function GET(req: NextRequest) {
     storageError = e?.message || 'storage listing failed';
   }
 
-  users.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+  users.sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
 
   return NextResponse.json({
     summary: {
