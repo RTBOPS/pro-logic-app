@@ -153,7 +153,7 @@ function ControlInner() {
     if (!file || !uid) return;
     setUploading(true);
     try {
-      const path = `graphics_projections/${uid}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+      const path = `graphics_projections/${auth.currentUser?.uid}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
       const snap = await uploadBytes(storageRef(storage, path), file);
       const url = await getDownloadURL(snap.ref);
       setProjCfg(c => ({ ...c, url, kind: file.type.startsWith('video') ? 'video' : 'image' }));
@@ -620,7 +620,7 @@ function ControlInner() {
     if (!file || !uid) return;
     setUploading(true);
     try {
-      const path = `graphics_banners/${uid}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+      const path = `graphics_banners/${auth.currentUser?.uid}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
       const snap = await uploadBytes(storageRef(storage, path), file);
       const url = await getDownloadURL(snap.ref);
       setBanners(b => [...b, { id: Math.random().toString(36).slice(2, 10), url, name: file.name }]);
@@ -635,7 +635,7 @@ function ControlInner() {
     if (!file || !uid) return;
     setUploading(true);
     try {
-      const path = `graphics_banners/${uid}/centerlogo_${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+      const path = `graphics_banners/${auth.currentUser?.uid}/centerlogo_${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
       const snap = await uploadBytes(storageRef(storage, path), file);
       const url = await getDownloadURL(snap.ref);
       setBanners(b => [...b, { id: Math.random().toString(36).slice(2, 10), url, name: file.name }]);
@@ -651,7 +651,7 @@ function ControlInner() {
     if (!file || !uid) return;
     setUploading(true);
     try {
-      const path = `graphics_banners/${uid}/portalfx_${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+      const path = `graphics_banners/${auth.currentUser?.uid}/portalfx_${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
       const snap = await uploadBytes(storageRef(storage, path), file);
       const url = await getDownloadURL(snap.ref);
       setPortalCfg(c => ({ ...c, video: url }));
@@ -665,7 +665,7 @@ function ControlInner() {
     const uid = auth.currentUser?.uid;
     if (!file || !uid) return;
     try {
-      const path = `graphics_banners/${uid}/person_${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+      const path = `graphics_banners/${auth.currentUser?.uid}/person_${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
       const snap = await uploadBytes(storageRef(storage, path), file);
       assign(await getDownloadURL(snap.ref));
     } catch (err: any) { alert('Upload failed: ' + err.message); }
@@ -676,7 +676,7 @@ function ControlInner() {
     const uid = auth.currentUser?.uid;
     if (!uid) return;
     const ext = (blob.type.split('/')[1] || 'png').replace('jpeg', 'jpg');
-    const path = `graphics_banners/${uid}/mug_${Date.now()}.${ext}`;
+    const path = `graphics_banners/${auth.currentUser?.uid}/mug_${Date.now()}.${ext}`;
     const snap = await uploadBytes(storageRef(storage, path), blob);
     assign(await getDownloadURL(snap.ref));
   };
@@ -791,7 +791,7 @@ function ControlInner() {
     const uid = auth.currentUser?.uid;
     if (!file || !uid) return;
     try {
-      const path = `graphics_banners/${uid}/logo_${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+      const path = `graphics_banners/${auth.currentUser?.uid}/logo_${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
       const snap = await uploadBytes(storageRef(storage, path), file);
       const url = await getDownloadURL(snap.ref);
       mTeam(side, { logo: url }, true);

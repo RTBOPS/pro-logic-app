@@ -1,11 +1,16 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-    // Uploads and SDK reads require a signed-in user. Public pages (call
-    // sheets, confirmations) load images through tokenized download URLs,
-    // which keep working regardless of these rules.
-    match /{allPaths=**} {
-      allow read, write: if request.auth != null;
+    // Every object lives under its uploader's own uid: {folder}/{uid}/...
+    // Only that user may read or write it through the SDK. Public pages
+    // (call sheets, confirmations, live graphics output) render images from
+    // tokenized download URLs, which keep working regardless of these rules.
+    match /{folder}/{uid}/{allPaths=**} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if request.auth != null
+        && request.auth.uid == uid
+        && request.resource.size < 25 * 1024 * 1024;
+      allow delete: if request.auth != null && request.auth.uid == uid;
     }
   }
 }

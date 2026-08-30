@@ -79,8 +79,6 @@ export default function PartnersPage() {
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(paypal)) { setJoinError('A valid PayPal email is required — commissions are paid there.'); return; }
     setJoining(true); setJoinError('');
     try {
-      const existing = await getDoc(doc(db, 'affiliates', code));
-      if (existing.exists()) { setJoinError('That code is taken — try another.'); setJoining(false); return; }
       const data = {
         uid: user.uid,
         name: profile?.displayName || '',
@@ -92,7 +90,10 @@ export default function PartnersPage() {
       await setDoc(doc(db, 'affiliates', code), data);
       setAff({ code, ...data });
     } catch (e: any) {
-      setJoinError(e?.message || 'Could not create your code.');
+      const msg = /permission|insufficient/i.test(e?.message || '')
+        ? 'That code is taken — try another.'
+        : (e?.message || 'Could not create your code.');
+      setJoinError(msg);
     } finally { setJoining(false); }
   };
 

@@ -7,7 +7,7 @@ import {
   Square, Circle as CircleIcon, Minus, PenLine, MousePointer,
   ImagePlus, Type, Bold, Italic,
 } from 'lucide-react';
-import { storage } from '@/lib/firebase';
+import { storage, auth } from '@/lib/firebase';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 export interface BlueprintItem {
@@ -739,7 +739,7 @@ export default function BlueprintCanvas({
 
       // Upload to Firebase Storage if productionId provided
       if (productionId && storage) {
-        const ref = storageRef(storage, `blueprints/${productionId}/background`);
+        const ref = storageRef(storage, `blueprints/${auth.currentUser?.uid}/${productionId}/background`);
         await uploadBytes(ref, file);
       }
     } finally {

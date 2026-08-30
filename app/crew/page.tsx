@@ -152,7 +152,7 @@ export default function CrewPage() {
     const file = e.target.files?.[0];
     if (!file) return;
     setUploading(true);
-    const path = `crew/${Date.now()}_${file.name}`;
+    const path = `crew/${auth.currentUser?.uid}/${Date.now()}_${file.name}`;
     const snap = await uploadBytes(storageRef(storage, path), file);
     const url = await getDownloadURL(snap.ref);
     setForm(f => ({ ...f, picture: url }));

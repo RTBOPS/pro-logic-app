@@ -19,6 +19,7 @@ function adminDb() {
   return getFirestore();
 }
 
+const EVENT_PASS_PRICE = '79.00';
 const EVENT_PASS_HOURS = 96; // 4 days: covers a full event weekend
 
 export async function GET(req: NextRequest) {
@@ -45,8 +46,16 @@ export async function GET(req: NextRequest) {
     });
     const cap = await capRes.json();
     const completed = cap.status === 'COMPLETED';
-    const uid = cap.purchase_units?.[0]?.payments?.captures?.[0]?.custom_id
-      || cap.purchase_units?.[0]?.custom_id;
+    const capture = cap.purchase_units?.[0]?.payments?.captures?.[0];
+    const uid = capture?.custom_id || cap.purchase_units?.[0]?.custom_id;
+    // Verify the money actually paid — never grant on an attacker-crafted
+    // underpaid order. Amount and currency must match the Event Pass price.
+    const paid = capture?.amount?.value;
+    const currency = capture?.amount?.currency_code;
+    if (completed && (paid !== EVENT_PASS_PRICE || currency !== 'USD')) {
+      console.error('Event pass amount mismatch:', paid, currency);
+      return NextResponse.redirect(`${appUrl}/pricing?eventpass=error`);
+    }
 
     if (!completed || !uid) {
       console.error('Event pass capture failed:', JSON.stringify(cap).slice(0, 500));

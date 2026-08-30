@@ -40,7 +40,7 @@ export default function TransportationPage() {
     try {
       const urls: string[] = [];
       for (const file of Array.from(files)) {
-        const path = `transportation/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+        const path = `transportation/${auth.currentUser?.uid}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
         const snap = await uploadBytes(storageRef(storage, path), file);
         urls.push(await getDownloadURL(snap.ref));
       }

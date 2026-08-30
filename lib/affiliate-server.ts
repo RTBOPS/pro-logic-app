@@ -22,6 +22,8 @@ export async function recordCommission(
 
     const aff = await db.doc(`affiliates/${code}`).get();
     if (!aff.exists || aff.data()?.active === false) return;
+    // No self-referral: a partner can't earn commission on their own purchases.
+    if (aff.data()?.uid === uid) return;
 
     // 12-month window starts at the buyer's first commissioned payment.
     let start = user.referralWindowStart as string | undefined;

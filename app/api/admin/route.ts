@@ -7,6 +7,8 @@ import { getStorage } from 'firebase-admin/storage';
 /* Owner-only operations dashboard: accounts, revenue, event passes,
  * affiliate liability and storage consumption. */
 
+const BUCKET = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || 'prologicstudio-4a6f5.firebasestorage.app';
+
 function admin() {
   if (!getApps().length) {
     initializeApp({
@@ -15,8 +17,7 @@ function admin() {
         clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
         privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
       }),
-      storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
-        || 'prologicstudio-4a6f5.firebasestorage.app',
+
     });
   }
   return { auth: getAuth(), db: getFirestore(), storage: getStorage() };
@@ -102,7 +103,7 @@ export async function GET(req: NextRequest) {
   const byUid: Record<string, number> = {};
   let storageError = '';
   try {
-    const [files] = await storage.bucket().getFiles({ maxResults: 20000 });
+    const [files] = await storage.bucket(BUCKET).getFiles({ maxResults: 20000 });
     for (const f of files) {
       const size = parseInt(String(f.metadata.size || 0), 10) || 0;
       storageTotal += size;

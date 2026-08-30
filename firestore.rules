@@ -40,12 +40,21 @@ service cloud.firestore {
       allow read: if signedIn() && request.auth.uid == uid;
       allow create: if signedIn() && request.auth.uid == uid
         && request.resource.data.get('plan', 'free') == 'free'
-        && !('paypalSubscriptionId' in request.resource.data);
+        && !('paypalSubscriptionId' in request.resource.data)
+        && !('paypalPlanId' in request.resource.data)
+        && !('planStatus' in request.resource.data)
+        && !('planActivatedAt' in request.resource.data)
+        && !('event_pass_until' in request.resource.data)
+        && !('event_pass_order' in request.resource.data)
+        && !('referralWindowStart' in request.resource.data);
       allow update: if signedIn() && request.auth.uid == uid
         && request.resource.data.get('plan', 'free') == resource.data.get('plan', 'free')
         && request.resource.data.get('planStatus', '') == resource.data.get('planStatus', '')
         && request.resource.data.get('paypalSubscriptionId', '') == resource.data.get('paypalSubscriptionId', '')
         && request.resource.data.get('event_pass_until', '') == resource.data.get('event_pass_until', '')
+        && request.resource.data.get('event_pass_order', '') == resource.data.get('event_pass_order', '')
+        && request.resource.data.get('paypalPlanId', '') == resource.data.get('paypalPlanId', '')
+        && request.resource.data.get('referralWindowStart', '') == resource.data.get('referralWindowStart', '')
         && request.resource.data.get('referredBy', '') == resource.data.get('referredBy', '');
     }
 
@@ -94,7 +103,7 @@ service cloud.firestore {
     // the server (Admin SDK). Referral records are created by the referred
     // user at signup, keyed by their own uid.
     match /affiliates/{code} {
-      allow read: if signedIn();
+      allow read: if signedIn() && resource.data.uid == request.auth.uid;
       allow create: if signedIn() && request.resource.data.uid == request.auth.uid;
       allow update, delete: if signedIn() && resource.data.uid == request.auth.uid;
 

@@ -52,7 +52,7 @@ export default function CompliancePage() {
     if (!file || !uid) return;
     setUploading(true);
     try {
-      const path = `compliance/${uid}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+      const path = `compliance/${auth.currentUser?.uid}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
       const snap = await uploadBytes(storageRef(storage, path), file);
       const url = await getDownloadURL(snap.ref);
       setForm(f => ({ ...f, url, filename: file.name, name: f.name || file.name.replace(/\.[^.]+$/, '') }));

@@ -47,7 +47,7 @@ export default function CreativePage() {
     setUploading(true);
     try {
       for (const file of files) {
-        const path = `creative/${uid}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+        const path = `creative/${auth.currentUser?.uid}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
         const snap = await uploadBytes(storageRef(storage, path), file);
         const url = await getDownloadURL(snap.ref);
         await addDoc(collection(db, 'users', ns, 'creative_images'), { production_id: prodId, board: tab, url, caption: '' });

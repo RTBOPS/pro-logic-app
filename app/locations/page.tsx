@@ -54,7 +54,7 @@ export default function LocationsPage() {
       const urls: string[] = [];
       for (const file of Array.from(files)) {
         if (file.size > 10 * 1024 * 1024) { setUploadError('File too large (max 10MB)'); continue; }
-        const path = `locations/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+        const path = `locations/${auth.currentUser?.uid}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
         const snap = await uploadBytes(storageRef(storage, path), file);
         const url = await getDownloadURL(snap.ref);
         urls.push(url);

@@ -132,7 +132,7 @@ export default function ViewfinderPage() {
       canvas.width = Math.round(cw); canvas.height = Math.round(ch);
       canvas.getContext('2d')!.drawImage(video, (vw - cw) / 2, (vh - ch) / 2, cw, ch, 0, 0, canvas.width, canvas.height);
       const blob: Blob = await new Promise(res => canvas.toBlob(b => res(b!), 'image/jpeg', 0.9));
-      const path = `scouting/${uid}/${Date.now()}.jpg`;
+      const path = `scouting/${auth.currentUser?.uid}/${Date.now()}.jpg`;
       const snap = await uploadBytes(storageRef(storage, path), blob);
       const url = await getDownloadURL(snap.ref);
       await addDoc(collection(db, 'users', uid, 'scouting_shots'), {

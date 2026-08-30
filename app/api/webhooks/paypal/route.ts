@@ -77,14 +77,18 @@ async function verifyWebhookSignature(req: NextRequest, body: string): Promise<b
 export async function POST(req: NextRequest) {
   const body = await req.text();
 
-  // Verify whenever a webhook id is configured — NODE_ENV is not a security
-  // boundary (preview deploys are publicly reachable).
-  if (process.env.PAYPAL_WEBHOOK_ID) {
-    const valid = await verifyWebhookSignature(req, body);
-    if (!valid) {
-      console.error('PayPal webhook signature verification failed');
-      return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
-    }
+  // Fail CLOSED: without a configured webhook id we cannot verify authenticity,
+  // and this endpoint writes plans and mints commissions — never trust an
+  // unverifiable body. NODE_ENV is not a security boundary (preview deploys
+  // are publicly reachable).
+  if (!process.env.PAYPAL_WEBHOOK_ID) {
+    console.error('PAYPAL_WEBHOOK_ID not configured — refusing unverifiable webhook');
+    return NextResponse.json({ error: 'Webhook not configured' }, { status: 503 });
+  }
+  const valid = await verifyWebhookSignature(req, body);
+  if (!valid) {
+    console.error('PayPal webhook signature verification failed');
+    return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
   }
 
   let event: any;

@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { db, storage } from '@/lib/firebase';
+import { db, storage, auth } from '@/lib/firebase';
 import { useAuth } from '@/hooks/useAuth';
 import { useWorkspaces } from '@/hooks/useNamespace';
 import { Upload, Building2, Save, UserPlus, Trash2, Users, Share2, Lock } from 'lucide-react';
@@ -74,7 +74,7 @@ export default function CompanyPage() {
     const key = field === 'logo_url' ? 'logo' : 'watermark';
     setUploading(key as any);
     try {
-      const path = `company/${key}_${Date.now()}_${file.name}`;
+      const path = `company/${auth.currentUser?.uid}/${key}_${Date.now()}_${file.name}`;
       const snap = await uploadBytes(storageRef(storage, path), file);
       const url = await getDownloadURL(snap.ref);
       setForm(f => ({ ...f, [field]: url }));
